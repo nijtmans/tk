@@ -13,6 +13,7 @@
 *.sl
 *.so
 .fslckout
+_FOSSIL_
 Makefile
 Tk-Info.plist
 Wish-Info.plist
@@ -58,6 +59,7 @@ unix/tk.pc
 unix/tclIndex
 win/Debug*
 win/Release*
+win/tk.pc
 win/*.manifest
 win/nmakehlp.out
 win/nmhlp-out.txt
