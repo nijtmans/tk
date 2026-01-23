@@ -65,7 +65,7 @@ proc testKey {window event type mods} {
     focus -force $window
     update
     event generate $window $event
-    if {$keyInfo eq {}} {
+    if {$keyInfo == {}} {
 	vwait keyInfo
     }
     set save $keyInfo
@@ -75,10 +75,10 @@ proc testKey {window event type mods} {
 	lappend injectcmd $option
     }
     eval $injectcmd
-    if {$keyInfo eq {}} {
+    if {$keyInfo == {}} {
 	vwait keyInfo
     }
-    if {$save ne $keyInfo} {
+    if {$save != $keyInfo} {
 	return "[format "0x%x" $numericKeysym] ($mods): $save != $keyInfo"
     }
     return pass
@@ -86,19 +86,19 @@ proc testKey {window event type mods} {
 
 proc testKeyWithMods {window keysym type} {
     set result [testKey $window "<$keysym>" $type {}]
-    if {$result ne "pass"} {
+    if {$result != {pass}} {
 	return $result
     }
     set result [testKey $window "<Shift-$keysym>" $type {-shift}]
-    if {$result ne "pass"} {
+    if {$result != {pass}} {
 	return $result
     }
     set result [testKey $window "<Option-$keysym>" $type {-option}]
-    if {$result ne "pass"} {
+    if {$result != {pass}} {
 	return $result
     }
     set result [testKey $window "<Shift-Option-$keysym>" $type {-shift -option}]
-    if {$result ne "pass"} {
+    if {$result != {pass}} {
 	return $result
     }
     return pass
@@ -6990,7 +6990,7 @@ test bind-34.3 {-warp works with null or negative coordinates} -setup {
 test bind-35.0 {Generated and real key events agree} -constraints {aqua} -body {
     foreach k {o O F2 Home Right Greek_sigma Greek_ALPHA} {
 	set result [testKeyWithMods . $k press]
-	if {$result ne "pass"} {
+	if {$result != "pass"} {
 	    return $result
 	}
     }
@@ -7005,7 +7005,7 @@ test bind-35.1 {Key events agree for entry widgets} -constraints {aqua} -setup {
 } -body {
     foreach k {o O F2 Home Right Greek_sigma Greek_ALPHA Menu} {
 	set result [testKeyWithMods .new.e $k press]
-	if {$result ne "pass"} {
+	if {$result != "pass"} {
 	    return $result
 	}
     }
@@ -7052,16 +7052,16 @@ test bind-35.3 {Events agree for modifier keys} -constraints {aqua} -setup {
     } {
 	set keyInfo {}
 	event generate . [lindex $event 0]
-	if {$keyInfo eq {}} {
+	if {$keyInfo == {}} {
 	    vwait keyInfo
 	}
 	set save $keyInfo
 	testinjectkeyevent flagschanged $numericKeysym [lindex $event 1]
-	if {$keyInfo eq {}} {
+	if {$keyInfo == {}} {
 	    vwait keyInfo
 	}
-	if {$save ne $keyInfo} {
-	    return "$save ne $keyInfo"
+	if {$save != $keyInfo} {
+	    return "$save != $keyInfo"
 	}
     }
     return pass
