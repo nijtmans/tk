@@ -137,10 +137,10 @@ ScrollRestrictProc(
     if (eventPtr->type == NoExpose) {
 	info->done = 1;
     } else if (eventPtr->type == GraphicsExpose) {
-	rect.x = (short)eventPtr->xgraphicsexpose.x;
-	rect.y = (short)eventPtr->xgraphicsexpose.y;
-	rect.width = (unsigned short)eventPtr->xgraphicsexpose.width;
-	rect.height = (unsigned short)eventPtr->xgraphicsexpose.height;
+	rect.x = eventPtr->xgraphicsexpose.x;
+	rect.y = eventPtr->xgraphicsexpose.y;
+	rect.width = eventPtr->xgraphicsexpose.width;
+	rect.height = eventPtr->xgraphicsexpose.height;
 	XUnionRectWithRegion(&rect, info->region,
 		info->region);
 
@@ -156,14 +156,14 @@ ScrollRestrictProc(
 	 * area as damaged.
 	 */
 
-	rect.x = (short)eventPtr->xexpose.x;
-	rect.y = (short)eventPtr->xexpose.y;
-	rect.width = (unsigned short)eventPtr->xexpose.width;
-	rect.height = (unsigned short)eventPtr->xexpose.height;
+	rect.x = eventPtr->xexpose.x;
+	rect.y = eventPtr->xexpose.y;
+	rect.width = eventPtr->xexpose.width;
+	rect.height = eventPtr->xexpose.height;
 	XUnionRectWithRegion(&rect, info->region,
 		info->region);
-	rect.x += (short)info->dx;
-	rect.y += (short)info->dy;
+	rect.x += info->dx;
+	rect.y += info->dy;
 	XUnionRectWithRegion(&rect, info->region,
 		info->region);
     } else {

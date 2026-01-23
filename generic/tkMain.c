@@ -250,6 +250,8 @@ Tk_MainEx(
 	 *  -encoding ENCODING FILENAME
 	 * or like
 	 *  FILENAME
+	 * or like
+	 *  -file FILENAME (ancient history support only, removed with Tcl 9.0)
 	 */
 
 	/* mind argc is being adjusted as we proceed */

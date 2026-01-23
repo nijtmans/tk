@@ -185,14 +185,12 @@ MODULE_SCOPE Tcl_Encoding	TkWinGetUnicodeEncoding(void);
 MODULE_SCOPE void		TkWinSetupSystemFonts(TkMainInfo *mainPtr);
 
 /*
- * Values used to be returned by TkWinGetPlatformTheme.
+ * Values returned by TkWinGetPlatformTheme.
  */
 
-#ifndef TK_NO_DEPRECATED
-#   define TK_THEME_WIN_CLASSIC    1
-#   define TK_THEME_WIN_XP         2
-#   define TK_THEME_WIN_VISTA      3
-#endif
+#define TK_THEME_WIN_CLASSIC    1
+#define TK_THEME_WIN_XP         2
+#define TK_THEME_WIN_VISTA      3
 
 /*
  * The following is implemented in tkWinWm and used by tkWinEmbed.c

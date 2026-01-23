@@ -13,10 +13,7 @@
 
 #include "tkWin.h"
 #include <windows.h>
-#include <shlobj.h>
-#include <initguid.h>
 #include <shellapi.h>
-#include <commoncontrols.h>
 
 /*
  * These structures represent the contents of a icon, in terms of its image
@@ -82,7 +79,6 @@ typedef struct {
 DWORD BytesPerLine(LPBITMAPINFOHEADER lpBMIH);
 LPSTR FindDIBBits(LPSTR lpbi);
 HICON CreateIcoFromPhoto(int width, int height, Tk_PhotoImageBlock block);
-int GetFileIcon(ClientData cdata, Tcl_Interp *interp, int objc,  Tcl_Obj * const objv[]);
 
 
 /*

@@ -178,7 +178,7 @@ Tk_UseWindow(
 	}
     }
     if (containerPtr == NULL) {
-	containerPtr = (Container *)Tcl_Alloc(sizeof(Container));
+	containerPtr = (Container *)ckalloc(sizeof(Container));
 	containerPtr->parent = parent;
 	containerPtr->parentRoot = parentAtts.root;
 	containerPtr->parentPtr = NULL;
@@ -282,7 +282,7 @@ Tk_MakeContainer(
      */
 
     Tk_MakeWindowExist(tkwin);
-    containerPtr = (Container *)Tcl_Alloc(sizeof(Container));
+    containerPtr = (Container *)ckalloc(sizeof(Container));
     containerPtr->parent = Tk_WindowId(tkwin);
     containerPtr->parentRoot = RootWindowOfScreen(Tk_Screen(tkwin));
     containerPtr->parentPtr = winPtr;
@@ -1002,7 +1002,7 @@ EmbedWindowDeleted(
 	} else {
 	    prevPtr->nextPtr = containerPtr->nextPtr;
 	}
-	Tcl_Free(containerPtr);
+	ckfree(containerPtr);
     }
 }
 
@@ -1129,7 +1129,7 @@ TkpMakeTransparentWindowExist(
     Window parent)		/* Parent window. */
 {
     TkWindow *winPtr = (TkWindow *) tkwin;
-    unsigned long mask = CWDontPropagate | CWEventMask;
+    long int mask = CWDontPropagate | CWEventMask;
 
     /*
      * Ignore the important events while the window is mapped.

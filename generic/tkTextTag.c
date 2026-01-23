@@ -42,7 +42,7 @@ static const Tk_OptionSpec tagOptionSpecs[] = {
     {TK_OPTION_BORDER, "-lmargincolor", NULL, NULL,
 	NULL, TCL_INDEX_NONE, offsetof(TkTextTag, lMarginColor), TK_OPTION_NULL_OK, 0, 0},
     {TK_OPTION_PIXELS, "-offset", NULL, NULL,
-	NULL, offsetof(TkTextTag, offsetObj), TCL_INDEX_NONE, TK_OPTION_NULL_OK|TK_OPTION_NEG_OK, 0, 0},
+	NULL, offsetof(TkTextTag, offsetObj), TCL_INDEX_NONE, TK_OPTION_NULL_OK, 0, 0},
     {TK_OPTION_BOOLEAN, "-overstrike", NULL, NULL,
 	NULL, TCL_INDEX_NONE, offsetof(TkTextTag, overstrike),
 	TK_OPTION_NULL_OK, 0, 0},
@@ -170,12 +170,12 @@ TkTextTagCmd(
 		*/
 		textPtr->sharedTextPtr->stateEpoch++;
 	}
-	for (i = 4; i < objc; i += 2) {
+	for (i = 4; i < (Tcl_Size)objc; i += 2) {
 	    if (TkTextGetObjIndex(interp, textPtr, objv[i],
 		    &index1) != TCL_OK) {
 		return TCL_ERROR;
 	    }
-	    if (objc > (i+1)) {
+	    if ((Tcl_Size)objc > (i+1)) {
 		if (TkTextGetObjIndex(interp, textPtr, objv[i+1],
 			&index2) != TCL_OK) {
 		    return TCL_ERROR;
@@ -363,8 +363,71 @@ TkTextTagCmd(
 	     * from "unspecified").
 	     */
 
+	    if (tagPtr->borderWidthObj) {
+		int borderWidth;
+		Tk_GetPixelsFromObj(NULL, textPtr->tkwin, tagPtr->borderWidthObj, &borderWidth);
+		if (borderWidth < 0) {
+		    borderWidth = 0;
+		    Tcl_DecrRefCount(tagPtr->borderWidthObj);
+		    tagPtr->borderWidthObj = NULL;
+		}
+	    }
+	    if (tagPtr->lMargin1Obj) {
+		int lMargin1;
+		Tk_GetPixelsFromObj(NULL, textPtr->tkwin, tagPtr->lMargin1Obj, &lMargin1);
+		if (lMargin1 < 0) {
+		    lMargin1 = 0;
+		    Tcl_DecrRefCount(tagPtr->lMargin1Obj);
+		    tagPtr->lMargin1Obj = NULL;
+		}
+	    }
+	    if (tagPtr->lMargin2Obj) {
+		int lMargin2;
+		Tk_GetPixelsFromObj(NULL, textPtr->tkwin, tagPtr->lMargin2Obj, &lMargin2);
+		if (lMargin2 < 0) {
+		    lMargin2 = 0;
+		    Tcl_DecrRefCount(tagPtr->lMargin2Obj);
+		    tagPtr->lMargin2Obj = NULL;
+		}
+	    }
+	    if (tagPtr->rMarginObj) {
+		int rMargin;
+		Tk_GetPixelsFromObj(NULL, textPtr->tkwin, tagPtr->rMarginObj, &rMargin);
+		if (rMargin < 0) {
+		    rMargin = 0;
+		    Tcl_DecrRefCount(tagPtr->rMarginObj);
+		    tagPtr->rMarginObj = NULL;
+		}
+	    }
+	    if (tagPtr->spacing1Obj) {
+		int spacing1;
+		Tk_GetPixelsFromObj(NULL, textPtr->tkwin, tagPtr->spacing1Obj, &spacing1);
+		if (spacing1 < 0) {
+		    spacing1 = 0;
+		    Tcl_DecrRefCount(tagPtr->spacing1Obj);
+		    tagPtr->spacing1Obj = NULL;
+		}
+	    }
+	    if (tagPtr->spacing2Obj) {
+		int spacing2;
+		Tk_GetPixelsFromObj(NULL, textPtr->tkwin, tagPtr->spacing2Obj, &spacing2);
+		if (spacing2 < 0) {
+		    spacing2 = 0;
+		    Tcl_DecrRefCount(tagPtr->spacing2Obj);
+		    tagPtr->spacing2Obj = NULL;
+		}
+	    }
+	    if (tagPtr->spacing3Obj) {
+		int spacing3;
+		Tk_GetPixelsFromObj(NULL, textPtr->tkwin, tagPtr->spacing3Obj, &spacing3);
+		if (spacing3 < 0) {
+		    spacing3 = 0;
+		    Tcl_DecrRefCount(tagPtr->spacing3Obj);
+		    tagPtr->spacing3Obj = NULL;
+		}
+	    }
 	    if (tagPtr->tabArrayPtr != NULL) {
-		Tcl_Free(tagPtr->tabArrayPtr);
+		ckfree(tagPtr->tabArrayPtr);
 		tagPtr->tabArrayPtr = NULL;
 	    }
 	    if (tagPtr->tabStringPtr != NULL) {
@@ -468,7 +531,7 @@ TkTextTagCmd(
 	    Tcl_WrongNumArgs(interp, 3, objv, "tagName ?tagName ...?");
 	    return TCL_ERROR;
 	}
-	for (i = 3; i < objc; i++) {
+	for (i = 3; i < (Tcl_Size)objc; i++) {
 	    hPtr = Tcl_FindHashEntry(&textPtr->sharedTextPtr->tagTable,
 		    Tcl_GetString(objv[i]));
 	    if (hPtr == NULL) {
@@ -541,7 +604,7 @@ TkTextTagCmd(
 	    Tcl_HashSearch search;
 	    Tcl_HashEntry *hPtr;
 
-	    arrayPtr = (TkTextTag **)Tcl_Alloc(textPtr->sharedTextPtr->numTags
+	    arrayPtr = (TkTextTag **)ckalloc(textPtr->sharedTextPtr->numTags
 		    * sizeof(TkTextTag *));
 	    for (i=0, hPtr = Tcl_FirstHashEntry(
 		    &textPtr->sharedTextPtr->tagTable, &search);
@@ -575,7 +638,7 @@ TkTextTagCmd(
 		    Tcl_NewStringObj(tagPtr->name,-1));
 	}
 	Tcl_SetObjResult(interp, listObj);
-	Tcl_Free(arrayPtr);
+	ckfree(arrayPtr);
 	break;
     }
     case TAG_NEXTRANGE: {
@@ -915,7 +978,7 @@ TkTextCreateTag(
      * to it to the hash table entry.
      */
 
-    tagPtr = (TkTextTag *)Tcl_Alloc(sizeof(TkTextTag));
+    tagPtr = (TkTextTag *)ckalloc(sizeof(TkTextTag));
     tagPtr->name = name;
     tagPtr->textPtr = NULL;
     tagPtr->toggleCount = 0;
@@ -1119,7 +1182,7 @@ TkTextFreeTag(
      */
 
     if (tagPtr->tabArrayPtr != NULL) {
-	Tcl_Free(tagPtr->tabArrayPtr);
+	ckfree(tagPtr->tabArrayPtr);
     }
 
     /*
@@ -1147,7 +1210,7 @@ TkTextFreeTag(
 	    Tcl_Panic("Tag being deleted from wrong widget");
 	}
 	if (textPtr->refCount-- <= 1) {
-	    Tcl_Free(textPtr);
+	    ckfree(textPtr);
 	}
 	tagPtr->textPtr = NULL;
     }
@@ -1156,7 +1219,7 @@ TkTextFreeTag(
      * Finally free the tag's memory.
      */
 
-    Tcl_Free(tagPtr);
+    ckfree(tagPtr);
 }
 
 /*
@@ -1407,7 +1470,7 @@ TkTextBindProc(
 
   done:
     if (textPtr->refCount-- <= 1) {
-	Tcl_Free(textPtr);
+	ckfree(textPtr);
     }
 }
 
@@ -1541,7 +1604,7 @@ TkTextPickCurrent(
     SortTags(textPtr->numCurTags, textPtr->curTagArrayPtr);
     if (numNewTags > 0) {
 	size = numNewTags * sizeof(TkTextTag *);
-	copyArrayPtr = (TkTextTag **)Tcl_Alloc(size);
+	copyArrayPtr = (TkTextTag **)ckalloc(size);
 	memcpy(copyArrayPtr, newArrayPtr, size);
 	for (i = 0; i < textPtr->numCurTags; i++) {
 	    for (j = 0; j < numNewTags; j++) {
@@ -1591,7 +1654,7 @@ TkTextPickCurrent(
 	    event.xcrossing.detail = NotifyAncestor;
 	    TagBindEvent(textPtr, &event, numOldTags, oldArrayPtr);
 	}
-	Tcl_Free(oldArrayPtr);
+	ckfree(oldArrayPtr);
     }
 
     /*
@@ -1613,7 +1676,7 @@ TkTextPickCurrent(
 	    event.xcrossing.detail = NotifyAncestor;
 	    TagBindEvent(textPtr, &event, numNewTags, copyArrayPtr);
 	}
-	Tcl_Free(copyArrayPtr);
+	ckfree(copyArrayPtr);
     }
 }
 
@@ -1653,7 +1716,7 @@ TagBindEvent(
      */
 
     if (numTags > NUM_BIND_TAGS) {
-	nameArrPtr = (const char **)Tcl_Alloc(numTags * sizeof(const char *));
+	nameArrPtr = (const char **)ckalloc(numTags * sizeof(const char *));
     } else {
 	nameArrPtr = nameArray;
     }
@@ -1683,7 +1746,7 @@ TagBindEvent(
 	    textPtr->tkwin, numTags, (void **) nameArrPtr);
 
     if (numTags > NUM_BIND_TAGS) {
-	Tcl_Free(nameArrPtr);
+	ckfree(nameArrPtr);
     }
 }
 

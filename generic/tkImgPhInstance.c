@@ -61,7 +61,7 @@ static int		ReclaimColors(ColorTableId *id, int numColors);
  */
 
 static Tcl_HashTable imgPhotoColorHash;
-static bool imgPhotoColorHashInitialized;
+static int imgPhotoColorHashInitialized;
 #define N_COLOR_HASH	(sizeof(ColorTableId) / sizeof(int))
 
 /*
@@ -294,7 +294,7 @@ TkImgPhotoGet(
      * a new instance of the image.
      */
 
-    instancePtr = (PhotoInstance *)Tcl_Alloc(sizeof(PhotoInstance));
+    instancePtr = (PhotoInstance *)ckalloc(sizeof(PhotoInstance));
     instancePtr->modelPtr = modelPtr;
     instancePtr->display = Tk_Display(tkwin);
     instancePtr->colormap = Tk_Colormap(tkwin);
@@ -856,12 +856,12 @@ TkImgPhotoInstanceSetSize(
 	    || (instancePtr->error == NULL)) {
 	if (modelPtr->height > 0 && modelPtr->width > 0) {
 	    /*
-	     * TODO: use Tcl_AttemptAlloc() here once there is a strategy that
+	     * TODO: use attemptckalloc() here once there is a strategy that
 	     * will allow us to recover from failure. Right now, there's no
 	     * such possibility.
 	     */
 
-	    newError = (schar *)Tcl_Alloc(modelPtr->height * modelPtr->width
+	    newError = (schar *)ckalloc(modelPtr->height * modelPtr->width
 		    * 3 * sizeof(schar));
 
 	    /*
@@ -915,7 +915,7 @@ TkImgPhotoInstanceSetSize(
 		    errSrcPtr += instancePtr->width * 3;
 		}
 	    }
-	    Tcl_Free(instancePtr->error);
+	    ckfree(instancePtr->error);
 	}
 
 	instancePtr->error = newError;
@@ -1081,7 +1081,7 @@ GetColorTable(
     id.gamma = instancePtr->gamma;
     if (!imgPhotoColorHashInitialized) {
 	Tcl_InitHashTable(&imgPhotoColorHash, N_COLOR_HASH);
-	imgPhotoColorHashInitialized = true;
+	imgPhotoColorHashInitialized = 1;
     }
     entry = Tcl_CreateHashEntry(&imgPhotoColorHash, (char *) &id, &isNew);
 
@@ -1096,7 +1096,7 @@ GetColorTable(
 	 * No color table currently available; need to make one.
 	 */
 
-	colorPtr = (ColorTable *)Tcl_Alloc(sizeof(ColorTable));
+	colorPtr = (ColorTable *)ckalloc(sizeof(ColorTable));
 
 	/*
 	 * The following line of code should not normally be needed due to the
@@ -1257,7 +1257,7 @@ AllocateColors(
 	    } else {
 		numColors = MAX(MAX(nRed, nGreen), nBlue);
 	    }
-	    colors = (XColor *)Tcl_Alloc(numColors * sizeof(XColor));
+	    colors = (XColor *)ckalloc(numColors * sizeof(XColor));
 
 	    for (i = 0; i < numColors; ++i) {
 		if (igam == 1.0) {
@@ -1277,7 +1277,7 @@ AllocateColors(
 	     */
 
 	    numColors = (mono) ? nRed: (nRed * nGreen * nBlue);
-	    colors = (XColor *)Tcl_Alloc(numColors * sizeof(XColor));
+	    colors = (XColor *)ckalloc(numColors * sizeof(XColor));
 
 	    if (!mono) {
 		/*
@@ -1321,7 +1321,7 @@ AllocateColors(
 	 * Now try to allocate the colors we've calculated.
 	 */
 
-	pixels = (unsigned long *)Tcl_Alloc(numColors * sizeof(unsigned long));
+	pixels = (unsigned long *)ckalloc(numColors * sizeof(unsigned long));
 	for (i = 0; i < numColors; ++i) {
 	    if (!XAllocColor(colorPtr->id.display, colorPtr->id.colormap,
 		    &colors[i])) {
@@ -1352,8 +1352,8 @@ AllocateColors(
 	    break;
 	}
 	XFreeColors(colorPtr->id.display, colorPtr->id.colormap, pixels, i, 0);
-	Tcl_Free(colors);
-	Tcl_Free(pixels);
+	ckfree(colors);
+	ckfree(pixels);
 
 	if (!mono) {
 	    if ((nRed == 2) && (nGreen == 2) && (nBlue == 2)) {
@@ -1455,7 +1455,7 @@ AllocateColors(
 	}
     }
 
-    Tcl_Free(colors);
+    ckfree(colors);
 }
 
 /*
@@ -1490,7 +1490,7 @@ DisposeColorTable(
 		    colorPtr->pixelMap, colorPtr->numColors, 0);
 	    Tk_FreeColormap(colorPtr->id.display, colorPtr->id.colormap);
 	}
-	Tcl_Free(colorPtr->pixelMap);
+	ckfree(colorPtr->pixelMap);
     }
 
     entry = Tcl_FindHashEntry(&imgPhotoColorHash, &colorPtr->id);
@@ -1499,7 +1499,7 @@ DisposeColorTable(
     }
     Tcl_DeleteHashEntry(entry);
 
-    Tcl_Free(colorPtr);
+    ckfree(colorPtr);
 }
 
 /*
@@ -1584,7 +1584,7 @@ ReclaimColors(
 		    colorPtr->pixelMap, colorPtr->numColors, 0);
 	    numColors -= colorPtr->numColors;
 	    colorPtr->numColors = 0;
-	    Tcl_Free(colorPtr->pixelMap);
+	    ckfree(colorPtr->pixelMap);
 	    colorPtr->pixelMap = NULL;
 	}
 
@@ -1628,7 +1628,7 @@ TkImgDisposeInstance(
 	XDestroyImage(instancePtr->imagePtr);
     }
     if (instancePtr->error != NULL) {
-	Tcl_Free(instancePtr->error);
+	ckfree(instancePtr->error);
     }
     if (instancePtr->colorTablePtr != NULL) {
 	FreeColorTable(instancePtr->colorTablePtr, 1);
@@ -1644,7 +1644,7 @@ TkImgDisposeInstance(
 	prevPtr->nextPtr = instancePtr->nextPtr;
     }
     Tk_FreeColormap(instancePtr->display, instancePtr->colormap);
-    Tcl_Free(instancePtr);
+    ckfree(instancePtr);
 }
 
 /*
@@ -1721,11 +1721,11 @@ TkImgDitherInstance(
     imagePtr->bytes_per_line = bytesPerLine;
 
     /*
-     * TODO: use Tcl_AttemptAlloc() here once we have some strategy for
+     * TODO: use attemptckalloc() here once we have some strategy for
      * recovering from the failure.
      */
 
-    imagePtr->data = (char *)Tcl_Alloc(imagePtr->bytes_per_line * nLines);
+    imagePtr->data = (char *)ckalloc(imagePtr->bytes_per_line * nLines);
     bigEndian = imagePtr->bitmap_bit_order == MSBFirst;
     firstBit = bigEndian? (1 << (imagePtr->bitmap_unit - 1)): 1;
 
@@ -1987,7 +1987,7 @@ TkImgDitherInstance(
 	yStart = yEnd;
     }
 
-    Tcl_Free(imagePtr->data);
+    ckfree(imagePtr->data);
     imagePtr->data = NULL;
 }
 

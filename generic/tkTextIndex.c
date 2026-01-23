@@ -29,11 +29,9 @@
  * Modifiers for index parsing: 'display', 'any' or nothing.
  */
 
-typedef enum {
-    TKINDEX_NONE,
-    TKINDEX_DISPLAY,
-    TKINDEX_ANY
-} indexModifier;
+#define TKINDEX_NONE	0
+#define TKINDEX_DISPLAY	1
+#define TKINDEX_ANY	2
 
 /*
  * Forward declarations for functions defined later in this file:
@@ -77,13 +75,14 @@ static void		UpdateStringOfTextIndex(Tcl_Obj *objPtr);
  * text widgets internally.
  */
 
-const Tcl_ObjType tkTextIndexType = {
-    "textindex",		/* name */
+const TkObjType tkTextIndexType = {
+    {"textindex",		/* name */
     FreeTextIndexInternalRep,	/* freeIntRepProc */
     DupTextIndexInternalRep,	/* dupIntRepProc */
     NULL,			/* updateStringProc */
     NULL,			/* setFromAnyProc */
-    TCL_OBJTYPE_V0
+    TCL_OBJTYPE_V0},
+    0
 };
 
 static void
@@ -99,10 +98,10 @@ FreeTextIndexInternalRep(
 	     * The text widget has been deleted and we need to free it now.
 	     */
 
-	    Tcl_Free(indexPtr->textPtr);
+	    ckfree(indexPtr->textPtr);
 	}
     }
-    Tcl_Free(indexPtr);
+    ckfree(indexPtr);
     indexObjPtr->typePtr = NULL;
 }
 
@@ -114,7 +113,7 @@ DupTextIndexInternalRep(
     Tcl_Size epoch;
     TkTextIndex *dupIndexPtr, *indexPtr;
 
-    dupIndexPtr = (TkTextIndex *)Tcl_Alloc(sizeof(TkTextIndex));
+    dupIndexPtr = (TkTextIndex *)ckalloc(sizeof(TkTextIndex));
     indexPtr = GET_TEXTINDEX(srcPtr);
     epoch = GET_INDEXEPOCH(srcPtr);
 
@@ -127,7 +126,7 @@ DupTextIndexInternalRep(
     }
     SET_TEXTINDEX(copyPtr, dupIndexPtr);
     SET_INDEXEPOCH(copyPtr, epoch);
-    copyPtr->typePtr = &tkTextIndexType;
+    copyPtr->typePtr = &tkTextIndexType.objType;
 }
 
 /*
@@ -146,7 +145,7 @@ UpdateStringOfTextIndex(
 
     len = TkTextPrintIndex(indexPtr->textPtr, indexPtr, buffer);
 
-    objPtr->bytes = (char *)Tcl_Alloc(len + 1);
+    objPtr->bytes = (char *)ckalloc(len + 1);
     strcpy(objPtr->bytes, buffer);
     objPtr->length = len;
 }
@@ -183,13 +182,13 @@ MakeObjIndex(
 				 * position. */
     const TkTextIndex *origPtr)	/* Pointer to index. */
 {
-    TkTextIndex *indexPtr = (TkTextIndex *)Tcl_Alloc(sizeof(TkTextIndex));
+    TkTextIndex *indexPtr = (TkTextIndex *)ckalloc(sizeof(TkTextIndex));
 
     indexPtr->tree = origPtr->tree;
     indexPtr->linePtr = origPtr->linePtr;
     indexPtr->byteIndex = origPtr->byteIndex;
     SET_TEXTINDEX(objPtr, indexPtr);
-    objPtr->typePtr = &tkTextIndexType;
+    objPtr->typePtr = &tkTextIndexType.objType;
     indexPtr->textPtr = textPtr;
 
     if (textPtr != NULL) {
@@ -212,7 +211,7 @@ TkTextGetIndexFromObj(
     TkTextIndex *indexPtr = NULL;
     int cache;
 
-    if (objPtr->typePtr == &tkTextIndexType) {
+    if (objPtr->typePtr == &tkTextIndexType.objType) {
 	Tcl_Size epoch;
 
 	indexPtr = GET_TEXTINDEX(objPtr);
@@ -386,15 +385,15 @@ TkTextMakeByteIndex(
     TkTextBTree tree,	/* Tree that lineIndex and byteIndex refer
 				 * to. */
     const TkText *textPtr,
-    Tcl_Size lineIndex,		/* Index of desired line (0 means first line
+    int lineIndex,		/* Index of desired line (0 means first line
 				 * of text). */
     Tcl_Size byteIndex,		/* Byte index of desired character. */
     TkTextIndex *indexPtr)	/* Structure to fill in. */
 {
     TkTextSegment *segPtr;
-    Tcl_Size index;
+    int index;
     const char *p, *start;
-    Tcl_UniChar ch;
+    int ch;
 
     indexPtr->tree = tree;
     if (lineIndex < 0) {
@@ -1135,7 +1134,7 @@ TkTextPrintIndex(
 	charIndex += numBytes;
     }
 
-    return snprintf(string, TK_POS_CHARS, "%" TCL_SIZE_MODIFIER "d.%" TCL_SIZE_MODIFIER "d",
+    return snprintf(string, TK_POS_CHARS, "%d.%" TCL_SIZE_MODIFIER "d",
 	    TkBTreeLinesTo(textPtr, indexPtr->linePtr) + 1, charIndex);
 }
 
@@ -1222,8 +1221,7 @@ ForwBack(
 {
     const char *p, *units;
     char *end;
-    int count, lineIndex;
-    indexModifier modifier;
+    int count, lineIndex, modifier;
     size_t length;
 
     /*
@@ -1550,7 +1548,7 @@ void
 TkTextIndexForwChars(
     const TkText *textPtr,	/* Overall information about text widget. */
     const TkTextIndex *srcPtr,	/* Source index. */
-    Tcl_Size charCount,		/* How many characters forward to move. May
+    int charCount,		/* How many characters forward to move. May
 				 * be negative. */
     TkTextIndex *dstPtr,	/* Destination index: gets modified. */
     TkTextCountType type)	/* The type of item to count */
@@ -1560,16 +1558,16 @@ TkTextIndexForwChars(
     TkTextElideInfo *infoPtr = NULL;
     Tcl_Size byteOffset;
     char *start, *end, *p;
-    Tcl_UniChar ch;
-    bool elide = false;
-    bool checkElided = (type & COUNT_DISPLAY) != 0;
+    int ch;
+    int elide = 0;
+    int checkElided = (type & COUNT_DISPLAY);
 
     if (charCount < 0) {
 	TkTextIndexBackChars(textPtr, srcPtr, -charCount, dstPtr, type);
 	return;
     }
     if (checkElided) {
-	infoPtr = (TkTextElideInfo *)Tcl_Alloc(sizeof(TkTextElideInfo));
+	infoPtr = (TkTextElideInfo *)ckalloc(sizeof(TkTextElideInfo));
 	elide = TkTextIsElided(textPtr, srcPtr, infoPtr);
     }
 
@@ -1638,7 +1636,7 @@ TkTextIndexForwChars(
 			     * elide will be zero, of course).
 			     */
 
-			    elide = false;
+			    elide = 0;
 			    while (--infoPtr->elidePriority > 0) {
 				if (infoPtr->tagCnts[infoPtr->elidePriority]
 					& 1) {
@@ -1697,7 +1695,7 @@ TkTextIndexForwChars(
   forwardCharDone:
     if (infoPtr != NULL) {
 	TkTextFreeElideInfo(infoPtr);
-	Tcl_Free(infoPtr);
+	ckfree(infoPtr);
     }
 }
 
@@ -1824,8 +1822,8 @@ TkTextIndexCount(
     TkTextSegment *segPtr, *seg2Ptr = NULL;
     TkTextElideInfo *infoPtr = NULL;
     Tcl_Size byteOffset, maxBytes, count = 0;
-    bool elide = false;
-    bool checkElided = (type & COUNT_DISPLAY) != 0;
+    int elide = 0;
+    int checkElided = (type & COUNT_DISPLAY);
 
     /*
      * Find seg that contains src index, and remember how many bytes not to
@@ -1838,7 +1836,7 @@ TkTextIndexCount(
     seg2Ptr = TkTextIndexToSeg(indexPtr2, &maxBytes);
 
     if (checkElided) {
-	infoPtr = (TkTextElideInfo *)Tcl_Alloc(sizeof(TkTextElideInfo));
+	infoPtr = (TkTextElideInfo *)ckalloc(sizeof(TkTextElideInfo));
 	elide = TkTextIsElided(textPtr, indexPtr1, infoPtr);
     }
 
@@ -1978,7 +1976,7 @@ TkTextIndexCount(
   countDone:
     if (infoPtr != NULL) {
 	TkTextFreeElideInfo(infoPtr);
-	Tcl_Free(infoPtr);
+	ckfree(infoPtr);
     }
     return count;
 }
@@ -2079,7 +2077,7 @@ void
 TkTextIndexBackChars(
     const TkText *textPtr,	/* Overall information about text widget. */
     const TkTextIndex *srcPtr,	/* Source index. */
-    Tcl_Size charCount,		/* How many characters backward to move. May
+    int charCount,		/* How many characters backward to move. May
 				 * be negative. */
     TkTextIndex *dstPtr,	/* Destination index: gets modified. */
     TkTextCountType type)	/* The type of item to count */
@@ -2088,15 +2086,15 @@ TkTextIndexBackChars(
     TkTextElideInfo *infoPtr = NULL;
     int lineIndex, segSize;
     const char *p, *start, *end;
-    bool elide = false;
-    bool checkElided = (type & COUNT_DISPLAY) != 0;
+    int elide = 0;
+    int checkElided = (type & COUNT_DISPLAY);
 
     if (charCount < 0) {
 	TkTextIndexForwChars(textPtr, srcPtr, -charCount, dstPtr, type);
 	return;
     }
     if (checkElided) {
-	infoPtr = (TkTextElideInfo *)Tcl_Alloc(sizeof(TkTextElideInfo));
+	infoPtr = (TkTextElideInfo *)ckalloc(sizeof(TkTextElideInfo));
 	elide = TkTextIsElided(textPtr, srcPtr, infoPtr);
     }
 
@@ -2176,7 +2174,7 @@ TkTextIndexBackChars(
 			 * will be zero, of course).
 			 */
 
-			elide = false;
+			elide = 0;
 			while (--infoPtr->elidePriority > 0) {
 			    if (infoPtr->tagCnts[infoPtr->elidePriority] & 1) {
 				elide = infoPtr->tagPtrs[
@@ -2267,7 +2265,7 @@ TkTextIndexBackChars(
   backwardCharDone:
     if (infoPtr != NULL) {
 	TkTextFreeElideInfo(infoPtr);
-	Tcl_Free(infoPtr);
+	ckfree(infoPtr);
     }
 }
 
@@ -2302,7 +2300,7 @@ StartEnd(
     const char *p;
     size_t length;
     TkTextSegment *segPtr;
-    indexModifier modifier;
+    int modifier;
 
     /*
      * Find the end of the modifier word.

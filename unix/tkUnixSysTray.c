@@ -198,8 +198,8 @@ typedef struct {
  * Forward declarations for procedures defined in this file.
  */
 
-static Tcl_ObjCmdProc2 TrayIconCreateCmd;
-static Tcl_ObjCmdProc2 TrayIconObjectCmd;
+static Tcl_ObjCmdProc TrayIconCreateCmd;
+static Tcl_ObjCmdProc TrayIconObjectCmd;
 static int TrayIconConfigureMethod(DockIcon *icon, Tcl_Interp *interp,
 	Tcl_Size objc, Tcl_Obj *const objv[], int addflags);
 static int PostBalloon(DockIcon* icon, const char *utf8msg,
@@ -248,7 +248,7 @@ static int
 TrayIconObjectCmd(
     void *cd,
     Tcl_Interp *interp,
-    Tcl_Size objc,
+    int objc,
     Tcl_Obj *const objv[])
 {
     DockIcon *icon = (DockIcon*)cd;
@@ -1597,13 +1597,13 @@ static int
 TrayIconCreateCmd(
     void *cd,
     Tcl_Interp *interp,
-    Tcl_Size objc,
+    int objc,
     Tcl_Obj *const objv[])
 {
     Tk_Window mainWindow = (Tk_Window)cd;
     DockIcon *icon;
 
-    icon = (DockIcon*)Tcl_AttemptAlloc(sizeof(DockIcon));
+    icon = (DockIcon*)attemptckalloc(sizeof(DockIcon));
     if (!icon) {
 	Tcl_SetObjResult(interp, Tcl_NewStringObj("running out of memory", TCL_INDEX_NONE));
 	goto handleErrors;
@@ -1669,7 +1669,7 @@ TrayIconCreateCmd(
 	}
     }
 
-    icon->widgetCmd = Tcl_CreateObjCommand2(interp, Tcl_GetString(objv[1]),
+    icon->widgetCmd = Tcl_CreateObjCommand(interp, Tcl_GetString(objv[1]),
 	    TrayIconObjectCmd, icon, TrayIconDeleteProc);
 
     /* Sometimes a command just can't be created... */
@@ -1691,7 +1691,7 @@ handleErrors:
 	    /* Resources will be freed by DestroyNotify handler */
 	    Tk_DestroyWindow(icon->tkwin);
 	}
-	Tcl_Free(icon);
+	ckfree(icon);
     }
     return TCL_ERROR;
 }
@@ -1716,7 +1716,7 @@ int
 Tktray_Init(
     Tcl_Interp *interp)
 {
-    Tcl_CreateObjCommand2(interp, "::tk::systray::_systray",
+    Tcl_CreateObjCommand(interp, "::tk::systray::_systray",
 	    TrayIconCreateCmd, Tk_MainWindow(interp), NULL);
     return TCL_OK;
 }

@@ -174,7 +174,7 @@ TkpGetColor(
 	    && FindSystemColor(name+6, &color, &index))
 	    || TkParseColor(Tk_Display(tkwin), Tk_Colormap(tkwin), name,
 		    &color)) {
-	winColPtr = (WinColor *)Tcl_Alloc(sizeof(WinColor));
+	winColPtr = (WinColor *)ckalloc(sizeof(WinColor));
 	winColPtr->info.color = color;
 	winColPtr->index = index;
 
@@ -212,7 +212,7 @@ TkpGetColorByValue(
     XColor *colorPtr)		/* Red, green, and blue fields indicate
 				 * desired color. */
 {
-    WinColor *tkColPtr = (WinColor *)Tcl_Alloc(sizeof(WinColor));
+    WinColor *tkColPtr = (WinColor *)ckalloc(sizeof(WinColor));
 
     tkColPtr->info.color.red = colorPtr->red;
     tkColPtr->info.color.green = colorPtr->green;
@@ -437,10 +437,10 @@ XFreeColors(
 		GetPaletteEntries(cmap->palette, index, 1, &entry);
 		if (cref == RGB(entry.peRed, entry.peGreen, entry.peBlue)) {
 		    count = cmap->size - index;
-		    entries = (PALETTEENTRY *)Tcl_Alloc(sizeof(PALETTEENTRY) * count);
+		    entries = (PALETTEENTRY *)ckalloc(sizeof(PALETTEENTRY) * count);
 		    GetPaletteEntries(cmap->palette, index+1, count, entries);
 		    SetPaletteEntries(cmap->palette, index, count, entries);
-		    Tcl_Free(entries);
+		    ckfree(entries);
 		    cmap->size--;
 		} else {
 		    Tcl_Panic("Tried to free a color that isn't allocated");
@@ -494,10 +494,10 @@ XCreateColormap(
     logPalettePtr = (LOGPALETTE *) logPalBuf;
     logPalettePtr->palVersion = 0x300;
     sysPal = (HPALETTE) GetStockObject(DEFAULT_PALETTE);
-    logPalettePtr->palNumEntries = (WORD)GetPaletteEntries(sysPal, 0, 256,
+    logPalettePtr->palNumEntries = GetPaletteEntries(sysPal, 0, 256,
 	    logPalettePtr->palPalEntry);
 
-    cmap = (TkWinColormap *)Tcl_Alloc(sizeof(TkWinColormap));
+    cmap = (TkWinColormap *)ckalloc(sizeof(TkWinColormap));
     cmap->size = logPalettePtr->palNumEntries;
     cmap->stale = 0;
     cmap->palette = CreatePalette(logPalettePtr);
@@ -545,7 +545,7 @@ XFreeColormap(
 	Tcl_Panic("Unable to free colormap, palette is still selected");
     }
     Tcl_DeleteHashTable(&cmap->refCounts);
-    Tcl_Free(cmap);
+    ckfree(cmap);
     return Success;
 }
 

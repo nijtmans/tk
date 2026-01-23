@@ -164,7 +164,7 @@ ElementStateEventProc(void *clientData, XEvent *ev)
 	     */
 	    Tk_DeleteEventHandler(es->corePtr->tkwin,
 		    ElementStateMask, ElementStateEventProc, es);
-	    Tcl_Free(clientData);
+	    ckfree(clientData);
 	    break;
     }
 }
@@ -177,7 +177,7 @@ ElementStateEventProc(void *clientData, XEvent *ev)
 
 void TtkTrackElementState(WidgetCore *corePtr)
 {
-    ElementStateTracker *es = (ElementStateTracker *)Tcl_Alloc(sizeof(*es));
+    ElementStateTracker *es = (ElementStateTracker *)ckalloc(sizeof(*es));
     es->corePtr = corePtr;
     es->tracking = 0;
     es->activeElement = es->pressedElement = 0;

@@ -11,7 +11,6 @@
  */
 
 #include "tkWinInt.h"
-extern int TkWinAccessiblity_Init(Tcl_Interp *interp);
 
 
 /*
@@ -39,14 +38,13 @@ TkpInit(
     /*
      * This is necessary for static initialization, and is ok otherwise
      * because TkWinXInit flips a static bit to do its work just once. Also,
-     * initialize accessibility, printing and systray API's here.
+     * initialize printing and systray API's here.
      */
 
     WinIcoInit(interp);
     Winprint_Init(interp);
     TkWinXInit(Tk_GetHINSTANCE());
     Icu_Init(interp);
-    TkWinAccessiblity_Init(interp);
     return TCL_OK;
 }
 
@@ -96,7 +94,7 @@ TkpGetAppName(
     }
     Tcl_DStringAppend(namePtr, name, namelength);
     if (argv != NULL) {
-	Tcl_Free(argv);
+	ckfree(argv);
     }
 }
 

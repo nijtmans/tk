@@ -19,8 +19,8 @@
  *
  * If an application using Tcl_Main() is compiled with USE_TCL_STUBS,
  * Tcl_Main() will be replaced by a stub function, which loads
- * libtcl9.1.so/tcl91.dll and then calls its Tcl_MainEx(). If
- * libtcl9.1.so/tcl91.dll is not present (at runtime), a crash is what happens.
+ * libtcl9.0.so/tcl90.dll and then calls its Tcl_MainEx(). If
+ * libtcl9.0.so/tcl90.dll is not present (at runtime), a crash is what happens.
  *
  * So ... tkAppInit.c should not be compiled with USE_TCL_STUBS
  * (unless you want to use the TIP #596 functionality)
@@ -151,6 +151,13 @@ _tWinMain(
     consoleRequired = TRUE;
 
     /*
+     * Set up the default locale to be standard "C" locale so parsing is
+     * performed correctly.
+     */
+
+    setlocale(LC_ALL, "C");
+
+    /*
      * Get our args from the c-runtime. Ignore lpszCmdLine.
      */
 
@@ -250,7 +257,7 @@ Tcl_AppInit(
      */
 
     /*
-     * Call Tcl_CreateObjCommand2 for application-specific commands, if they
+     * Call Tcl_CreateObjCommand for application-specific commands, if they
      * weren't already created by the init procedures called above.
      */
 
@@ -290,6 +297,13 @@ _tmain(
     int argc,
     TCHAR **argv)
 {
+    /*
+     * Set up the default locale to be standard "C" locale so parsing is
+     * performed correctly.
+     */
+
+    setlocale(LC_ALL, "C");
+
     /*
      * Console emulation widget not required as this entry is from the
      * console subsystem, thus stdin,out,err already have end-points.

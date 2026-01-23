@@ -40,7 +40,7 @@ static const unsigned char az[] = {
  * are handled by this table, above that is handled especially.
  */
 
-typedef unsigned char elem[32];
+typedef char elem[32];
 
 static const elem xColors[] = {
     /* Colors starting with 'a' */
@@ -427,8 +427,8 @@ parseHex64bit(
 static int
 colorcmp(
     const char *spec,
-    const unsigned char *pname,
-    unsigned short *special)
+    const char *pname,
+    int *special)
 {
     int r;
     int c, d;
@@ -476,7 +476,7 @@ colorcmp(
 
 	r = 1;
     }
-    *special = (unsigned short)num;
+    *special = num;
     return r;
 }
 
@@ -537,10 +537,9 @@ XParseColor(
 	 * p    = pointer to current element being considered.
 	 */
 
-	int size;
-	unsigned short num;
+	int size, num;
 	const elem *p;
-	const unsigned char *q;
+	const char *q;
 	int r = (spec[0] - 'A') & 0xdf;
 
 	if (r >= (int) sizeof(az) - 1) {
@@ -568,7 +567,7 @@ XParseColor(
 	    if (((*p)[31] != 8) || num > 100) {
 		return 0;
 	    }
-	    num = (unsigned short)((num * 255 + 50) / 100);
+	    num = (num * 255 + 50) / 100;
 	    if ((num == 230) || (num == 128)) {
 		/*
 		 * Those two entries have a deviation i.r.t the table.
@@ -580,9 +579,9 @@ XParseColor(
 	    colorPtr->red = colorPtr->green = colorPtr->blue = num;
 	} else {
 	    q = *p + 28 - num * 3;
-	    colorPtr->red = (unsigned short)((RED(q) << 8) | RED(q));
-	    colorPtr->green = (unsigned short)((GREEN(q) << 8) | GREEN(q));
-	    colorPtr->blue = (unsigned short)((BLUE(q) << 8) | BLUE(q));
+	    colorPtr->red = ((RED(q) << 8) | RED(q));
+	    colorPtr->green = ((GREEN(q) << 8) | GREEN(q));
+	    colorPtr->blue = ((BLUE(q) << 8) | BLUE(q));
 	}
     }
     colorPtr->pixel = TkpGetPixel(colorPtr);

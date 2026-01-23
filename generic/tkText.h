@@ -116,9 +116,14 @@ typedef struct TkTextEmbWindow {
 				 * window. */
     Tcl_Obj *createObj;	/* Script to create window on-demand. NULL
 				 * means no such script. */
+#if TK_MAJOR_VERSION > 8
     Tcl_Obj *padXObj, *padYObj;		/* Padding to leave around each side of window. */
+#endif
     TkAlignMode align;		/* How to align window in vertical space. See
 				 * definitions in tkTextWind.c. */
+#if TK_MAJOR_VERSION < 9
+    int padX, padY;
+#endif
     int stretch;		/* Should window stretch to fill vertical
 				 * space of line (except for pady)? 0 or 1. */
     Tk_OptionTable optionTable;	/* Token representing the configuration
@@ -147,10 +152,15 @@ typedef struct TkTextEmbImage {
 				 * the image. */
     Tk_Image image;		/* Image for this segment. NULL means that the
 				 * image hasn't been created yet. */
+#if TK_MAJOR_VERSION > 8
     Tcl_Obj *padXObj, *padYObj;	/* Padding to leave around each side of image,
 				 * in pixels. */
+#endif
     TkAlignMode align;		/* How to align image in vertical space. See
 				 * definitions in tkTextImage.c. */
+#if TK_MAJOR_VERSION < 9
+    int padX, padY;
+#endif
     int chunkCount;		/* Number of display chunks that refer to this
 				 * image. */
     Tk_OptionTable optionTable;	/* Token representing the configuration
@@ -368,6 +378,10 @@ typedef struct TkTextTag {
 				 * baseline of line. Used for superscripts and
 				 * subscripts. NULL means option not specified. */
     int offset;			/* No longer used, but kept for binary compatibility. */
+#if TK_MAJOR_VERSION < 9
+    Tcl_Obj *overstrikeObj;	/* -overstrike option. NULL
+				 * means option not specified. */
+#endif
     int overstrike;		/* > 0 means draw horizontal line through
 				 * middle of text. -1 means not specified. */
     XColor *overstrikeColor;    /* Color for the overstrike. NULL means same
@@ -394,6 +408,10 @@ typedef struct TkTextTag {
 				 * NULL. Corresponds to tabStringPtr. */
     TkTextTabStyle tabStyle;	/* One of TK_TEXT_TABSTYLE_TABULAR or TK_TEXT_TABSTYLE_WORDPROCESSOR
 				 * or TK_TEXT_TABSTYLE_NULL (if not specified). */
+#if TK_MAJOR_VERSION < 9
+    Tcl_Obj *underlineObj;	/* -underline option. NULL
+				 * means option not specified. */
+#endif
     int underline;		/* > 0 means draw underline underneath
 				 * text. -1 means not specified. */
     XColor *underlineColor;     /* Color for the underline. NULL means same
@@ -402,6 +420,10 @@ typedef struct TkTextTag {
 				 * Must be TEXT_WRAPMODE_CHAR, TEXT_WRAPMODE_WORD,
 				 * TEXT_WRAPMODE_NONE, or TEXT_WRAPMODE_NULL to
 				 * use wrapmode for whole widget. */
+#if TK_MAJOR_VERSION < 9
+    Tcl_Obj *elideObj;		/* -elide option. NULL
+				 * means option not specified. */
+#endif
     int elide;			/* Non-zero means that data under this tag
 				 * should not be displayed. -1 means not specified. */
     int affectsDisplay;		/* Non-zero means that this tag affects the
@@ -443,7 +465,7 @@ typedef struct TkTextSearch {
 				 * this segment. */
     TkTextTag *tagPtr;		/* Tag to search for (or tag found, if allTags
 				 * is non-zero). */
-    Tcl_Size linesLeft;		/* Lines left to search (including curIndex
+    int linesLeft;		/* Lines left to search (including curIndex
 				 * and stopIndex). When this becomes <= 0 the
 				 * search is over. */
     int allTags;		/* Non-zero means ignore tag check: search for
@@ -641,14 +663,23 @@ typedef struct TkText {
 
     Tk_3DBorder border;		/* Structure used to draw 3-D border and
 				 * default background. */
+#if TK_MAJOR_VERSION > 8
     Tcl_Obj *borderWidthObj;	/* Width of 3-D border to draw around entire
 				 * widget. */
     Tcl_Obj *padXObj, *padYObj;		/* Padding between text and window border. */
+#else
+    int borderWidth;
+    int padX, padY;
+#endif
     int relief;			/* 3-d effect for border around entire widget:
 				 * TK_RELIEF_RAISED etc. */
+#if TK_MAJOR_VERSION > 8
     Tcl_Obj *highlightWidthObj;		/* Width in pixels of highlight to draw around
 				 * widget when it has the focus. <= 0 means
 				 * don't draw a highlight. */
+#else
+    int highlightWidth;
+#endif
     XColor *highlightBgColorPtr;
 				/* Color for drawing traversal highlight area
 				 * when highlight is off. */
@@ -660,12 +691,16 @@ typedef struct TkText {
 				 * font. */
     int charHeight;		/* Height of average character in default
 				 * font, including line spacing. */
+#if TK_MAJOR_VERSION > 8
     Tcl_Obj *spacing1Obj;	/* Default extra spacing above first display
 				 * line for each text line. */
     Tcl_Obj *spacing2Obj;	/* Default extra spacing between display lines
 				 * for the same text line. */
     Tcl_Obj *spacing3Obj;	/* Default extra spacing below last display
 				 * line for each text line. */
+#else
+    int spacing1, spacing2, spacing3;
+#endif
     Tcl_Obj *tabOptionObj;	/* Value of -tabs option string. */
     TkTextTabArray *tabArrayPtr;
 				/* Information about tab stops (malloc'ed).
@@ -682,7 +717,11 @@ typedef struct TkText {
 				 * TEXT_WRAPMODE_WORD, or TEXT_WRAPMODE_NULL to
 				 * use wrapmode for whole widget. */
     int width;		/* Desired dimensions for window, measured in characters */
+#if TK_MAJOR_VERSION > 8
     Tcl_Obj *heightObj;
+#else
+    int height;
+#endif
     int setGrid;		/* Non-zero means pass gridding information to
 				 * window manager. */
     int prevWidth, prevHeight;	/* Last known dimensions of window; used to
@@ -705,6 +744,9 @@ typedef struct TkText {
 				/* Border and background for selected
 				 * characters when they don't have the
 				 * focus. */
+#if TK_MAJOR_VERSION < 8
+    int selBorderWidth;
+#endif
     Tcl_Obj *selBorderWidthObj;	/* Width of border around selection. */
     XColor *selFgColorPtr;	/* Foreground color for selected text. This is
 				 * a copy of information in *selTagPtr, so it
@@ -724,8 +766,12 @@ typedef struct TkText {
 				/* Points to segment for "insert" mark. */
     Tk_3DBorder insertBorder;	/* Used to draw vertical bar for insertion
 				 * cursor. */
+#if TK_MAJOR_VERSION > 8
     Tcl_Obj *insertWidthObj;		/* Total width of insert cursor. */
     Tcl_Obj *insertBorderWidthObj;	/* Width of 3-D border around insert cursor */
+#else
+    int insertWidth, insertBorderWidth;
+#endif
     TkTextInsertUnfocussed insertUnfocussed;
 				/* How to display the insert cursor when the
 				 * text widget does not have the focus. */
@@ -895,7 +941,7 @@ typedef struct TkTextElideInfo {
     int elide;			/* Is the state currently elided. */
     Tcl_Size elidePriority;			/* Tag priority controlling elide state. */
     TkTextSegment *segPtr;	/* Segment to look at next. */
-    Tcl_Size segOffset;		/* Offset of segment within line. */
+    int segOffset;		/* Offset of segment within line. */
     int deftagCnts[LOTSA_TAGS];
     TkTextTag *deftagPtrs[LOTSA_TAGS];
     int *tagCnts;		/* 0 or 1 depending if the tag with that
@@ -997,7 +1043,7 @@ MODULE_SCOPE void	TkBTreeDeleteIndexRange(TkTextBTree tree,
 			    TkTextIndex *index1Ptr, TkTextIndex *index2Ptr);
 MODULE_SCOPE Tcl_Size	TkBTreeEpoch(TkTextBTree tree);
 MODULE_SCOPE TkTextLine *TkBTreeFindLine(TkTextBTree tree,
-			    const TkText *textPtr, Tcl_Size line);
+			    const TkText *textPtr, int line);
 MODULE_SCOPE TkTextLine *TkBTreeFindPixelLine(TkTextBTree tree,
 			    const TkText *textPtr, int pixels,
 			    int *pixelOffset);
@@ -1005,7 +1051,7 @@ MODULE_SCOPE TkTextTag **TkBTreeGetTags(const TkTextIndex *indexPtr,
 			    const TkText *textPtr, Tcl_Size *numTagsPtr);
 MODULE_SCOPE void	TkBTreeInsertChars(TkTextBTree tree,
 			    TkTextIndex *indexPtr, const char *string);
-MODULE_SCOPE Tcl_Size	TkBTreeLinesTo(const TkText *textPtr,
+MODULE_SCOPE int	TkBTreeLinesTo(const TkText *textPtr,
 			    TkTextLine *linePtr);
 MODULE_SCOPE int	TkBTreePixelsTo(const TkText *textPtr,
 			    TkTextLine *linePtr);
@@ -1066,7 +1112,7 @@ MODULE_SCOPE TkTextTabArray *TkTextGetTabs(Tcl_Interp *interp,
 MODULE_SCOPE void	TkTextFindDisplayLineEnd(TkText *textPtr,
 			    TkTextIndex *indexPtr, int end, int *xOffset);
 MODULE_SCOPE void	TkTextIndexBackChars(const TkText *textPtr,
-			    const TkTextIndex *srcPtr, Tcl_Size count,
+			    const TkTextIndex *srcPtr, int count,
 			    TkTextIndex *dstPtr, TkTextCountType type);
 MODULE_SCOPE int	TkTextIndexCmp(const TkTextIndex *index1Ptr,
 			    const TkTextIndex *index2Ptr);
@@ -1078,7 +1124,7 @@ MODULE_SCOPE int	TkTextIndexCount(const TkText *textPtr,
 			    const TkTextIndex *index2Ptr,
 			    TkTextCountType type);
 MODULE_SCOPE void	TkTextIndexForwChars(const TkText *textPtr,
-			    const TkTextIndex *srcPtr, Tcl_Size count,
+			    const TkTextIndex *srcPtr, int count,
 			    TkTextIndex *dstPtr, TkTextCountType type);
 MODULE_SCOPE void	TkTextIndexOfX(TkText *textPtr, int x,
 			    TkTextIndex *indexPtr);
@@ -1093,7 +1139,7 @@ MODULE_SCOPE TkTextIndex *TkTextMakeCharIndex(TkTextBTree tree, TkText *textPtr,
 MODULE_SCOPE int	TkTextMeasureDown(TkText *textPtr,
 			    TkTextIndex *srcPtr, int distance);
 MODULE_SCOPE void	TkTextFreeElideInfo(TkTextElideInfo *infoPtr);
-MODULE_SCOPE bool	TkTextIsElided(const TkText *textPtr,
+MODULE_SCOPE int	TkTextIsElided(const TkText *textPtr,
 			    const TkTextIndex *indexPtr,
 			    TkTextElideInfo *infoPtr);
 MODULE_SCOPE int	TkTextMakePixelIndex(TkText *textPtr,
@@ -1101,8 +1147,8 @@ MODULE_SCOPE int	TkTextMakePixelIndex(TkText *textPtr,
 MODULE_SCOPE void	TkTextInvalidateLineMetrics(
 			    TkSharedText *sharedTextPtr, TkText *textPtr,
 			    TkTextLine *linePtr, int lineCount, TkTextInvalidateAction action);
-MODULE_SCOPE int	TkTextUpdateLineMetrics(TkText *textPtr, Tcl_Size lineNum,
-			    Tcl_Size endLine, int doThisMuch);
+MODULE_SCOPE int	TkTextUpdateLineMetrics(TkText *textPtr, int lineNum,
+			    int endLine, int doThisMuch);
 MODULE_SCOPE int	TkTextUpdateOneLine(TkText *textPtr,
 			    TkTextLine *linePtr, int pixelHeight,
 			    TkTextIndex *indexPtr, int partialCalc);

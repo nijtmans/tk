@@ -584,7 +584,7 @@ InvokeClientMessageHandlers(
 		if (tmpPtr == NULL) {
 		    tsdPtr->lastCmPtr = prevPtr;
 		}
-		Tcl_Free(curPtr);
+		ckfree(curPtr);
 		curPtr = tmpPtr;
 		continue;
 	    }
@@ -646,7 +646,7 @@ InvokeGenericHandlers(
 		if (tmpPtr == NULL) {
 		    tsdPtr->lastGenericPtr = prevPtr;
 		}
-		Tcl_Free(curPtr);
+		ckfree(curPtr);
 		curPtr = tmpPtr;
 		continue;
 	    }
@@ -710,7 +710,7 @@ Tk_CreateEventHandler(
 	 * No event handlers defined at all, so must create.
 	 */
 
-	handlerPtr = (TkEventHandler *)Tcl_Alloc(sizeof(TkEventHandler));
+	handlerPtr = (TkEventHandler *)ckalloc(sizeof(TkEventHandler));
 	winPtr->handlerList = handlerPtr;
     } else {
 	int found = 0;
@@ -741,7 +741,7 @@ Tk_CreateEventHandler(
 	 * No event handler matched, so create a new one.
 	 */
 
-	handlerPtr->nextPtr = (TkEventHandler *)Tcl_Alloc(sizeof(TkEventHandler));
+	handlerPtr->nextPtr = (TkEventHandler *)ckalloc(sizeof(TkEventHandler));
 	handlerPtr = handlerPtr->nextPtr;
     }
 
@@ -827,7 +827,7 @@ Tk_DeleteEventHandler(
     } else {
 	prevPtr->nextPtr = handlerPtr->nextPtr;
     }
-    Tcl_Free(handlerPtr);
+    ckfree(handlerPtr);
 
     /*
      * No need to call XSelectInput: Tk always selects on all events for all
@@ -863,7 +863,7 @@ Tk_CreateGenericHandler(
     ThreadSpecificData *tsdPtr = (ThreadSpecificData *)
 	    Tcl_GetThreadData(&dataKey, sizeof(ThreadSpecificData));
 
-    handlerPtr = (GenericHandler *)Tcl_Alloc(sizeof(GenericHandler));
+    handlerPtr = (GenericHandler *)ckalloc(sizeof(GenericHandler));
 
     handlerPtr->proc		= proc;
     handlerPtr->clientData	= clientData;
@@ -942,7 +942,7 @@ Tk_CreateClientMessageHandler(
      * with an extra clientData field we'll never use.
      */
 
-    handlerPtr = (GenericHandler *)Tcl_Alloc(sizeof(GenericHandler));
+    handlerPtr = (GenericHandler *)ckalloc(sizeof(GenericHandler));
 
     handlerPtr->proc = (Tk_GenericProc *) proc;
     handlerPtr->clientData = NULL;	/* never used */
@@ -1344,7 +1344,7 @@ TkEventDeadWindow(
 		ipPtr->winPtr = NULL;
 	    }
 	}
-	Tcl_Free(handlerPtr);
+	ckfree(handlerPtr);
     }
 }
 
@@ -1519,7 +1519,7 @@ Tk_QueueWindowEvent(
      */
 
     if (!(dispPtr->flags & TK_DISPLAY_COLLAPSE_MOTION_EVENTS)) {
-	wevPtr = (TkWindowEvent *)Tcl_Alloc(sizeof(TkWindowEvent));
+	wevPtr = (TkWindowEvent *)ckalloc(sizeof(TkWindowEvent));
 	wevPtr->header.proc = WindowEventProc;
 	wevPtr->event = *eventPtr;
 	Tcl_QueueEvent(&wevPtr->header, position);
@@ -1551,7 +1551,7 @@ Tk_QueueWindowEvent(
 	}
     }
 
-    wevPtr = (TkWindowEvent *)Tcl_Alloc(sizeof(TkWindowEvent));
+    wevPtr = (TkWindowEvent *)ckalloc(sizeof(TkWindowEvent));
     wevPtr->header.proc = WindowEventProc;
     wevPtr->event = *eventPtr;
     if ((eventPtr->type == MotionNotify) && (position == TCL_QUEUE_TAIL)) {
@@ -1739,7 +1739,7 @@ CleanUpTkEvent(
 #if !defined(_WIN32) && !defined(MAC_OSX_TK)
 	TkKeyEvent *kePtr = (TkKeyEvent *) eventPtr;
 	if (kePtr->charValuePtr != NULL) {
-	    Tcl_Free(kePtr->charValuePtr);
+	    ckfree(kePtr->charValuePtr);
 	    kePtr->charValuePtr = NULL;
 	    kePtr->charValueLen = 0;
 	}
@@ -1815,7 +1815,7 @@ TkCreateExitHandler(
 {
     ExitHandler *exitPtr;
 
-    exitPtr = (ExitHandler *)Tcl_Alloc(sizeof(ExitHandler));
+    exitPtr = (ExitHandler *)ckalloc(sizeof(ExitHandler));
     exitPtr->proc = proc;
     exitPtr->clientData = clientData;
     Tcl_MutexLock(&exitMutex);
@@ -1880,7 +1880,7 @@ TkDeleteExitHandler(
 	    } else {
 		prevPtr->nextPtr = exitPtr->nextPtr;
 	    }
-	    Tcl_Free(exitPtr);
+	    ckfree(exitPtr);
 	    break;
 	}
     }
@@ -1914,7 +1914,7 @@ TkCreateThreadExitHandler(
     ThreadSpecificData *tsdPtr = (ThreadSpecificData *)
 	    Tcl_GetThreadData(&dataKey, sizeof(ThreadSpecificData));
 
-    exitPtr = (ExitHandler *)Tcl_Alloc(sizeof(ExitHandler));
+    exitPtr = (ExitHandler *)ckalloc(sizeof(ExitHandler));
     exitPtr->proc = proc;
     exitPtr->clientData = clientData;
 
@@ -1964,7 +1964,7 @@ TkDeleteThreadExitHandler(
 	    } else {
 		prevPtr->nextPtr = exitPtr->nextPtr;
 	    }
-	    Tcl_Free(exitPtr);
+	    ckfree(exitPtr);
 	    return;
 	}
     }
@@ -2014,7 +2014,7 @@ TkFinalize(
 	firstExitPtr = exitPtr->nextPtr;
 	Tcl_MutexUnlock(&exitMutex);
 	exitPtr->proc(exitPtr->clientData);
-	Tcl_Free(exitPtr);
+	ckfree(exitPtr);
 	Tcl_MutexLock(&exitMutex);
     }
     firstExitPtr = NULL;
@@ -2064,7 +2064,7 @@ TkFinalizeThread(
 
 	    tsdPtr->firstExitPtr = exitPtr->nextPtr;
 	    exitPtr->proc(exitPtr->clientData);
-	    Tcl_Free(exitPtr);
+	    ckfree(exitPtr);
 	}
     }
 }

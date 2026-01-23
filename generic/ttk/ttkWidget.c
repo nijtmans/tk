@@ -163,7 +163,7 @@ void TtkWidgetChangeState(WidgetCore *corePtr,
  */
 static int
 WidgetInstanceObjCmd(
-    void *clientData, Tcl_Interp *interp, Tcl_Size objc, Tcl_Obj *const objv[])
+    void *clientData, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[])
 {
     WidgetCore *corePtr = (WidgetCore *)clientData;
     const Ttk_Ensemble *commands = corePtr->widgetSpec->commands;
@@ -376,14 +376,14 @@ int TtkWidgetConstructorObjCmd(
     /*
      * Allocate and initialize the widget record.
      */
-    recordPtr = Tcl_Alloc(widgetSpec->recordSize);
+    recordPtr = ckalloc(widgetSpec->recordSize);
     memset(recordPtr, 0, widgetSpec->recordSize);
     corePtr = (WidgetCore *)recordPtr;
 
     corePtr->tkwin	= tkwin;
     corePtr->interp	= interp;
     corePtr->widgetSpec	= widgetSpec;
-    corePtr->widgetCmd	= Tcl_CreateObjCommand2(interp, Tk_PathName(tkwin),
+    corePtr->widgetCmd	= Tcl_CreateObjCommand(interp, Tk_PathName(tkwin),
 	WidgetInstanceObjCmd, recordPtr, WidgetInstanceObjCmdDeleted);
     corePtr->optionTable = optionTable;
     corePtr->layout	= NULL;

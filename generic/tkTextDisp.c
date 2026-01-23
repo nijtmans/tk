@@ -650,7 +650,7 @@ TkTextCreateDInfo(
     TextDInfo *dInfoPtr;
     XGCValues gcValues;
 
-    dInfoPtr = (TextDInfo *)Tcl_Alloc(sizeof(TextDInfo));
+    dInfoPtr = (TextDInfo *)ckalloc(sizeof(TextDInfo));
     Tcl_InitHashTable(&dInfoPtr->styleTable, sizeof(StyleValues)/sizeof(int));
     dInfoPtr->dLinePtr = NULL;
     dInfoPtr->copyGC = NULL;
@@ -734,7 +734,7 @@ TkTextFreeDInfo(
 	textPtr->refCount--;
 	dInfoPtr->scrollbarTimer = NULL;
     }
-    Tcl_Free(dInfoPtr);
+    ckfree(dInfoPtr);
 }
 
 /*
@@ -983,7 +983,7 @@ GetStyle(
 	}
     }
     if (tagPtrs != NULL) {
-	Tcl_Free(tagPtrs);
+	ckfree(tagPtrs);
     }
 
     /*
@@ -1002,7 +1002,7 @@ GetStyle(
      * No existing style matched. Make a new one.
      */
 
-    stylePtr = (TextStyle *)Tcl_Alloc(sizeof(TextStyle));
+    stylePtr = (TextStyle *)ckalloc(sizeof(TextStyle));
     stylePtr->refCount = 1;
     if (styleValues.border != NULL) {
 	gcValues.foreground = Tk_3DBorderColor(styleValues.border)->pixel;
@@ -1077,7 +1077,7 @@ FreeStyle(
 	    Tk_FreeGC(textPtr->display, stylePtr->ovGC);
 	}
 	Tcl_DeleteHashEntry(stylePtr->hPtr);
-	Tcl_Free(stylePtr);
+	ckfree(stylePtr);
     }
 }
 
@@ -1170,8 +1170,7 @@ LayoutDLine(
 				 * numBytes > 0. Used to drop 0-sized chunks
 				 * from the end of the line. */
     Tcl_Size byteOffset;
-    int ascent, descent, code, elidesize;
-    bool elide;
+    int ascent, descent, code, elide, elidesize;
     StyleValues *sValuePtr;
     TkTextElideInfo info;	/* Keep track of elide state. */
 
@@ -1179,7 +1178,7 @@ LayoutDLine(
      * Create and initialize a new DLine structure.
      */
 
-    dlPtr = (DLine *)Tcl_Alloc(sizeof(DLine));
+    dlPtr = (DLine *)ckalloc(sizeof(DLine));
     dlPtr->index = *indexPtr;
     dlPtr->byteCount = 0;
     dlPtr->y = 0;
@@ -1414,7 +1413,7 @@ LayoutDLine(
 	     * into a single display line.
 	     *
 	    if (segPtr == NULL && chunkPtr != NULL) {
-		Tcl_Free(chunkPtr);
+		ckfree(chunkPtr);
 		chunkPtr = NULL;
 	    }
 	     */
@@ -1428,7 +1427,7 @@ LayoutDLine(
 	    continue;
 	}
 	if (chunkPtr == NULL) {
-	    chunkPtr = (TkTextDispChunk *)Tcl_Alloc(sizeof(TkTextDispChunk));
+	    chunkPtr = (TkTextDispChunk *)ckalloc(sizeof(TkTextDispChunk));
 	    chunkPtr->nextPtr = NULL;
 	    chunkPtr->clientData = NULL;
 	}
@@ -1561,7 +1560,7 @@ LayoutDLine(
 	     */
 
 	    if (chunkPtr != NULL) {
-		Tcl_Free(chunkPtr);
+		ckfree(chunkPtr);
 	    }
 	    break;
 	}
@@ -1692,7 +1691,7 @@ LayoutDLine(
 	    if (chunkPtr->undisplayProc != NULL) {
 		chunkPtr->undisplayProc(textPtr, chunkPtr);
 	    }
-	    Tcl_Free(chunkPtr);
+	    ckfree(chunkPtr);
 	}
 	if (breakByteOffset != breakChunkPtr->numBytes) {
 	    if (breakChunkPtr->undisplayProc != NULL) {
@@ -2395,9 +2394,9 @@ FreeDLines(
 	    }
 	    FreeStyle(textPtr, chunkPtr->stylePtr);
 	    nextChunkPtr = chunkPtr->nextPtr;
-	    Tcl_Free(chunkPtr);
+	    ckfree(chunkPtr);
 	}
-	Tcl_Free(firstPtr);
+	ckfree(firstPtr);
 	firstPtr = nextDLinePtr;
     }
     if (action != DLINE_FREE_TEMP) {
@@ -3019,7 +3018,7 @@ AsyncUpdateLineMetrics(
 	 */
 
 	if (textPtr->refCount-- <= 1) {
-	    Tcl_Free(textPtr);
+	    ckfree(textPtr);
 	}
 	return;
     }
@@ -3096,7 +3095,7 @@ AsyncUpdateLineMetrics(
 	GenerateWidgetViewSyncEvent(textPtr, 1);
 
 	if (textPtr->refCount-- <= 1) {
-	    Tcl_Free(textPtr);
+	    ckfree(textPtr);
 	}
 	return;
     }
@@ -3198,8 +3197,8 @@ GenerateWidgetViewSyncEvent(
 int
 TkTextUpdateLineMetrics(
     TkText *textPtr,		/* Information about widget. */
-    Tcl_Size lineNum,		/* Start at this line. */
-    Tcl_Size endLine,		/* Go no further than this line. */
+    int lineNum,		/* Start at this line. */
+    int endLine,		/* Go no further than this line. */
     int doThisMuch)		/* How many lines to check, or how many 10s of
 				 * lines to recalculate. If '-1' then do
 				 * everything in the range (which may take a
@@ -3262,7 +3261,7 @@ TkTextUpdateLineMetrics(
 	    if (tkTextDebug) {
 		char buffer[4 * TCL_INTEGER_SPACE + 3];
 
-		snprintf(buffer, sizeof(buffer), "%" TCL_SIZE_MODIFIER "d %" TCL_SIZE_MODIFIER "d %d %d",
+		snprintf(buffer, sizeof(buffer), "%d %d %d %d",
 			lineNum, endLine, totalLines, count);
 		LOG("tk_textInvalidateLine", buffer);
 	    }
@@ -4132,7 +4131,7 @@ TkTextUpdateOneLine(
 	    Tcl_Panic("Mustn't ever update line height of last artificial line");
 	}
 
-	snprintf(buffer, sizeof(buffer), "%" TCL_SIZE_MODIFIER "d %d", TkBTreeLinesTo(textPtr,linePtr), pixelHeight);
+	snprintf(buffer, sizeof(buffer), "%d %d", TkBTreeLinesTo(textPtr,linePtr), pixelHeight);
 	LOG("tk_textNumPixels", buffer);
     }
     if (textPtr->dInfoPtr->scrollbarTimer == NULL) {
@@ -4216,7 +4215,7 @@ DisplayText(
 	dInfoPtr->flags &= ~REPICK_NEEDED;
 	TkTextPickCurrent(textPtr, &textPtr->pickEvent);
 	if (textPtr->refCount-- <= 1) {
-	    Tcl_Free(textPtr);
+	    ckfree(textPtr);
 	    goto end;
 	}
 	if ((textPtr->tkwin == NULL) || (textPtr->flags & DESTROYED)) {
@@ -5261,6 +5260,12 @@ TkTextRelayoutWindow(
     Tk_GetPixelsFromObj(NULL, textPtr->tkwin, textPtr->padYObj, &padY);
 	Tk_GetPixelsFromObj(NULL, textPtr->tkwin, textPtr->borderWidthObj, &borderWidth);
 	Tk_GetPixelsFromObj(NULL, textPtr->tkwin, textPtr->highlightWidthObj, &highlightWidth);
+    if (highlightWidth < 0) {
+	highlightWidth = 0;
+	Tcl_DecrRefCount(textPtr->highlightWidthObj);
+	textPtr->highlightWidthObj = Tcl_NewIntObj(0);
+	Tcl_IncrRefCount(textPtr->highlightWidthObj);
+    }
     dInfoPtr->x = highlightWidth + borderWidth + padX;
     dInfoPtr->y = highlightWidth + borderWidth + padY;
     dInfoPtr->maxX = Tk_Width(textPtr->tkwin) - highlightWidth
@@ -6869,7 +6874,7 @@ AsyncUpdateYScrollbar(
     }
 
     if (textPtr->refCount-- <= 1) {
-	Tcl_Free(textPtr);
+	ckfree(textPtr);
     }
 }
 
@@ -7700,7 +7705,7 @@ TkTextCharLayoutProc(
 #ifdef TK_LAYOUT_WITH_BASE_CHUNKS
     if (baseCharChunkPtr == NULL) {
 	baseCharChunkPtr = chunkPtr;
-	bciPtr = (BaseCharInfo *)Tcl_Alloc(sizeof(BaseCharInfo));
+	bciPtr = (BaseCharInfo *)ckalloc(sizeof(BaseCharInfo));
 	baseString = &bciPtr->baseChars;
 	Tcl_DStringInit(baseString);
 	bciPtr->width = 0;
@@ -7708,7 +7713,7 @@ TkTextCharLayoutProc(
 	ciPtr = &bciPtr->ci;
     } else {
 	bciPtr = (BaseCharInfo *)baseCharChunkPtr->clientData;
-	ciPtr = (CharInfo *)Tcl_Alloc(sizeof(CharInfo));
+	ciPtr = (CharInfo *)ckalloc(sizeof(CharInfo));
 	baseString = &bciPtr->baseChars;
     }
 
@@ -7786,7 +7791,7 @@ TkTextCharLayoutProc(
 	    } else {
 		Tcl_DStringSetLength(baseString,lineOffset);
 	    }
-	    Tcl_Free(ciPtr);
+	    ckfree(ciPtr);
 #endif /* TK_LAYOUT_WITH_BASE_CHUNKS */
 	    return 0;
 	}
@@ -7812,7 +7817,7 @@ TkTextCharLayoutProc(
     chunkPtr->breakIndex = -1;
 
 #ifndef TK_LAYOUT_WITH_BASE_CHUNKS
-    ciPtr = (CharInfo *)Tcl_Alloc(offsetof(CharInfo, chars) + 1 + bytesThatFit);
+    ciPtr = (CharInfo *)ckalloc(offsetof(CharInfo, chars) + 1 + bytesThatFit);
     chunkPtr->clientData = ciPtr;
     memcpy(ciPtr->chars, p, bytesThatFit);
 #endif /* TK_LAYOUT_WITH_BASE_CHUNKS */
@@ -8193,7 +8198,7 @@ CharUndisplayProc(
 	ciPtr->numBytes = 0;
 #endif /* TK_LAYOUT_WITH_BASE_CHUNKS */
 
-	Tcl_Free(ciPtr);
+	ckfree(ciPtr);
 	chunkPtr->clientData = NULL;
     }
 }
@@ -8982,7 +8987,7 @@ FinalizeBaseChunk(
  *	This procedure makes sure that all the chunks of the stretch are
  *	disconnected from the base chunk and the base chunk specific data is
  *	freed. It is invoked from the UndisplayProc. The procedure doesn't
- *	Tcl_Free the base chunk clientData itself, that's up to the main
+ *	ckfree the base chunk clientData itself, that's up to the main
  *	UndisplayProc.
  *
  * Results:

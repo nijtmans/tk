@@ -121,17 +121,17 @@ static const Tk_ConfigSpec configSpecs[] = {
     {TK_CONFIG_BORDER, "-insertbackground", "insertBackground", "Foreground",
 	DEF_CANVAS_INSERT_BG, offsetof(TkCanvas, textInfo.insertBorder), 0, NULL},
     {TK_CONFIG_PIXELS, "-insertborderwidth", "insertBorderWidth", "BorderWidth",
-	DEF_CANVAS_INSERT_BD_COLOR, offsetof(TkCanvas, textInfo.insertBorderWidthObj),
+	DEF_CANVAS_INSERT_BD_COLOR, offsetof(TkCanvas, textInfo.reserved1),
 	TK_CONFIG_OBJS|TK_CONFIG_COLOR_ONLY, NULL},
     {TK_CONFIG_PIXELS, "-insertborderwidth", "insertBorderWidth", "BorderWidth",
-	DEF_CANVAS_INSERT_BD_MONO, offsetof(TkCanvas, textInfo.insertBorderWidthObj),
+	DEF_CANVAS_INSERT_BD_MONO, offsetof(TkCanvas, textInfo.reserved1),
 	TK_CONFIG_OBJS|TK_CONFIG_MONO_ONLY, NULL},
     {TK_CONFIG_INT, "-insertofftime", "insertOffTime", "OffTime",
 	DEF_CANVAS_INSERT_OFF_TIME, offsetof(TkCanvas, insertOffTime), 0, NULL},
     {TK_CONFIG_INT, "-insertontime", "insertOnTime", "OnTime",
 	DEF_CANVAS_INSERT_ON_TIME, offsetof(TkCanvas, insertOnTime), 0, NULL},
     {TK_CONFIG_PIXELS, "-insertwidth", "insertWidth", "InsertWidth",
-	DEF_CANVAS_INSERT_WIDTH, offsetof(TkCanvas, textInfo.insertWidthObj), TK_CONFIG_OBJS, NULL},
+	DEF_CANVAS_INSERT_WIDTH, offsetof(TkCanvas, textInfo.reserved2), TK_CONFIG_OBJS, NULL},
     {TK_CONFIG_CUSTOM, "-offset", "offset", "Offset", "0,0",
 	offsetof(TkCanvas, tsoffset),TK_CONFIG_DONT_SET_DEFAULT,
 	&offsetOption},
@@ -147,10 +147,10 @@ static const Tk_ConfigSpec configSpecs[] = {
 	DEF_CANVAS_SELECT_MONO, offsetof(TkCanvas, textInfo.selBorder),
 	TK_CONFIG_MONO_ONLY, NULL},
     {TK_CONFIG_PIXELS, "-selectborderwidth", "selectBorderWidth", "BorderWidth",
-	DEF_CANVAS_SELECT_BD_COLOR, offsetof(TkCanvas, textInfo.selBorderWidthObj),
+	DEF_CANVAS_SELECT_BD_COLOR, offsetof(TkCanvas, textInfo.reserved3),
 	TK_CONFIG_OBJS|TK_CONFIG_COLOR_ONLY, NULL},
     {TK_CONFIG_PIXELS, "-selectborderwidth", "selectBorderWidth", "BorderWidth",
-	DEF_CANVAS_SELECT_BD_MONO, offsetof(TkCanvas, textInfo.selBorderWidthObj),
+	DEF_CANVAS_SELECT_BD_MONO, offsetof(TkCanvas, textInfo.reserved3),
 	TK_CONFIG_OBJS|TK_CONFIG_MONO_ONLY, NULL},
     {TK_CONFIG_COLOR, "-selectforeground", "selectForeground", "Background",
 	DEF_CANVAS_SELECT_FG_COLOR, offsetof(TkCanvas, textInfo.selFgColorPtr),
@@ -237,7 +237,7 @@ static void		CanvasSetOrigin(TkCanvas *canvasPtr,
 			    int xOrigin, int yOrigin);
 static void		CanvasUpdateScrollbars(TkCanvas *canvasPtr);
 static int		CanvasWidgetCmd(void *clientData,
-			    Tcl_Interp *interp, Tcl_Size objc,
+			    Tcl_Interp *interp, int objc,
 			    Tcl_Obj *const *objv);
 static void		CanvasWorldChanged(void *instanceData);
 static int		ConfigureCanvas(Tcl_Interp *interp,
@@ -574,7 +574,7 @@ DefaultRotateImplementation(
     if (ItemCoords(canvasPtr, itemPtr, 0, NULL) == TCL_OK &&
 	    Tcl_ListObjGetElements(NULL, Tcl_GetObjResult(interp),
 		    &objc, &objv) == TCL_OK) {
-	coordv = (double *)Tcl_Alloc(sizeof(double) * objc);
+	coordv = (double *) ckalloc(sizeof(double) * objc);
 	for (i=0 ; i<objc ; i++) {
 	    if (Tcl_GetDoubleFromObj(NULL, objv[i], &coordv[i]) != TCL_OK) {
 		ok = 0;
@@ -600,7 +600,7 @@ DefaultRotateImplementation(
 	     * Write the coordinates back into the item.
 	     */
 
-	    newObjv = (Tcl_Obj **) Tcl_Alloc(sizeof(Tcl_Obj *) * objc);
+	    newObjv = (Tcl_Obj **) ckalloc(sizeof(Tcl_Obj *) * objc);
 	    for (i=0 ; i<objc ; i++) {
 		newObjv[i] = Tcl_NewDoubleObj(coordv[i]);
 		Tcl_IncrRefCount(newObjv[i]);
@@ -609,9 +609,9 @@ DefaultRotateImplementation(
 	    for (i=0 ; i<objc ; i++) {
 		Tcl_DecrRefCount(newObjv[i]);
 	    }
-	    Tcl_Free(newObjv);
+	    ckfree(newObjv);
 	}
-	Tcl_Free(coordv);
+	ckfree(coordv);
     }
 
     /*
@@ -642,7 +642,7 @@ int
 Tk_CanvasObjCmd(
     void *clientData,	/* Main window associated with interpreter. */
     Tcl_Interp *interp,		/* Current interpreter. */
-    Tcl_Size objc,			/* Number of arguments. */
+    int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
     Tk_Window tkwin = (Tk_Window)clientData;
@@ -669,11 +669,11 @@ Tk_CanvasObjCmd(
      * pointers).
      */
 
-    canvasPtr = (TkCanvas *)Tcl_Alloc(sizeof(TkCanvas));
+    canvasPtr = (TkCanvas *)ckalloc(sizeof(TkCanvas));
     canvasPtr->tkwin = newWin;
     canvasPtr->display = Tk_Display(newWin);
     canvasPtr->interp = interp;
-    canvasPtr->widgetCmd = Tcl_CreateObjCommand2(interp,
+    canvasPtr->widgetCmd = Tcl_CreateObjCommand(interp,
 	    Tk_PathName(canvasPtr->tkwin), CanvasWidgetCmd, canvasPtr,
 	    CanvasCmdDeletedProc);
     canvasPtr->firstItemPtr = NULL;
@@ -691,7 +691,7 @@ Tk_CanvasObjCmd(
     canvasPtr->confine = 0;
     canvasPtr->textInfo.selBorder = NULL;
     canvasPtr->textInfo.selBorderWidth = 0;
-    canvasPtr->textInfo.selBorderWidthObj = NULL;
+    canvasPtr->textInfo.reserved3 = NULL;
     canvasPtr->textInfo.selFgColorPtr = NULL;
     canvasPtr->textInfo.selItemPtr = NULL;
     canvasPtr->textInfo.selectFirst = TCL_INDEX_NONE;
@@ -700,9 +700,9 @@ Tk_CanvasObjCmd(
     canvasPtr->textInfo.selectAnchor = 0;
     canvasPtr->textInfo.insertBorder = NULL;
     canvasPtr->textInfo.insertWidth = 0;
-    canvasPtr->textInfo.insertWidthObj = NULL;
+    canvasPtr->textInfo.reserved2 = NULL;
     canvasPtr->textInfo.insertBorderWidth = 0;
-    canvasPtr->textInfo.insertBorderWidthObj = NULL;
+    canvasPtr->textInfo.reserved1 = NULL;
     canvasPtr->textInfo.focusItemPtr = NULL;
     canvasPtr->textInfo.gotFocus = 0;
     canvasPtr->textInfo.cursorOn = 0;
@@ -793,7 +793,7 @@ static int
 CanvasWidgetCmd(
     void *clientData,	/* Information about canvas widget. */
     Tcl_Interp *interp,		/* Current interpreter. */
-    Tcl_Size objc,			/* Number of arguments. */
+    int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
     TkCanvas *canvasPtr = (TkCanvas *)clientData;
@@ -1269,7 +1269,7 @@ CanvasWidgetCmd(
 	}
 
 	typePtr = matchPtr;
-	itemPtr = (Tk_Item *)Tcl_Alloc(typePtr->itemSize);
+	itemPtr = (Tk_Item *)ckalloc(typePtr->itemSize);
 	itemPtr->id = canvasPtr->nextId++;
 	itemPtr->tagPtr = itemPtr->staticTagSpace;
 	itemPtr->tagSpace = TK_TAG_SPACE;
@@ -1279,7 +1279,7 @@ CanvasWidgetCmd(
 	itemPtr->redraw_flags = 0;
 
 	if (ItemCreate(canvasPtr, itemPtr, objc, objv) != TCL_OK) {
-	    Tcl_Free(itemPtr);
+	    ckfree(itemPtr);
 	    result = TCL_ERROR;
 	    goto done;
 	}
@@ -1362,7 +1362,7 @@ CanvasWidgetCmd(
 		}
 		ItemDelete(canvasPtr, itemPtr);
 		if (itemPtr->tagPtr != itemPtr->staticTagSpace) {
-		    Tcl_Free(itemPtr->tagPtr);
+		    ckfree(itemPtr->tagPtr);
 		}
 		entryPtr = Tcl_FindHashEntry(&canvasPtr->idTable,
 			INT2PTR(itemPtr->id));
@@ -1382,7 +1382,7 @@ CanvasWidgetCmd(
 		if (canvasPtr->lastItemPtr == itemPtr) {
 		    canvasPtr->lastItemPtr = itemPtr->prevPtr;
 		}
-		Tcl_Free(itemPtr);
+		ckfree(itemPtr);
 		if (itemPtr == canvasPtr->currentItemPtr) {
 		    canvasPtr->currentItemPtr = NULL;
 		    canvasPtr->flags |= REPICK_NEEDED;
@@ -2203,9 +2203,9 @@ DestroyCanvas(
 	canvasPtr->firstItemPtr = itemPtr->nextPtr;
 	ItemDelete(canvasPtr, itemPtr);
 	if (itemPtr->tagPtr != itemPtr->staticTagSpace) {
-	    Tcl_Free(itemPtr->tagPtr);
+	    ckfree(itemPtr->tagPtr);
 	}
-	Tcl_Free(itemPtr);
+	ckfree(itemPtr);
     }
 
     /*
@@ -2229,7 +2229,7 @@ DestroyCanvas(
     }
     Tk_FreeOptions(configSpecs, canvasPtr, canvasPtr->display, 0);
     canvasPtr->tkwin = NULL;
-    Tcl_Free(canvasPtr);
+    ckfree(canvasPtr);
 }
 
 /*
@@ -2283,13 +2283,67 @@ ConfigureCanvas(
     Tk_GetPixelsFromObj(NULL, canvasPtr->tkwin, canvasPtr->borderWidthObj, &borderWidth);
     Tk_GetPixelsFromObj(NULL, canvasPtr->tkwin, canvasPtr->heightObj, &height);
     Tk_GetPixelsFromObj(NULL, canvasPtr->tkwin, canvasPtr->highlightWidthObj, &highlightWidth);
-    Tk_GetPixelsFromObj(NULL, canvasPtr->tkwin, canvasPtr->textInfo.insertBorderWidthObj, &canvasPtr->textInfo.insertBorderWidth);
-    Tk_GetPixelsFromObj(NULL, canvasPtr->tkwin, canvasPtr->textInfo.insertWidthObj, &canvasPtr->textInfo.insertWidth);
-    Tk_GetPixelsFromObj(NULL, canvasPtr->tkwin, canvasPtr->textInfo.selBorderWidthObj, &canvasPtr->textInfo.selBorderWidth);
+    Tk_GetPixelsFromObj(NULL, canvasPtr->tkwin, (Tcl_Obj *)canvasPtr->textInfo.reserved1, &canvasPtr->textInfo.insertBorderWidth);
+    Tk_GetPixelsFromObj(NULL, canvasPtr->tkwin, (Tcl_Obj *)canvasPtr->textInfo.reserved2, &canvasPtr->textInfo.insertWidth);
+    Tk_GetPixelsFromObj(NULL, canvasPtr->tkwin, (Tcl_Obj *)canvasPtr->textInfo.reserved3, &canvasPtr->textInfo.selBorderWidth);
     Tk_GetPixelsFromObj(NULL, canvasPtr->tkwin, canvasPtr->widthObj, &width);
     Tk_GetPixelsFromObj(NULL, canvasPtr->tkwin, canvasPtr->xScrollIncrementObj, &xScrollIncrement);
     Tk_GetPixelsFromObj(NULL, canvasPtr->tkwin, canvasPtr->yScrollIncrementObj, &yScrollIncrement);
+    if (borderWidth < 0) {
+	borderWidth = 0;
+	Tcl_DecrRefCount(canvasPtr->borderWidthObj);
+	canvasPtr->borderWidthObj = Tcl_NewIntObj(0);
+	Tcl_IncrRefCount(canvasPtr->borderWidthObj);
+    }
+    if (height < 0) {
+	height = 0;
+	Tcl_DecrRefCount(canvasPtr->heightObj);
+	canvasPtr->heightObj = Tcl_NewIntObj(0);
+	Tcl_IncrRefCount(canvasPtr->heightObj);
+    }
+    if (highlightWidth < 0) {
+	highlightWidth = 0;
+	Tcl_DecrRefCount(canvasPtr->highlightWidthObj);
+	canvasPtr->highlightWidthObj = Tcl_NewIntObj(0);
+	Tcl_IncrRefCount(canvasPtr->highlightWidthObj);
+    }
+    if (width < 0) {
+	width = 0;
+	Tcl_DecrRefCount(canvasPtr->widthObj);
+	canvasPtr->widthObj = Tcl_NewIntObj(0);
+	Tcl_IncrRefCount(canvasPtr->widthObj);
+    }
+    if (xScrollIncrement < 0) {
+	xScrollIncrement = 0;
+	Tcl_DecrRefCount(canvasPtr->xScrollIncrementObj);
+	canvasPtr->xScrollIncrementObj = Tcl_NewIntObj(0);
+	Tcl_IncrRefCount(canvasPtr->xScrollIncrementObj);
+    }
+    if (yScrollIncrement < 0) {
+	yScrollIncrement = 0;
+	Tcl_DecrRefCount(canvasPtr->yScrollIncrementObj);
+	canvasPtr->yScrollIncrementObj = Tcl_NewIntObj(0);
+	Tcl_IncrRefCount(canvasPtr->yScrollIncrementObj);
+    }
     canvasPtr->inset = borderWidth + highlightWidth;
+    if (canvasPtr->textInfo.insertBorderWidth < 0) {
+	canvasPtr->textInfo.insertBorderWidth = 0;
+	Tcl_DecrRefCount((Tcl_Obj *)canvasPtr->textInfo.reserved1);
+	canvasPtr->textInfo.reserved1 = Tcl_NewIntObj(0);
+	Tcl_IncrRefCount((Tcl_Obj *)canvasPtr->textInfo.reserved1);
+    }
+    if (canvasPtr->textInfo.insertWidth < 0) {
+	canvasPtr->textInfo.insertWidth = 0;
+	Tcl_DecrRefCount((Tcl_Obj *)canvasPtr->textInfo.reserved2);
+	canvasPtr->textInfo.reserved2 = Tcl_NewIntObj(0);
+	Tcl_IncrRefCount((Tcl_Obj *)canvasPtr->textInfo.reserved2);
+    }
+    if (canvasPtr->textInfo.selBorderWidth < 0) {
+	canvasPtr->textInfo.selBorderWidth = 0;
+	Tcl_DecrRefCount((Tcl_Obj *)canvasPtr->textInfo.reserved3);
+	canvasPtr->textInfo.reserved3 = Tcl_NewIntObj(0);
+	Tcl_IncrRefCount((Tcl_Obj *)canvasPtr->textInfo.reserved3);
+    }
 
     gcValues.function = GXcopy;
     gcValues.graphics_exposures = False;
@@ -2360,7 +2414,7 @@ ConfigureCanvas(
 	    Tcl_SetErrorCode(interp, "TK", "CANVAS", "SCROLL_REGION", (char *)NULL);
 	badRegion:
 	    Tcl_DecrRefCount(canvasPtr->regionObj);
-	    Tcl_Free(argv2);
+	    ckfree(argv2);
 	    canvasPtr->regionObj = NULL;
 	    return TCL_ERROR;
 	}
@@ -2374,7 +2428,7 @@ ConfigureCanvas(
 		    argv2[3], &canvasPtr->scrollY2) != TCL_OK)) {
 	    goto badRegion;
 	}
-	Tcl_Free(argv2);
+	ckfree(argv2);
     }
 
     flags = canvasPtr->tsoffset.flags;
@@ -2434,9 +2488,9 @@ CanvasWorldChanged(
     TkCanvas *canvasPtr = (TkCanvas *)instanceData;
     Tk_Item *itemPtr;
 
-    Tk_GetPixelsFromObj(NULL, canvasPtr->tkwin, canvasPtr->textInfo.insertBorderWidthObj, &canvasPtr->textInfo.insertBorderWidth);
-    Tk_GetPixelsFromObj(NULL, canvasPtr->tkwin, canvasPtr->textInfo.insertWidthObj, &canvasPtr->textInfo.insertWidth);
-    Tk_GetPixelsFromObj(NULL, canvasPtr->tkwin, canvasPtr->textInfo.selBorderWidthObj, &canvasPtr->textInfo.selBorderWidth);
+    Tk_GetPixelsFromObj(NULL, canvasPtr->tkwin, (Tcl_Obj *)canvasPtr->textInfo.reserved1, &canvasPtr->textInfo.insertBorderWidth);
+    Tk_GetPixelsFromObj(NULL, canvasPtr->tkwin, (Tcl_Obj *)canvasPtr->textInfo.reserved2, &canvasPtr->textInfo.insertWidth);
+    Tk_GetPixelsFromObj(NULL, canvasPtr->tkwin, (Tcl_Obj *)canvasPtr->textInfo.reserved3, &canvasPtr->textInfo.selBorderWidth);
 
     itemPtr = canvasPtr->firstItemPtr;
     for ( ; itemPtr != NULL; itemPtr = itemPtr->nextPtr) {
@@ -2792,7 +2846,7 @@ DrawCanvas(
     blockPtr.offset[3] = 3;
 #endif
 
-    blockPtr.pixelPtr = (unsigned char *)Tcl_Alloc(blockPtr.pixelSize * blockPtr.height * blockPtr.width);
+    blockPtr.pixelPtr = (unsigned char *)ckalloc(blockPtr.pixelSize * blockPtr.height * blockPtr.width);
 
     /*
      * Now convert the image data pixel by pixel from XImage to 32bit RGBA
@@ -2972,7 +3026,7 @@ DrawCanvas(
 
 done:
     if (blockPtr.pixelPtr)
-	Tcl_Free(blockPtr.pixelPtr);
+	ckfree(blockPtr.pixelPtr);
     if (pixmap)
 	Tk_FreePixmap(Tk_Display(tkwin), pixmap);
     if (ximagePtr)
@@ -3688,7 +3742,7 @@ TagSearchExprInit(
     TagSearchExpr *expr = *exprPtrPtr;
 
     if (expr == NULL) {
-	expr = (TagSearchExpr *)Tcl_Alloc(sizeof(TagSearchExpr));
+	expr = (TagSearchExpr *)ckalloc(sizeof(TagSearchExpr));
 	expr->allocated = 0;
 	expr->uids = NULL;
 	expr->next = NULL;
@@ -3719,9 +3773,9 @@ TagSearchExprDestroy(
 {
     if (expr != NULL) {
 	if (expr->uids) {
-	    Tcl_Free(expr->uids);
+	    ckfree(expr->uids);
 	}
-	Tcl_Free(expr);
+	ckfree(expr);
     }
 }
 
@@ -3769,7 +3823,7 @@ TagSearchScan(
 	 * Allocate primary search struct on first call.
 	 */
 
-	*searchPtrPtr = searchPtr = (TagSearch *)Tcl_Alloc(sizeof(TagSearch));
+	*searchPtrPtr = searchPtr = (TagSearch *)ckalloc(sizeof(TagSearch));
 	searchPtr->expr = NULL;
 
 	/*
@@ -3777,7 +3831,7 @@ TagSearchScan(
 	 */
 
 	searchPtr->rewritebufferAllocated = 100;
-	searchPtr->rewritebuffer = (char *)Tcl_Alloc(searchPtr->rewritebufferAllocated);
+	searchPtr->rewritebuffer = (char *)ckalloc(searchPtr->rewritebufferAllocated);
     }
     TagSearchExprInit(&searchPtr->expr);
 
@@ -3795,7 +3849,7 @@ TagSearchScan(
 	    searchPtr->rewritebufferAllocated) {
 	searchPtr->rewritebufferAllocated = searchPtr->stringLength + 100;
 	searchPtr->rewritebuffer = (char *)
-		Tcl_Realloc(searchPtr->rewritebuffer,
+		ckrealloc(searchPtr->rewritebuffer,
 		searchPtr->rewritebufferAllocated);
     }
 
@@ -3923,8 +3977,8 @@ TagSearchDestroy(
 {
     if (searchPtr) {
 	TagSearchExprDestroy(searchPtr->expr);
-	Tcl_Free(searchPtr->rewritebuffer);
-	Tcl_Free(searchPtr);
+	ckfree(searchPtr->rewritebuffer);
+	ckfree(searchPtr);
     }
 }
 
@@ -3977,10 +4031,10 @@ TagSearchScanExpr(
 	if (expr->index >= expr->allocated-1) {
 	    expr->allocated += 15;
 	    if (expr->uids) {
-		expr->uids = (Tk_Uid *)Tcl_Realloc(expr->uids,
+		expr->uids = (Tk_Uid *)ckrealloc(expr->uids,
 			expr->allocated * sizeof(Tk_Uid));
 	    } else {
-		expr->uids = (Tk_Uid *)Tcl_Alloc(expr->allocated * sizeof(Tk_Uid));
+		expr->uids = (Tk_Uid *)ckalloc(expr->allocated * sizeof(Tk_Uid));
 	    }
 	}
 
@@ -4610,11 +4664,11 @@ DoItem(
 	Tk_Uid *newTagPtr;
 
 	itemPtr->tagSpace += 5;
-	newTagPtr = (Tk_Uid *)Tcl_Alloc(itemPtr->tagSpace * sizeof(Tk_Uid));
+	newTagPtr = (Tk_Uid *)ckalloc(itemPtr->tagSpace * sizeof(Tk_Uid));
 	memcpy(newTagPtr, itemPtr->tagPtr,
 		itemPtr->numTags * sizeof(Tk_Uid));
 	if (itemPtr->tagPtr != itemPtr->staticTagSpace) {
-	    Tcl_Free(itemPtr->tagPtr);
+	    ckfree(itemPtr->tagPtr);
 	}
 	itemPtr->tagPtr = newTagPtr;
 	tagPtr = &itemPtr->tagPtr[itemPtr->numTags];
@@ -5508,7 +5562,7 @@ CanvasDoEvent(
     if (numObjects <= NUM_STATIC) {
 	objectPtr = staticObjects;
     } else {
-	objectPtr = (void **)Tcl_Alloc(numObjects * sizeof(void *));
+	objectPtr = (void **)ckalloc(numObjects * sizeof(void *));
     }
     objectPtr[0] = (char *)searchUids->allUid;
     for (i = itemPtr->numTags - 1; i != TCL_INDEX_NONE; i--) {
@@ -5539,7 +5593,7 @@ CanvasDoEvent(
 		numObjects, objectPtr);
     }
     if (objectPtr != staticObjects) {
-	Tcl_Free(objectPtr);
+	ckfree(objectPtr);
     }
 }
 

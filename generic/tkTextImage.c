@@ -242,7 +242,7 @@ TkTextImageCmd(
 	 * Create the new image segment and initialize it.
 	 */
 
-	eiPtr = (TkTextSegment *)Tcl_Alloc(EI_SEG_SIZE);
+	eiPtr = (TkTextSegment *)ckalloc(EI_SEG_SIZE);
 	eiPtr->typePtr = &tkTextEmbImageType;
 	eiPtr->size = 1;
 	eiPtr->body.ei.sharedTextPtr = textPtr->sharedTextPtr;
@@ -401,7 +401,7 @@ EmbImageConfigure(
     hPtr = Tcl_CreateHashEntry(&textPtr->sharedTextPtr->imageTable, name,
 	    &dummy);
     Tcl_SetHashValue(hPtr, eiPtr);
-    eiPtr->body.ei.name = (char *)Tcl_Alloc(length + 1);
+    eiPtr->body.ei.name = (char *)ckalloc(length + 1);
     memcpy(eiPtr->body.ei.name, name, length + 1);
     Tcl_SetObjResult(textPtr->interp, Tcl_NewStringObj(name, TCL_INDEX_NONE));
     Tcl_DStringFree(&newName);
@@ -460,9 +460,9 @@ EmbImageDeleteProc(
     Tk_FreeConfigOptions(&eiPtr->body.ei, eiPtr->body.ei.optionTable,
 	    NULL);
     if (eiPtr->body.ei.name) {
-	Tcl_Free(eiPtr->body.ei.name);
+	ckfree(eiPtr->body.ei.name);
     }
-    Tcl_Free(eiPtr);
+    ckfree(eiPtr);
     return 0;
 }
 
@@ -539,9 +539,19 @@ EmbImageLayoutProc(
 
     if (eiPtr->body.ei.padXObj) {
 	Tk_GetPixelsFromObj(NULL, textPtr->tkwin, eiPtr->body.ei.padXObj, &padX);
+	if (padX < 0) {
+	    Tcl_DecrRefCount(eiPtr->body.ei.padXObj);
+	    eiPtr->body.ei.padXObj = Tcl_NewIntObj(0);
+	    Tcl_IncrRefCount(eiPtr->body.ei.padXObj);
+	}
     }
     if (eiPtr->body.ei.padYObj) {
 	Tk_GetPixelsFromObj(NULL, textPtr->tkwin, eiPtr->body.ei.padYObj, &padY);
+	if (padY < 0) {
+	    Tcl_DecrRefCount(eiPtr->body.ei.padYObj);
+	    eiPtr->body.ei.padYObj = Tcl_NewIntObj(0);
+	    Tcl_IncrRefCount(eiPtr->body.ei.padYObj);
+	}
     }
     /*
      * See if there's room for this image on this line.

@@ -90,10 +90,10 @@ XDestroyWindow(
 	}
 
 	if (macWin->toplevel->referenceCount == 0) {
-	    Tcl_Free(macWin->toplevel);
+	    ckfree(macWin->toplevel);
 	}
 	macWin->winPtr->privatePtr = NULL;
-	Tcl_Free(macWin);
+	ckfree(macWin);
 	return Success;
     }
     if (macWin->visRgn) {
@@ -117,7 +117,7 @@ XDestroyWindow(
      */
 
     if (macWin->toplevel->referenceCount == 0) {
-	Tcl_Free(macWin->toplevel);
+	ckfree(macWin->toplevel);
     }
     return Success;
 }
@@ -152,7 +152,7 @@ XMapWindow(
 	return BadWindow;
     }
     MacDrawable *macWin = (MacDrawable *)window;
-    static bool initialized = false;
+    static Bool initialized = NO;
     NSPoint mouse = [NSEvent mouseLocation];
     int x = mouse.x, y = TkMacOSXZeroScreenHeight() - mouse.y;
     //fprintf(stderr, "XMapWindow: %s\n", Tk_PathName(macWin->winPtr));
@@ -260,7 +260,7 @@ XMapWindow(
 	event.xvisibility.state = VisibilityUnobscured;
 	NotifyVisibility(winPtr, &event);
     } else {
-	initialized = true;
+	initialized = YES;
     }
     return Success;
 }
@@ -1369,7 +1369,7 @@ Tk_GetPixmap(
     if (display != NULL) {
 	LastKnownRequestProcessed(display)++;
     }
-    macPix = (MacDrawable *)Tcl_Alloc(sizeof(MacDrawable));
+    macPix = (MacDrawable *)ckalloc(sizeof(MacDrawable));
     macPix->winPtr = NULL;
     macPix->xOff = 0;
     macPix->yOff = 0;
@@ -1413,7 +1413,7 @@ Tk_FreePixmap(
     if (macPix->context) {
 	CFRelease(macPix->context);
     }
-    Tcl_Free(macPix);
+    ckfree(macPix);
 }
 
 /*

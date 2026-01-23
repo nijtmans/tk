@@ -4,9 +4,9 @@
  *      This module implements access to the Win32 GDI API.
  *
  * Copyright © 1991-2018 Microsoft Corp.
- * Copyright © 2009, Michael I. Schwartz
+ * Copyright © 2009, Michael I. Schwartz.
  * Copyright © 1998-2019 Harald Oehlmann, Elmicron GmbH
- * Copyright © 2021 Kevin Walzer
+ * Copyright © 2021 Kevin Walzer.
  *
  * See the file "license.terms" for information on usage and redistribution of
  * this file, and for a DISCLAIMER OF ALL WARRANTIES.
@@ -39,19 +39,19 @@ typedef BOOL WINAPI (*DrawFunc) (
 #endif
 
 /* Real functions. */
-static Tcl_ObjCmdProc2 GdiArc;
-static Tcl_ObjCmdProc2 GdiBitmap;
-static Tcl_ObjCmdProc2 GdiCharWidths;
-static Tcl_ObjCmdProc2 GdiImage;
-static Tcl_ObjCmdProc2 GdiPhoto;
-static Tcl_ObjCmdProc2 GdiLine;
-static Tcl_ObjCmdProc2 GdiOval;
-static Tcl_ObjCmdProc2 GdiPolygon;
-static Tcl_ObjCmdProc2 GdiRectangle;
-static Tcl_ObjCmdProc2 GdiText;
-static Tcl_ObjCmdProc2 GdiTextPlain;
-static Tcl_ObjCmdProc2 GdiMap;
-static Tcl_ObjCmdProc2 GdiCopyBits;
+static Tcl_ObjCmdProc GdiArc;
+static Tcl_ObjCmdProc GdiBitmap;
+static Tcl_ObjCmdProc GdiCharWidths;
+static Tcl_ObjCmdProc GdiImage;
+static Tcl_ObjCmdProc GdiPhoto;
+static Tcl_ObjCmdProc GdiLine;
+static Tcl_ObjCmdProc GdiOval;
+static Tcl_ObjCmdProc GdiPolygon;
+static Tcl_ObjCmdProc GdiRectangle;
+static Tcl_ObjCmdProc GdiText;
+static Tcl_ObjCmdProc GdiTextPlain;
+static Tcl_ObjCmdProc GdiMap;
+static Tcl_ObjCmdProc GdiCopyBits;
 
 /* Local copies of similar routines elsewhere in Tcl/Tk. */
 static int GdiGetColor(Tcl_Obj *nameObj, COLORREF *color);
@@ -88,13 +88,13 @@ static HPALETTE		GetSystemPalette(void);
 static void		GetDisplaySize(LONG *width, LONG *height);
 static int		GdiParseFontWords(Tcl_Interp *interp, LOGFONTW *lf,
 			    Tcl_Obj *const *objv, Tcl_Size argc);
-static Tcl_ObjCmdProc2 PrintSelectPrinter;
-static Tcl_ObjCmdProc2 PrintOpenPrinter;
-static Tcl_ObjCmdProc2 PrintClosePrinter;
-static Tcl_ObjCmdProc2 PrintOpenDoc;
-static Tcl_ObjCmdProc2 PrintCloseDoc;
-static Tcl_ObjCmdProc2 PrintOpenPage;
-static Tcl_ObjCmdProc2 PrintClosePage;
+static Tcl_ObjCmdProc PrintSelectPrinter;
+static Tcl_ObjCmdProc PrintOpenPrinter;
+static Tcl_ObjCmdProc PrintClosePrinter;
+static Tcl_ObjCmdProc PrintOpenDoc;
+static Tcl_ObjCmdProc PrintCloseDoc;
+static Tcl_ObjCmdProc PrintOpenPage;
+static Tcl_ObjCmdProc PrintClosePage;
 
 /*
  * Global state.
@@ -119,7 +119,7 @@ typedef struct WinprintData {
 
 static const struct gdi_command {
     const char *command_string;
-    Tcl_ObjCmdProc2 *command;
+    Tcl_ObjCmdProc *command;
 } gdi_commands[] = {
     { "arc",        GdiArc },
     { "bitmap",     GdiBitmap },
@@ -202,7 +202,7 @@ static Tcl_Size ParseDash (
     }
 
     dashspec = Tcl_GetString(objv[0]);
-    /* Tk_GetDash might potentially call Tcl_Free() on dash.pattern.pt if
+    /* Tk_GetDash might potentially call ckfree() on dash.pattern.pt if
      * dash.number is not initialized to 0
      */
     dash.number = 0;
@@ -217,7 +217,7 @@ static Tcl_Size ParseDash (
 
     /* free the possibly allocated space */
     if (dash.number > staticsize || dash.number < -staticsize) {
-	Tcl_Free(dash.pattern.pt);
+	ckfree(dash.pattern.pt);
     }
 
     *(const char **)dstPtr = dashspec;
@@ -379,7 +379,7 @@ static Tcl_Size ParseStyle (
 static int GdiArc(
     void *clientData,
     Tcl_Interp *interp,
-    Tcl_Size objc,
+    int objc,
     Tcl_Obj *const *objv)
 {
     WinprintData *dataPtr = (WinprintData *)clientData;
@@ -517,7 +517,7 @@ static int GdiArc(
 static int GdiBitmap(
     TCL_UNUSED(void *),
     Tcl_Interp *interp,
-    TCL_UNUSED(Tcl_Size),
+    TCL_UNUSED(int),
     Tcl_Obj *const *objv)
 {
     /*
@@ -550,7 +550,7 @@ static int GdiBitmap(
 static int GdiImage(
     TCL_UNUSED(void *),
     Tcl_Interp *interp,
-    TCL_UNUSED(Tcl_Size),
+    TCL_UNUSED(int),
     Tcl_Obj *const *objv)
 {
     /* Skip this for now..... */
@@ -583,7 +583,7 @@ static int GdiImage(
 static int GdiPhoto(
     void *clientData,
     Tcl_Interp *interp,
-    Tcl_Size objc,
+    int objc,
     Tcl_Obj *const *objv)
 {
     WinprintData *dataPtr = (WinprintData *)clientData;
@@ -675,7 +675,7 @@ static int GdiPhoto(
      * recoverable.
      */
 
-    pbuf = (char *)Tcl_AttemptAlloc(sll * ny * sizeof(char));
+    pbuf = (char *)attemptckalloc(sll * ny * sizeof(char));
     if (! pbuf) { /* Memory allocation failure. */
 	Tcl_AppendResult(interp,
 		"::tk::print::_gdi photo failed--out of memory", (char *)NULL);
@@ -768,7 +768,7 @@ static int GdiPhoto(
 	SetBrushOrgEx(hDC, pt.x, pt.y, &pt);
     }
 
-    Tcl_Free(pbuf);
+    ckfree(pbuf);
 
     if (retval == TCL_OK) {
 	Tcl_SetObjResult(interp, Tcl_ObjPrintf(
@@ -807,7 +807,7 @@ static int Smoothize(
     int nbpoints = 0;
     POINT* bpoints;
 
-    inPointList = (double *)Tcl_AttemptAlloc(2 * sizeof(double) * npoly);
+    inPointList = (double *)attemptckalloc(2 * sizeof(double) * npoly);
     if (inPointList == 0) {
 	/* TODO: unreachable */
 	return nbpoints; /* 0. */
@@ -819,10 +819,10 @@ static int Smoothize(
     }
 
     nbpoints = 1 + npoly * nStep; /* this is the upper limit. */
-    outPointList = (double *)Tcl_AttemptAlloc(2 * sizeof(double) * nbpoints);
+    outPointList = (double *)attemptckalloc(2 * sizeof(double) * nbpoints);
     if (outPointList == 0) {
 	/* TODO: unreachable */
-	Tcl_Free(inPointList);
+	ckfree(inPointList);
 	return 0;
     }
 
@@ -834,11 +834,11 @@ static int Smoothize(
 		NULL, outPointList);
     }
 
-    Tcl_Free(inPointList);
-    bpoints = (POINT *)Tcl_AttemptAlloc(sizeof(POINT)*nbpoints);
+    ckfree(inPointList);
+    bpoints = (POINT *)attemptckalloc(sizeof(POINT)*nbpoints);
     if (bpoints == 0) {
 	/* TODO: unreachable */
-	Tcl_Free(outPointList);
+	ckfree(outPointList);
 	return 0;
     }
 
@@ -846,7 +846,7 @@ static int Smoothize(
 	bpoints[n].x = (long)outPointList[2*n];
 	bpoints[n].y = (long)outPointList[2*n + 1];
     }
-    Tcl_Free(outPointList);
+    ckfree(outPointList);
     *bpointptr = bpoints;
     return nbpoints;
 }
@@ -1034,7 +1034,7 @@ static Tcl_Size ParseSmooth(
 static int GdiLine(
     void *clientData,
     Tcl_Interp *interp,
-    Tcl_Size objc,
+    int objc,
     Tcl_Obj *const *objv)
 {
     WinprintData *dataPtr = (WinprintData *)clientData;
@@ -1077,7 +1077,7 @@ static int GdiLine(
 	    || (Tcl_GetDoubleFromObj(interp, objv[5], &p2y) != TCL_OK)) {
 	return TCL_ERROR;
     }
-    polypoints = (POINT *)Tcl_AttemptAlloc((objc - 2)/2 * sizeof(POINT));
+    polypoints = (POINT *)attemptckalloc((objc - 2)/2 * sizeof(POINT));
     if (polypoints == NULL) {
 	Tcl_AppendResult(interp, "Out of memory in GdiLine", (char *)NULL);
 	return TCL_ERROR;
@@ -1121,13 +1121,13 @@ static int GdiLine(
 
 	if (Tcl_ParseArgsObjv(interp, lineArgvInfo, &argc, objv, NULL )
 		!= TCL_OK) {
-	    Tcl_Free(polypoints);
+	    ckfree(polypoints);
 	    return TCL_ERROR;
 	}
     }
 
     if (fill.isempty) {
-	Tcl_Free(polypoints);
+	ckfree(polypoints);
 	return TCL_OK;
     }
     if (arrow != ARROW_NONE) {
@@ -1142,7 +1142,7 @@ static int GdiLine(
 	nspoints = Smoothize(polypoints, npoly, nStep, smooth, &spoints);
 	if (nspoints > 0) {
 	    /* replace the old point list with the new one */
-	    Tcl_Free(polypoints);
+	    ckfree(polypoints);
 	    polypoints = spoints;
 	    npoly = nspoints;
 	}
@@ -1242,7 +1242,7 @@ static int GdiLine(
     Polyline(hDC, polypoints, npoly);
     GdiFreePen(interp, hDC, oldpen);
 
-    Tcl_Free(polypoints);
+    ckfree(polypoints);
     return TCL_OK;
 }
 
@@ -1262,7 +1262,7 @@ static int GdiLine(
 static int GdiOval(
     void *clientData,
     Tcl_Interp *interp,
-    Tcl_Size objc,
+    int objc,
     Tcl_Obj *const *objv)
 {
     WinprintData *dataPtr = (WinprintData *)clientData;
@@ -1371,7 +1371,7 @@ static int GdiOval(
 static int GdiPolygon(
     void *clientData,
     Tcl_Interp *interp,
-    Tcl_Size objc,
+    int objc,
     Tcl_Obj *const *objv)
 {
     WinprintData *dataPtr = (WinprintData *)clientData;
@@ -1409,7 +1409,7 @@ static int GdiPolygon(
 	    || (Tcl_GetDoubleFromObj(interp, objv[5], &p2y) != TCL_OK)) {
 	return TCL_ERROR;
     }
-    polypoints = (POINT *)Tcl_AttemptAlloc((objc - 2)/2 * sizeof(POINT));
+    polypoints = (POINT *)attemptckalloc((objc - 2)/2 * sizeof(POINT));
     if (polypoints == NULL) {
 	/* TODO: unreachable */
 	Tcl_AppendResult(interp, "Out of memory in GdiPolygon", (char *)NULL);
@@ -1451,7 +1451,7 @@ static int GdiPolygon(
 
 	if (Tcl_ParseArgsObjv(interp, polyArgvInfo, &argc, objv, NULL )
 		!= TCL_OK) {
-	    Tcl_Free(polypoints);
+	    ckfree(polypoints);
 	    return TCL_ERROR;
 	}
     }
@@ -1480,7 +1480,7 @@ static int GdiPolygon(
 	nspoints = Smoothize(polypoints, npoly, nStep, smooth, &spoints);
 	if (nspoints > 0) {
 	    /* replace the old point list with the new one */
-	    Tcl_Free(polypoints);
+	    ckfree(polypoints);
 	    polypoints = spoints;
 	    npoly = nspoints;
 	}
@@ -1491,7 +1491,7 @@ static int GdiPolygon(
     GdiFreePen(interp, hDC, oldpen);
     GdiFreeBrush(interp, hDC, oldbrush);
 
-    Tcl_Free(polypoints);
+    ckfree(polypoints);
     return TCL_OK;
 }
 
@@ -1511,7 +1511,7 @@ static int GdiPolygon(
 static int GdiRectangle(
     void *clientData,
     Tcl_Interp *interp,
-    Tcl_Size objc,
+    int objc,
     Tcl_Obj *const *objv)
 {
     WinprintData *dataPtr = (WinprintData *)clientData;
@@ -1624,7 +1624,7 @@ static int GdiRectangle(
 static int GdiCharWidths(
     void *clientData,
     Tcl_Interp *interp,
-    Tcl_Size objc,
+    int objc,
     Tcl_Obj *const *objv)
 {
     /*
@@ -1808,7 +1808,7 @@ static Tcl_Size ParseJustify (
 static int GdiText(
     void *clientData,
     Tcl_Interp *interp,
-    Tcl_Size objc,
+    int objc,
     Tcl_Obj *const *objv)
 {
     WinprintData *dataPtr = (WinprintData *)clientData;
@@ -2023,7 +2023,7 @@ static int GdiText(
 static int GdiTextPlain(
     void *clientData,
     Tcl_Interp *interp,
-    Tcl_Size objc,
+    int objc,
     Tcl_Obj *const *objv)
 {
     WinprintData *dataPtr = (WinprintData *)clientData;
@@ -2209,7 +2209,7 @@ static const char *GdiModeToName(
 static int GdiMap(
     void *clientData,
     Tcl_Interp *interp,
-    Tcl_Size objc,
+    int objc,
     Tcl_Obj *const *objv)
 {
     WinprintData *dataPtr = (WinprintData *)clientData;
@@ -2396,7 +2396,7 @@ static int GdiMap(
 static int GdiCopyBits(
     void *clientData,
     Tcl_Interp *interp,
-    Tcl_Size objc,
+    int objc,
     Tcl_Obj *const *objv)
 {
     WinprintData *dataPtr = (WinprintData *)clientData;
@@ -3054,7 +3054,7 @@ static int GdiMakePen(
     if (dashstyle != 0 && dashstyledata != 0) {
 	const char *cp;
 	size_t i;
-	char *dup = (char *)Tcl_Alloc(strlen(dashstyledata) + 1);
+	char *dup = (char *) ckalloc(strlen(dashstyledata) + 1);
 	strcpy(dup, dashstyledata);
 	/* DEBUG. */
 	Tcl_SetObjResult(interp, Tcl_ObjPrintf(
@@ -3097,7 +3097,7 @@ static int GdiMakePen(
 	    dashstyle = 0;
 	}
 	if (dup) {
-	    Tcl_Free(dup);
+	    ckfree(dup);
 	}
     }
 
@@ -3882,7 +3882,7 @@ static void WinprintDeleted(
 	DeleteDC(dataPtr->printDC);
 	Tcl_DStringFree(&dataPtr->jobNameW);
     }
-    Tcl_Free(dataPtr);
+    ckfree(dataPtr);
 }
 
 
@@ -3907,7 +3907,7 @@ int Winprint_Init(
     static const char *gdiName = "::tk::print::_gdi";
     static const size_t numCommands =
 	    sizeof(gdi_commands) / sizeof(struct gdi_command);
-    WinprintData *dataPtr = (WinprintData *)Tcl_Alloc(sizeof(WinprintData));
+    WinprintData *dataPtr = (WinprintData *)ckalloc(sizeof(WinprintData));
 
     /*
      * Set up the low-level [_gdi] command.
@@ -3918,7 +3918,7 @@ int Winprint_Init(
 	char buffer[100];
 
 	snprintf(buffer, sizeof(buffer), "%s::%s", gdiName, gdi_commands[i].command_string);
-	Tcl_CreateObjCommand2(interp, buffer, gdi_commands[i].command,
+	Tcl_CreateObjCommand(interp, buffer, gdi_commands[i].command,
 	    dataPtr, NULL);
 	Tcl_Export(interp, namespacePtr, gdi_commands[i].command_string, 0);
     }
@@ -3928,19 +3928,19 @@ int Winprint_Init(
      * The other printing-related commands.
      */
 
-    Tcl_CreateObjCommand2(interp, "::tk::print::_selectprinter",
+    Tcl_CreateObjCommand(interp, "::tk::print::_selectprinter",
 	    PrintSelectPrinter, dataPtr, NULL);
-    Tcl_CreateObjCommand2(interp, "::tk::print::_openprinter",
+    Tcl_CreateObjCommand(interp, "::tk::print::_openprinter",
 	    PrintOpenPrinter, dataPtr, NULL);
-    Tcl_CreateObjCommand2(interp, "::tk::print::_closeprinter",
+    Tcl_CreateObjCommand(interp, "::tk::print::_closeprinter",
 	    PrintClosePrinter, dataPtr, NULL);
-    Tcl_CreateObjCommand2(interp, "::tk::print::_opendoc",
+    Tcl_CreateObjCommand(interp, "::tk::print::_opendoc",
 	    PrintOpenDoc, dataPtr, NULL);
-    Tcl_CreateObjCommand2(interp, "::tk::print::_closedoc",
+    Tcl_CreateObjCommand(interp, "::tk::print::_closedoc",
 	    PrintCloseDoc, dataPtr, NULL);
-    Tcl_CreateObjCommand2(interp, "::tk::print::_openpage",
+    Tcl_CreateObjCommand(interp, "::tk::print::_openpage",
 	    PrintOpenPage, dataPtr, NULL);
-    Tcl_CreateObjCommand2(interp, "::tk::print::_closepage",
+    Tcl_CreateObjCommand(interp, "::tk::print::_closepage",
 	    PrintClosePage, dataPtr, NULL);
 
     dataPtr->printDC = NULL;
@@ -3965,7 +3965,7 @@ int Winprint_Init(
 static int PrintSelectPrinter(
     void *clientData,
     Tcl_Interp *interp,
-    TCL_UNUSED(Tcl_Size),
+    TCL_UNUSED(int),
     TCL_UNUSED(Tcl_Obj* const*))
 {
     WinprintData *dataPtr = (WinprintData *)clientData;
@@ -4087,7 +4087,7 @@ static int PrintSelectPrinter(
 int PrintOpenPrinter(
     void *clientData,
     Tcl_Interp *interp,
-    Tcl_Size objc,
+    int objc,
     Tcl_Obj *const objv[])
 {
     WinprintData *dataPtr = (WinprintData *)clientData;
@@ -4137,7 +4137,7 @@ int PrintOpenPrinter(
 int PrintClosePrinter(
     void *clientData,
     Tcl_Interp *interp,
-    TCL_UNUSED(Tcl_Size),
+    TCL_UNUSED(int),
     TCL_UNUSED(Tcl_Obj *const *))
 {
     WinprintData *dataPtr = (WinprintData *)clientData;
@@ -4165,7 +4165,7 @@ int PrintClosePrinter(
 int PrintOpenDoc(
     void *clientData,
     Tcl_Interp *interp,
-    Tcl_Size objc,
+    int objc,
     Tcl_Obj *const *objv)
 {
     WinprintData *dataPtr = (WinprintData *)clientData;
@@ -4250,7 +4250,7 @@ int PrintOpenDoc(
 int PrintCloseDoc(
     void *clientData,
     Tcl_Interp *interp,
-    TCL_UNUSED(Tcl_Size),
+    TCL_UNUSED(int),
     TCL_UNUSED(Tcl_Obj *const *))
 {
     WinprintData *dataPtr = (WinprintData *)clientData;
@@ -4288,7 +4288,7 @@ int PrintCloseDoc(
 int PrintOpenPage(
     void *clientData,
     Tcl_Interp *interp,
-    TCL_UNUSED(Tcl_Size),
+    TCL_UNUSED(int),
     TCL_UNUSED(Tcl_Obj *const *))
 {
     WinprintData *dataPtr = (WinprintData *)clientData;
@@ -4322,7 +4322,7 @@ int PrintOpenPage(
 int PrintClosePage(
     void *clientData,
     Tcl_Interp *interp,
-    TCL_UNUSED(Tcl_Size),
+    TCL_UNUSED(int),
     TCL_UNUSED(Tcl_Obj *const *))
 {
     WinprintData *dataPtr = (WinprintData *)clientData;

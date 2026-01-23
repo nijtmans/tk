@@ -298,7 +298,7 @@ FontPkgCleanup(
 	Tcl_FreeEncoding(familyPtr->encoding);
 	for (i = 0; i < FONTMAP_PAGES; i++) {
 	    if (familyPtr->fontMap[i] != NULL) {
-		Tcl_Free(familyPtr->fontMap[i]);
+		ckfree(familyPtr->fontMap[i]);
 	    }
 	}
 	tsdPtr->controlFamily.encoding = NULL;
@@ -545,7 +545,7 @@ TkpGetNativeFont(
 	}
 	fontStructPtr = CreateClosestFont(tkwin, &fa.fa, &fa.xa);
     }
-    fontPtr = (UnixFont *)Tcl_Alloc(sizeof(UnixFont));
+    fontPtr = (UnixFont *)ckalloc(sizeof(UnixFont));
     InitFont(tkwin, fontStructPtr, fontPtr);
 
     return (TkFont *) fontPtr;
@@ -601,7 +601,7 @@ TkpGetFontFromAttributes(
 
     fontPtr = (UnixFont *) tkFontPtr;
     if (fontPtr == NULL) {
-	fontPtr = (UnixFont *)Tcl_Alloc(sizeof(UnixFont));
+	fontPtr = (UnixFont *)ckalloc(sizeof(UnixFont));
     } else {
 	ReleaseFont(fontPtr);
     }
@@ -1585,7 +1585,7 @@ ReleaseFont(
 	ReleaseSubFont(fontPtr->display, &fontPtr->subFontArray[i]);
     }
     if (fontPtr->subFontArray != fontPtr->staticSubFonts) {
-	Tcl_Free(fontPtr->subFontArray);
+	ckfree(fontPtr->subFontArray);
     }
 }
 
@@ -1704,7 +1704,7 @@ AllocFontFamily(
 	}
     }
 
-    familyPtr = (FontFamily *)Tcl_Alloc(sizeof(FontFamily));
+    familyPtr = (FontFamily *)ckalloc(sizeof(FontFamily));
     memset(familyPtr, 0, sizeof(FontFamily));
     familyPtr->nextPtr = tsdPtr->fontFamilyList;
     tsdPtr->fontFamilyList = familyPtr;
@@ -1776,7 +1776,7 @@ FreeFontFamily(
     }
     for (i = 0; i < FONTMAP_PAGES; i++) {
 	if (familyPtr->fontMap[i] != NULL) {
-	    Tcl_Free(familyPtr->fontMap[i]);
+	    ckfree(familyPtr->fontMap[i]);
 	}
     }
 
@@ -1792,7 +1792,7 @@ FreeFontFamily(
 	familyPtrPtr = &(*familyPtrPtr)->nextPtr;
     }
 
-    Tcl_Free(familyPtr);
+    ckfree(familyPtr);
 }
 
 /*
@@ -2077,7 +2077,7 @@ FontMapLoadPage(
     ThreadSpecificData *tsdPtr = (ThreadSpecificData *)
 	    Tcl_GetThreadData(&dataKey, sizeof(ThreadSpecificData));
 
-    subFontPtr->fontMap[row] = (char *)Tcl_Alloc(FONTMAP_BITSPERPAGE / 8);
+    subFontPtr->fontMap[row] = (char *)ckalloc(FONTMAP_BITSPERPAGE / 8);
     memset(subFontPtr->fontMap[row], 0, FONTMAP_BITSPERPAGE / 8);
 
     if (subFontPtr->familyPtr == &tsdPtr->controlFamily) {
@@ -2409,7 +2409,7 @@ CanUseFallback(
 	     * make a copy.
 	     */
 
-	    nameList = (char **)Tcl_Alloc(numNames * sizeof(char *));
+	    nameList = (char **)ckalloc(numNames * sizeof(char *));
 	    memcpy(nameList, nameListOrig, numNames * sizeof(char *));
 	}
 	nameList[nameIdx] = NULL;
@@ -2427,7 +2427,7 @@ CanUseFallback(
 
     if (fontStructPtr == NULL) {
 	if (nameList != nameListOrig) {
-	    Tcl_Free(nameList);
+	    ckfree(nameList);
 	}
 	XFreeFontNames(nameListOrig);
 	return NULL;
@@ -2447,14 +2447,14 @@ CanUseFallback(
 	goto retry;
     }
     if (nameList != nameListOrig) {
-	Tcl_Free(nameList);
+	ckfree(nameList);
     }
     XFreeFontNames(nameListOrig);
 
     if (fontPtr->numSubFonts >= SUBFONT_SPACE) {
 	SubFont *newPtr;
 
-	newPtr = (SubFont *)Tcl_Alloc(sizeof(SubFont) * (fontPtr->numSubFonts + 1));
+	newPtr = (SubFont *)ckalloc(sizeof(SubFont) * (fontPtr->numSubFonts + 1));
 	memcpy(newPtr, fontPtr->subFontArray,
 		fontPtr->numSubFonts * sizeof(SubFont));
 	if (fixSubFontPtrPtr != NULL) {
@@ -2466,7 +2466,7 @@ CanUseFallback(
 	    }
 	}
 	if (fontPtr->subFontArray != fontPtr->staticSubFonts) {
-	    Tcl_Free(fontPtr->subFontArray);
+	    ckfree(fontPtr->subFontArray);
 	}
 	fontPtr->subFontArray = newPtr;
     }

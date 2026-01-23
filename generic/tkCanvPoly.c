@@ -95,7 +95,7 @@ static const Tk_ConfigSpec configSpecs[] = {
 	NULL, offsetof(PolygonItem, outline.dash),
 	TK_CONFIG_NULL_OK, &dashOption},
     {TK_CONFIG_PIXELS, "-dashoffset", NULL, NULL,
-	"0", offsetof(PolygonItem, outline.offsetObj), TK_CONFIG_OBJS|TK_OPTION_NEG_OK, NULL},
+	"0", offsetof(PolygonItem, outline.offsetObj), TK_CONFIG_OBJS, NULL},
     {TK_CONFIG_CUSTOM, "-disableddash", NULL, NULL,
 	NULL, offsetof(PolygonItem, outline.disabledDash),
 	TK_CONFIG_NULL_OK, &dashOption},
@@ -370,7 +370,7 @@ PolygonCoords(
     numPoints = objc/2;
     if (polyPtr->pointsAllocated <= numPoints) {
 	if (polyPtr->coordPtr != NULL) {
-	    Tcl_Free(polyPtr->coordPtr);
+	    ckfree(polyPtr->coordPtr);
 	}
 
 	/*
@@ -378,7 +378,7 @@ PolygonCoords(
 	 * another point to close the polygon.
 	 */
 
-	polyPtr->coordPtr = (double *)Tcl_Alloc(sizeof(double) * (objc+2));
+	polyPtr->coordPtr = (double *)ckalloc(sizeof(double) * (objc+2));
 	polyPtr->pointsAllocated = numPoints+1;
     }
     for (i = objc-1; i >= 0; i--) {
@@ -574,7 +574,7 @@ DeletePolygon(
 
     Tk_DeleteOutline(display, &polyPtr->outline);
     if (polyPtr->coordPtr != NULL) {
-	Tcl_Free(polyPtr->coordPtr);
+	ckfree(polyPtr->coordPtr);
     }
     if (polyPtr->fillColor != NULL) {
 	Tk_FreeColor(polyPtr->fillColor);
@@ -827,7 +827,7 @@ TkFillPolygon(
     if (numPoints <= MAX_STATIC_POINTS) {
 	pointPtr = staticPoints;
     } else {
-	pointPtr = (XPoint *)Tcl_Alloc(numPoints * sizeof(XPoint));
+	pointPtr = (XPoint *)ckalloc(numPoints * sizeof(XPoint));
     }
 
     for (i=0, pPtr=pointPtr ; i<numPoints; i+=1, coordPtr+=2, pPtr++) {
@@ -849,7 +849,7 @@ TkFillPolygon(
 		CoordModeOrigin);
     }
     if (pointPtr != staticPoints) {
-	Tcl_Free(pointPtr);
+	ckfree(pointPtr);
     }
 }
 
@@ -974,7 +974,7 @@ DisplayPolygon(
 	if (numPoints <= MAX_STATIC_POINTS) {
 	    pointPtr = staticPoints;
 	} else {
-	    pointPtr = (XPoint *)Tcl_Alloc(numPoints * sizeof(XPoint));
+	    pointPtr = (XPoint *)ckalloc(numPoints * sizeof(XPoint));
 	}
 	numPoints = polyPtr->smooth->coordProc(canvas, polyPtr->coordPtr,
 		polyPtr->numPoints, polyPtr->splineSteps, pointPtr, NULL);
@@ -987,7 +987,7 @@ DisplayPolygon(
 		    numPoints, CoordModeOrigin);
 	}
 	if (pointPtr != staticPoints) {
-	    Tcl_Free(pointPtr);
+	    ckfree(pointPtr);
 	}
     }
     Tk_ResetOutlineGC(canvas, itemPtr, &polyPtr->outline);
@@ -1044,14 +1044,14 @@ PolygonInsert(
     while ((int)beforeThis < 0) {
 	beforeThis += length;
     }
-    newCoordPtr = (double *)Tcl_Alloc(sizeof(double) * (length + 2 + objc));
+    newCoordPtr = (double *)ckalloc(sizeof(double) * (length + 2 + objc));
     for (i=0; i<(int)beforeThis; i++) {
 	newCoordPtr[i] = polyPtr->coordPtr[i];
     }
     for (i=0; i<objc; i++) {
 	if (Tcl_GetDoubleFromObj(NULL, objv[i],
 		&newCoordPtr[i+beforeThis]) != TCL_OK){
-	    Tcl_Free(newCoordPtr);
+	    ckfree(newCoordPtr);
 	    return;
 	}
     }
@@ -1060,7 +1060,7 @@ PolygonInsert(
 	newCoordPtr[i+objc] = polyPtr->coordPtr[i];
     }
     if (polyPtr->coordPtr) {
-	Tcl_Free(polyPtr->coordPtr);
+	ckfree(polyPtr->coordPtr);
     }
     length += objc;
     polyPtr->coordPtr = newCoordPtr;
@@ -1240,7 +1240,7 @@ PolygonDeleteCoords(
     if (count >= length) {
 	polyPtr->numPoints = 0;
 	if (polyPtr->coordPtr != NULL) {
-	    Tcl_Free(polyPtr->coordPtr);
+	    ckfree(polyPtr->coordPtr);
 	    polyPtr->coordPtr = NULL;
 	}
 	ComputePolygonBbox(canvas, polyPtr);
@@ -1329,7 +1329,7 @@ PolygonToPoint(
 	if (numPoints <= MAX_STATIC_POINTS) {
 	    polyPoints = staticSpace;
 	} else {
-	    polyPoints = (double *)Tcl_Alloc(2 * numPoints * sizeof(double));
+	    polyPoints = (double *)ckalloc(2 * numPoints * sizeof(double));
 	}
 	numPoints = polyPtr->smooth->coordProc(canvas, polyPtr->coordPtr,
 		polyPtr->numPoints, polyPtr->splineSteps, NULL, polyPoints);
@@ -1447,7 +1447,7 @@ PolygonToPoint(
 
   donepoint:
     if (polyPoints != staticSpace && polyPoints != polyPtr->coordPtr) {
-	Tcl_Free(polyPoints);
+	ckfree(polyPoints);
     }
     return bestDist;
 }
@@ -1537,7 +1537,7 @@ PolygonToArea(
 	if (numPoints <= MAX_STATIC_POINTS) {
 	    polyPoints = staticSpace;
 	} else {
-	    polyPoints = (double *)Tcl_Alloc(2 * numPoints * sizeof(double));
+	    polyPoints = (double *)ckalloc(2 * numPoints * sizeof(double));
 	}
 	numPoints = polyPtr->smooth->coordProc(canvas, polyPtr->coordPtr,
 		polyPtr->numPoints, polyPtr->splineSteps, NULL, polyPoints);
@@ -1640,7 +1640,7 @@ PolygonToArea(
 
   donearea:
     if ((polyPoints != staticSpace) && (polyPoints != polyPtr->coordPtr)) {
-	Tcl_Free(polyPoints);
+	ckfree(polyPoints);
     }
     return inside;
 }

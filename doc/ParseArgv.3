@@ -288,14 +288,14 @@ is updated to reflect reduced number of arguments.
  */
 int debugFlag = 0;
 int numReps = 100;
-const char defaultFileName[] = "out";
-const char *fileName = defaultFileName;
+char defaultFileName[] = "out";
+char *fileName = defaultFileName;
 Boolean exec = FALSE;
 
 /*
  * Define option descriptions.
  */
-static Tk_ArgvInfo argTable[] = {
+Tk_ArgvInfo argTable[] = {
     {"-X", TK_ARGV_CONSTANT, (char *) 1, &debugFlag,
         "Turn on debugging printfs"},
     {"-N", TK_ARGV_INT, NULL, &numReps,

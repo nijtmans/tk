@@ -434,7 +434,7 @@ static int		EntryValueChanged(Entry *entryPtr,
 			    const char *newValue);
 static void		EntryVisibleRange(Entry *entryPtr,
 			    double *firstPtr, double *lastPtr);
-static Tcl_ObjCmdProc2 EntryWidgetObjCmd;
+static Tcl_ObjCmdProc EntryWidgetObjCmd;
 static void		EntryWorldChanged(void *instanceData);
 static int		GetEntryIndex(Tcl_Interp *interp, Entry *entryPtr,
 			    Tcl_Obj *indexObj, Tcl_Size *indexPtr);
@@ -444,7 +444,7 @@ static int		InsertChars(Entry *entryPtr, Tcl_Size index, Tcl_Obj *obj);
  * These forward declarations are the spinbox specific ones:
  */
 
-static Tcl_ObjCmdProc2 SpinboxWidgetObjCmd;
+static Tcl_ObjCmdProc SpinboxWidgetObjCmd;
 static int		GetSpinboxElement(Spinbox *sbPtr, int x, int y);
 static int		SpinboxInvoke(Tcl_Interp *interp, Spinbox *sbPtr,
 			    int element);
@@ -483,7 +483,7 @@ int
 Tk_EntryObjCmd(
     TCL_UNUSED(void *),
     Tcl_Interp *interp,		/* Current interpreter. */
-    Tcl_Size objc,		/* Number of arguments. */
+    int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
     Entry *entryPtr;
@@ -516,18 +516,18 @@ Tk_EntryObjCmd(
      * initialized as memset covers the rest.
      */
 
-    entryPtr = (Entry *)Tcl_Alloc(sizeof(Entry));
+    entryPtr = (Entry *)ckalloc(sizeof(Entry));
     memset(entryPtr, 0, sizeof(Entry));
 
     entryPtr->tkwin		= tkwin;
     entryPtr->display		= Tk_Display(tkwin);
     entryPtr->interp		= interp;
-    entryPtr->widgetCmd		= Tcl_CreateObjCommand2(interp,
+    entryPtr->widgetCmd		= Tcl_CreateObjCommand(interp,
 	    Tk_PathName(entryPtr->tkwin), EntryWidgetObjCmd, entryPtr,
 	    EntryCmdDeletedProc);
     entryPtr->optionTable	= optionTable;
     entryPtr->type		= TK_ENTRY;
-    tmp				= (char *)Tcl_Alloc(1);
+    tmp				= (char *)ckalloc(1);
     tmp[0]			= '\0';
     entryPtr->string		= tmp;
     entryPtr->selectFirst	= TCL_INDEX_NONE;
@@ -596,7 +596,7 @@ static int
 EntryWidgetObjCmd(
     void *clientData,	/* Information about entry widget. */
     Tcl_Interp *interp,		/* Current interpreter. */
-    Tcl_Size objc,			/* Number of arguments. */
+    int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
     Entry *entryPtr = (Entry *)clientData;
@@ -1040,7 +1040,7 @@ DestroyEntry(
      * Tk_FreeOptions handle all the standard option-related stuff.
      */
 
-    Tcl_Free((void *)entryPtr->string);
+    ckfree((void *)entryPtr->string);
     if (entryPtr->textVarNameObj != NULL) {
 	Tcl_UntraceVar2(entryPtr->interp, Tcl_GetString(entryPtr->textVarNameObj),
 		NULL, TCL_GLOBAL_ONLY|TCL_TRACE_WRITES|TCL_TRACE_UNSETS,
@@ -1055,7 +1055,7 @@ DestroyEntry(
     }
     Tcl_DeleteTimerHandler(entryPtr->insertBlinkHandler);
     if (entryPtr->displayString != entryPtr->string) {
-	Tcl_Free((void *)entryPtr->displayString);
+	ckfree((void *)entryPtr->displayString);
     }
     if (entryPtr->type == TK_SPINBOX) {
 	Spinbox *sbPtr = (Spinbox *) entryPtr;
@@ -1065,7 +1065,7 @@ DestroyEntry(
 	    sbPtr->listObj = NULL;
 	}
 	if (sbPtr->formatBuf) {
-	    Tcl_Free(sbPtr->formatBuf);
+	    ckfree(sbPtr->formatBuf);
 	}
     }
     Tk_FreeTextLayout(entryPtr->textLayout);
@@ -1074,7 +1074,7 @@ DestroyEntry(
     Tcl_Release(entryPtr->tkwin);
     entryPtr->tkwin = NULL;
 
-    Tcl_Free(entryPtr);
+    ckfree(entryPtr);
 }
 
 /*
@@ -1186,10 +1186,40 @@ ConfigureEntry(
 	Tk_SetBackgroundFromBorder(entryPtr->tkwin, border);
 
 	Tk_GetPixelsFromObj(NULL, entryPtr->tkwin, entryPtr->borderWidthObj, &borderWidth);
+	if (borderWidth < 0) {
+	    borderWidth = 0;
+	    Tcl_DecrRefCount(entryPtr->borderWidthObj);
+	    entryPtr->borderWidthObj = Tcl_NewIntObj(0);
+	    Tcl_IncrRefCount(entryPtr->borderWidthObj);
+	}
 	Tk_GetPixelsFromObj(NULL, entryPtr->tkwin, entryPtr->highlightWidthObj, &highlightWidth);
+	if (highlightWidth < 0) {
+	    highlightWidth = 0;
+	    Tcl_DecrRefCount(entryPtr->highlightWidthObj);
+	    entryPtr->highlightWidthObj = Tcl_NewIntObj(0);
+	    Tcl_IncrRefCount(entryPtr->highlightWidthObj);
+	}
 	Tk_GetPixelsFromObj(NULL, entryPtr->tkwin, entryPtr->insertBorderWidthObj, &insertBorderWidth);
+	if (insertBorderWidth < 0) {
+	    insertBorderWidth = 0;
+	    Tcl_DecrRefCount(entryPtr->insertBorderWidthObj);
+	    entryPtr->insertBorderWidthObj = Tcl_NewIntObj(0);
+	    Tcl_IncrRefCount(entryPtr->insertBorderWidthObj);
+	}
 	Tk_GetPixelsFromObj(NULL, entryPtr->tkwin, entryPtr->insertWidthObj, &insertWidth);
+	if (insertWidth < 0) {
+	    insertWidth = 0;
+	    Tcl_DecrRefCount(entryPtr->insertWidthObj);
+	    entryPtr->insertWidthObj = Tcl_NewIntObj(0);
+	    Tcl_IncrRefCount(entryPtr->insertWidthObj);
+	}
 	Tk_GetPixelsFromObj(NULL, entryPtr->tkwin, entryPtr->selBorderWidthObj, &selBorderWidth);
+	if (selBorderWidth < 0) {
+	    selBorderWidth = 0;
+	    Tcl_DecrRefCount(entryPtr->selBorderWidthObj);
+	    entryPtr->selBorderWidthObj = Tcl_NewIntObj(0);
+	    Tcl_IncrRefCount(entryPtr->selBorderWidthObj);
+	}
 
 	if (entryPtr->type == TK_SPINBOX) {
 	    if (sbPtr->fromValue > sbPtr->toValue) {
@@ -1238,7 +1268,7 @@ ConfigureEntry(
 		if (formatSpace < TCL_DOUBLE_SPACE) {
 		    formatSpace = TCL_DOUBLE_SPACE;
 		}
-		sbPtr->formatBuf = (char *)Tcl_Realloc(sbPtr->formatBuf, formatSpace);
+		sbPtr->formatBuf = (char *)ckrealloc(sbPtr->formatBuf, formatSpace);
 
 		/*
 		 * We perturb the value of oldFrom to allow us to go into the
@@ -1978,7 +2008,7 @@ EntryComputeGeometry(
     char *p;
 
     if (entryPtr->displayString != entryPtr->string) {
-	Tcl_Free((void *)entryPtr->displayString);
+	ckfree((void *)entryPtr->displayString);
 	entryPtr->displayString = entryPtr->string;
 	entryPtr->numDisplayBytes = entryPtr->numBytes;
     }
@@ -2004,7 +2034,7 @@ EntryComputeGeometry(
 	size = Tcl_UniCharToUtf(ch, buf);
 
 	entryPtr->numDisplayBytes = entryPtr->numChars * size;
-	p = (char *)Tcl_Alloc(entryPtr->numDisplayBytes + 1);
+	p = (char *)ckalloc(entryPtr->numDisplayBytes + 1);
 	entryPtr->displayString = p;
 
 	for (i = entryPtr->numChars; i-- > 0; ) {
@@ -2173,7 +2203,7 @@ InsertChars(
     }
 
     newByteCount = entryPtr->numBytes + byteCount + 1;
-    newStr = (char *)Tcl_Alloc(newByteCount);
+    newStr = (char *)ckalloc(newByteCount);
     memcpy(newStr, string, byteIndex);
     strcpy(newStr + byteIndex, value);
     strcpy(newStr + byteIndex + byteCount, string + byteIndex);
@@ -2182,11 +2212,11 @@ InsertChars(
 	    entryPtr->validate == VALIDATE_ALL) &&
 	    EntryValidateChange(entryPtr, value, newStr, index,
 		    VALIDATE_INSERT) != TCL_OK) {
-	Tcl_Free(newStr);
+	ckfree(newStr);
 	return TCL_OK;
     }
 
-    Tcl_Free((void *)string);
+    ckfree((void *)string);
     entryPtr->string = newStr;
 
     /*
@@ -2274,11 +2304,11 @@ DeleteChars(
     byteCount = Tcl_UtfAtIndex(string + byteIndex, count) - (string+byteIndex);
 
     newByteCount = entryPtr->numBytes + 1 - byteCount;
-    newStr = (char *)Tcl_Alloc(newByteCount);
+    newStr = (char *)ckalloc(newByteCount);
     memcpy(newStr, string, (size_t) byteIndex);
     strcpy(newStr + byteIndex, string + byteIndex + byteCount);
 
-    toDelete = (char *)Tcl_Alloc(byteCount + 1);
+    toDelete = (char *)ckalloc(byteCount + 1);
     memcpy(toDelete, string + byteIndex, (size_t) byteCount);
     toDelete[byteCount] = '\0';
 
@@ -2286,13 +2316,13 @@ DeleteChars(
 	    entryPtr->validate == VALIDATE_ALL) &&
 	    EntryValidateChange(entryPtr, toDelete, newStr, index,
 		    VALIDATE_DELETE) != TCL_OK) {
-	Tcl_Free(newStr);
-	Tcl_Free(toDelete);
+	ckfree(newStr);
+	ckfree(toDelete);
 	return TCL_OK;
     }
 
-    Tcl_Free(toDelete);
-    Tcl_Free((void *)entryPtr->string);
+    ckfree(toDelete);
+    ckfree((void *)entryPtr->string);
     entryPtr->string = newStr;
     entryPtr->numChars -= count;
     entryPtr->numBytes -= byteCount;
@@ -2464,7 +2494,7 @@ EntrySetValue(
 	 * during validation
 	 */
 
-	char *tmp = (char *)Tcl_Alloc(valueLen + 1);
+	char *tmp = (char *)ckalloc(valueLen + 1);
 
 	strcpy(tmp, value);
 	value = tmp;
@@ -2482,18 +2512,18 @@ EntrySetValue(
 
 	if (entryPtr->flags & VALIDATE_ABORT) {
 	    entryPtr->flags &= ~VALIDATE_ABORT;
-	    Tcl_Free((void *)value);
+	    ckfree((void *)value);
 	    return;
 	}
     }
 
     oldSource = entryPtr->string;
-    Tcl_Free((void *)entryPtr->string);
+    ckfree((void *)entryPtr->string);
 
     if (malloced) {
 	entryPtr->string = value;
     } else {
-	char *tmp = (char *)Tcl_Alloc(valueLen + 1);
+	char *tmp = (char *)ckalloc(valueLen + 1);
 
 	strcpy(tmp, value);
 	entryPtr->string = tmp;
@@ -3700,7 +3730,7 @@ int
 Tk_SpinboxObjCmd(
     TCL_UNUSED(void *),
     Tcl_Interp *interp,		/* Current interpreter. */
-    Tcl_Size objc,			/* Number of arguments. */
+    int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
     Entry *entryPtr;
@@ -3734,19 +3764,19 @@ Tk_SpinboxObjCmd(
      * initialized as memset covers the rest.
      */
 
-    sbPtr = (Spinbox *)Tcl_Alloc(sizeof(Spinbox));
+    sbPtr = (Spinbox *)ckalloc(sizeof(Spinbox));
     entryPtr			= (Entry *) sbPtr;
     memset(sbPtr, 0, sizeof(Spinbox));
 
     entryPtr->tkwin		= tkwin;
     entryPtr->display		= Tk_Display(tkwin);
     entryPtr->interp		= interp;
-    entryPtr->widgetCmd		= Tcl_CreateObjCommand2(interp,
+    entryPtr->widgetCmd		= Tcl_CreateObjCommand(interp,
 	    Tk_PathName(entryPtr->tkwin), SpinboxWidgetObjCmd, sbPtr,
 	    EntryCmdDeletedProc);
     entryPtr->optionTable	= optionTable;
     entryPtr->type		= TK_SPINBOX;
-    tmp				= (char *)Tcl_Alloc(1);
+    tmp				= (char *)ckalloc(1);
     tmp[0]			= '\0';
     entryPtr->string		= tmp;
     entryPtr->selectFirst	= TCL_INDEX_NONE;
@@ -3773,7 +3803,7 @@ Tk_SpinboxObjCmd(
     sbPtr->fromValue		= 0.0;
     sbPtr->toValue		= 100.0;
     sbPtr->increment		= 1.0;
-    sbPtr->formatBuf		= (char *)Tcl_Alloc(TCL_DOUBLE_SPACE);
+    sbPtr->formatBuf		= (char *)ckalloc(TCL_DOUBLE_SPACE);
     sbPtr->bdRelief		= TK_RELIEF_FLAT;
     sbPtr->buRelief		= TK_RELIEF_FLAT;
 
@@ -3833,7 +3863,7 @@ static int
 SpinboxWidgetObjCmd(
     void *clientData,	/* Information about spinbox widget. */
     Tcl_Interp *interp,		/* Current interpreter. */
-    Tcl_Size objc,			/* Number of arguments. */
+    int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
     Entry *entryPtr = (Entry *)clientData;

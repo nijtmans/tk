@@ -37,12 +37,12 @@ Tk_GetPixmap(
     int depth)
 {
     TkWinDrawable *newTwdPtr, *twdPtr;
-    DWORD planes;
+    int planes;
     Screen *screen;
 
     LastKnownRequestProcessed(display)++;
 
-    newTwdPtr = (TkWinDrawable *)Tcl_Alloc(sizeof(TkWinDrawable));
+    newTwdPtr = (TkWinDrawable *)ckalloc(sizeof(TkWinDrawable));
     newTwdPtr->type = TWD_BITMAP;
     newTwdPtr->bitmap.depth = depth;
     twdPtr = (TkWinDrawable *) d;
@@ -59,11 +59,11 @@ Tk_GetPixmap(
     screen = ScreenOfDisplay(display, 0);
     planes = 1;
     if (depth == DefaultDepthOfScreen(screen)) {
-	planes = (DWORD)PTR2INT(screen->ext_data);
+	planes = PTR2INT(screen->ext_data);
 	depth /= planes;
     }
     newTwdPtr->bitmap.handle =
-	    CreateBitmap(width, height, planes, (DWORD) depth, NULL);
+	    CreateBitmap(width, height, (DWORD) planes, (DWORD) depth, NULL);
 
     /*
      * CreateBitmap tries to use memory on the graphics card. If it fails,
@@ -81,8 +81,8 @@ Tk_GetPixmap(
 	bitmapInfo.bmiHeader.biSize = sizeof(bitmapInfo.bmiHeader);
 	bitmapInfo.bmiHeader.biWidth = width;
 	bitmapInfo.bmiHeader.biHeight = height;
-	bitmapInfo.bmiHeader.biPlanes = (WORD)planes;
-	bitmapInfo.bmiHeader.biBitCount = (WORD)depth;
+	bitmapInfo.bmiHeader.biPlanes = planes;
+	bitmapInfo.bmiHeader.biBitCount = depth;
 	bitmapInfo.bmiHeader.biCompression = BI_RGB;
 	bitmapInfo.bmiHeader.biSizeImage = 0;
 	dc = GetDC(NULL);
@@ -114,7 +114,7 @@ Tk_GetPixmap(
     }
 
     if (newTwdPtr->bitmap.handle == NULL) {
-	Tcl_Free(newTwdPtr);
+	ckfree(newTwdPtr);
 	return None;
     }
 
@@ -147,7 +147,7 @@ Tk_FreePixmap(
     LastKnownRequestProcessed(display)++;
     if (twdPtr != NULL) {
 	DeleteObject(twdPtr->bitmap.handle);
-	Tcl_Free(twdPtr);
+	ckfree(twdPtr);
     }
 }
 

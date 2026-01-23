@@ -121,7 +121,7 @@ TkScrollbar *
 TkpCreateScrollbar(
     Tk_Window tkwin)
 {
-    MacScrollbar *scrollPtr = (MacScrollbar *)Tcl_Alloc(sizeof(MacScrollbar));
+    MacScrollbar *scrollPtr = (MacScrollbar *)ckalloc(sizeof(MacScrollbar));
 
     scrollPtr->troughGC = NULL;
     scrollPtr->copyGC = NULL;

@@ -339,7 +339,7 @@ static void		FrameRequestProc(void *clientData,
 			    Tk_Window tkwin);
 static void		FrameStructureProc(void *clientData,
 			    XEvent *eventPtr);
-static Tcl_ObjCmdProc2 FrameWidgetObjCmd;
+static Tcl_ObjCmdProc FrameWidgetObjCmd;
 static void		FrameWorldChanged(void *instanceData);
 static void		MapFrame(void *clientData);
 
@@ -389,7 +389,7 @@ int
 Tk_FrameObjCmd(
     void *clientData,	/* Either NULL or pointer to option table. */
     Tcl_Interp *interp,		/* Current interpreter. */
-    Tcl_Size objc,			/* Number of arguments. */
+    int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
     return TkCreateFrame(clientData, interp, objc, objv, TYPE_FRAME, NULL);
@@ -399,7 +399,7 @@ int
 Tk_ToplevelObjCmd(
     void *clientData,	/* Either NULL or pointer to option table. */
     Tcl_Interp *interp,		/* Current interpreter. */
-    Tcl_Size objc,			/* Number of arguments. */
+    int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
     return TkCreateFrame(clientData, interp, objc, objv, TYPE_TOPLEVEL, NULL);
@@ -409,7 +409,7 @@ int
 Tk_LabelframeObjCmd(
     void *clientData,	/* Either NULL or pointer to option table. */
     Tcl_Interp *interp,		/* Current interpreter. */
-    Tcl_Size objc,			/* Number of arguments. */
+    int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
     return TkCreateFrame(clientData, interp, objc, objv, TYPE_LABELFRAME, NULL);
@@ -612,16 +612,16 @@ TkCreateFrame(
      */
 
     if (type == TYPE_LABELFRAME) {
-	framePtr = (Frame *)Tcl_Alloc(sizeof(Labelframe));
+	framePtr = (Frame *)ckalloc(sizeof(Labelframe));
 	memset(framePtr, 0, sizeof(Labelframe));
     } else {
-	framePtr = (Frame *)Tcl_Alloc(sizeof(Frame));
+	framePtr = (Frame *)ckalloc(sizeof(Frame));
 	memset(framePtr, 0, sizeof(Frame));
     }
     framePtr->tkwin = newWin;
     framePtr->display = Tk_Display(newWin);
     framePtr->interp = interp;
-    framePtr->widgetCmd	= Tcl_CreateObjCommand2(interp, Tk_PathName(newWin),
+    framePtr->widgetCmd	= Tcl_CreateObjCommand(interp, Tk_PathName(newWin),
 	    FrameWidgetObjCmd, framePtr, FrameCmdDeletedProc);
     framePtr->optionTable = optionTable;
     framePtr->type = type;
@@ -697,7 +697,7 @@ static int
 FrameWidgetObjCmd(
     void *clientData,	/* Information about frame widget. */
     Tcl_Interp *interp,		/* Current interpreter. */
-    Tcl_Size objc,			/* Number of arguments. */
+    int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
     static const char *const frameOptions[] = {
@@ -845,7 +845,7 @@ DestroyFrame(
     if (framePtr->bgimg) {
 	Tk_FreeImage(framePtr->bgimg);
     }
-    Tcl_Free(framePtr);
+    ckfree(framePtr);
 }
 
 /*
@@ -920,6 +920,8 @@ ConfigureFrame(
     Tk_Window oldWindow = NULL;
     Labelframe *labelframePtr = (Labelframe *) framePtr;
     Tk_Image image = NULL;
+    int padX, padY, width, height;
+    int borderWidth, highlightWidth;
 
     /*
      * Need the old menubar name for the menu code to delete it.
@@ -978,6 +980,43 @@ ConfigureFrame(
 	Tk_SetBackgroundFromBorder(framePtr->tkwin, framePtr->border);
     } else {
 	Tk_SetWindowBackgroundPixmap(framePtr->tkwin, None);
+    }
+
+    Tk_GetPixelsFromObj(NULL, framePtr->tkwin, framePtr->borderWidthObj, &borderWidth);
+    if (borderWidth < 0) {
+	Tcl_DecrRefCount(framePtr->borderWidthObj);
+	framePtr->borderWidthObj = Tcl_NewIntObj(0);
+	Tcl_IncrRefCount(framePtr->borderWidthObj);
+    }
+    Tk_GetPixelsFromObj(NULL, framePtr->tkwin, framePtr->heightObj, &height);
+    if (height < 0) {
+	Tcl_DecrRefCount(framePtr->heightObj);
+	framePtr->heightObj = Tcl_NewIntObj(0);
+	Tcl_IncrRefCount(framePtr->heightObj);
+    }
+    Tk_GetPixelsFromObj(NULL, framePtr->tkwin, framePtr->highlightWidthObj, &highlightWidth);
+    if (highlightWidth < 0) {
+	Tcl_DecrRefCount(framePtr->highlightWidthObj);
+	framePtr->highlightWidthObj = Tcl_NewIntObj(0);
+	Tcl_IncrRefCount(framePtr->highlightWidthObj);
+    }
+    Tk_GetPixelsFromObj(NULL, framePtr->tkwin, framePtr->padXObj, &padX);
+    if (padX < 0) {
+	Tcl_DecrRefCount(framePtr->padXObj);
+	framePtr->padXObj = Tcl_NewIntObj(0);
+	Tcl_IncrRefCount(framePtr->padXObj);
+    }
+    Tk_GetPixelsFromObj(NULL, framePtr->tkwin, framePtr->padYObj, &padY);
+    if (padY < 0) {
+	Tcl_DecrRefCount(framePtr->padYObj);
+	framePtr->padYObj = Tcl_NewIntObj(0);
+	Tcl_IncrRefCount(framePtr->padYObj);
+    }
+    Tk_GetPixelsFromObj(NULL, framePtr->tkwin, framePtr->widthObj, &width);
+    if (width < 0) {
+	Tcl_DecrRefCount(framePtr->widthObj);
+	framePtr->widthObj = Tcl_NewIntObj(0);
+	Tcl_IncrRefCount(framePtr->widthObj);
     }
 
     /*
@@ -2059,10 +2098,10 @@ TkToplevelWindowForCommand(
     if (Tcl_GetCommandInfo(interp, cmdName, &cmdInfo) == 0) {
 	return NULL;
     }
-    if (cmdInfo.objProc2 != FrameWidgetObjCmd) {
+    if (cmdInfo.objProc != FrameWidgetObjCmd) {
 	return NULL;
     }
-    framePtr = (Frame *)cmdInfo.objClientData2;
+    framePtr = (Frame *)cmdInfo.objClientData;
     if (framePtr->type != TYPE_TOPLEVEL) {
 	return NULL;
     }

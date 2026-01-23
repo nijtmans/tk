@@ -14,7 +14,7 @@
 #include "tkBusy.h"
 
 typedef struct {
-    bool initialized;		/* false means table below needs initializing. */
+    int initialized;		/* 0 means table below needs initializing. */
     Tcl_HashTable windowTable;  /* The windowTable maps from HWND to Tk_Window
 				 * handles. */
 } ThreadSpecificData;
@@ -57,7 +57,7 @@ Tk_AttachHWND(
 
     if (!tsdPtr->initialized) {
 	Tcl_InitHashTable(&tsdPtr->windowTable, TCL_ONE_WORD_KEYS);
-	tsdPtr->initialized = true;
+	tsdPtr->initialized = 1;
     }
 
     /*
@@ -66,7 +66,7 @@ Tk_AttachHWND(
      */
 
     if (twdPtr == NULL) {
-	twdPtr = (TkWinDrawable *)Tcl_Alloc(sizeof(TkWinDrawable));
+	twdPtr = (TkWinDrawable *)ckalloc(sizeof(TkWinDrawable));
 	twdPtr->type = TWD_WINDOW;
 	twdPtr->window.winPtr = (TkWindow *) tkwin;
     } else if (twdPtr->window.handle != NULL) {
@@ -113,7 +113,7 @@ Tk_HWNDToWindow(
 
     if (!tsdPtr->initialized) {
 	Tcl_InitHashTable(&tsdPtr->windowTable, TCL_ONE_WORD_KEYS);
-	tsdPtr->initialized = true;
+	tsdPtr->initialized = 1;
     }
     entryPtr = Tcl_FindHashEntry(&tsdPtr->windowTable, hwnd);
     if (entryPtr != NULL) {
@@ -320,7 +320,7 @@ XDestroyWindow(
 	Tcl_DeleteHashEntry(entryPtr);
     }
 
-    Tcl_Free(twdPtr);
+    ckfree(twdPtr);
 
     /*
      * Don't bother destroying the window if we are going to destroy the

@@ -23,7 +23,7 @@
  */
 
 typedef struct {
-    bool initialized;
+    int initialized;
     Tcl_HashTable uidTable;
 } ThreadSpecificData;
 static Tcl_ThreadDataKey dataKey;
@@ -501,7 +501,7 @@ FreeUidThreadExitProc(
 	    Tcl_GetThreadData(&dataKey, sizeof(ThreadSpecificData));
 
     Tcl_DeleteHashTable(&tsdPtr->uidTable);
-    tsdPtr->initialized = false;
+    tsdPtr->initialized = 0;
 }
 
 /*
@@ -538,7 +538,7 @@ Tk_GetUid(
     if (!tsdPtr->initialized) {
 	Tcl_InitHashTable(tablePtr, TCL_STRING_KEYS);
 	Tcl_CreateThreadExitHandler(FreeUidThreadExitProc, NULL);
-	tsdPtr->initialized = true;
+	tsdPtr->initialized = 1;
     }
     return (Tk_Uid) Tcl_GetHashKey(tablePtr,
 	    Tcl_CreateHashEntry(tablePtr, string, &dummy));

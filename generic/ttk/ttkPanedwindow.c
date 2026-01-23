@@ -110,12 +110,12 @@ static const Tk_OptionSpec PaneOptionSpecs[] = {
 static Pane *CreatePane(Tcl_Interp *interp, Paned *pw, Tk_Window window)
 {
     Tk_OptionTable optionTable = pw->paned.paneOptionTable;
-    void *record = Tcl_Alloc(sizeof(Pane));
+    void *record = ckalloc(sizeof(Pane));
     Pane *pane = (Pane *)record;
 
     memset(record, 0, sizeof(Pane));
     if (Tk_InitOptions(interp, record, optionTable, window) != TCL_OK) {
-	Tcl_Free(record);
+	ckfree(record);
 	return NULL;
     }
 
@@ -133,7 +133,7 @@ static void DestroyPane(Paned *pw, Pane *pane)
 {
     void *record = pane;
     Tk_FreeConfigOptions(record, pw->paned.paneOptionTable, pw->core.tkwin);
-    Tcl_Free(record);
+    ckfree(record);
 }
 
 /* ConfigurePane --

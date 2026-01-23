@@ -49,10 +49,10 @@ static void		MouseTimerProc(void *clientData);
  *----------------------------------------------------------------------
  */
 
-unsigned int
+int
 TkWinGetModifierState(void)
 {
-    unsigned int state = 0;
+    int state = 0;
 
     if (GetKeyState(VK_SHIFT) & 0x8000) {
 	state |= ShiftMask;
@@ -143,7 +143,7 @@ TkWinPointerEvent(
     }
     tkwin = Tk_HWNDToWindow(hwnd);
 
-    state = (int)TkWinGetModifierState();
+    state = TkWinGetModifierState();
 
     Tk_UpdatePointer(tkwin, pos.x, pos.y, state);
 
@@ -525,7 +525,7 @@ XSetInputFocus(
  *----------------------------------------------------------------------
  */
 
-size_t
+int
 TkpChangeFocus(
     TkWindow *winPtr,		/* Window that is to receive the X focus. */
     int force)			/* Non-zero means claim the focus even if it
@@ -534,8 +534,7 @@ TkpChangeFocus(
 {
     TkDisplay *dispPtr = winPtr->dispPtr;
     Window focusWindow;
-    int dummy;
-    size_t serial;
+    int dummy, serial;
     TkWindow *winPtr2;
 
     if (!force) {

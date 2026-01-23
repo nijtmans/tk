@@ -59,13 +59,14 @@ static void		InitCursorObj(Tcl_Obj *objPtr);
  * option is set.
  */
 
-const Tcl_ObjType tkCursorObjType = {
-    "cursor",			/* name */
+const TkObjType tkCursorObjType = {
+    {"cursor",			/* name */
     FreeCursorObjProc,		/* freeIntRepProc */
     DupCursorObjProc,		/* dupIntRepProc */
     NULL,			/* updateStringProc */
     NULL,			/* setFromAnyProc */
-    TCL_OBJTYPE_V1(TkLengthOne)
+    TCL_OBJTYPE_V1(TkLengthOne)},
+    0
 };
 
 /*
@@ -102,7 +103,7 @@ Tk_AllocCursorFromObj(
 {
     TkCursor *cursorPtr;
 
-    if (objPtr->typePtr != &tkCursorObjType) {
+    if (objPtr->typePtr != &tkCursorObjType.objType) {
 	InitCursorObj(objPtr);
     }
     cursorPtr = (TkCursor *)objPtr->internalRep.twoPtrValue.ptr1;
@@ -488,7 +489,7 @@ FreeCursor(
     }
     TkpFreeCursor(cursorPtr);
     if (cursorPtr->objRefCount == 0) {
-	Tcl_Free(cursorPtr);
+	ckfree(cursorPtr);
     }
 }
 
@@ -596,7 +597,7 @@ FreeCursorObj(
     if (cursorPtr != NULL) {
 	if ((cursorPtr->objRefCount-- <= 1)
 		&& (cursorPtr->resourceRefCount == 0)) {
-	    Tcl_Free(cursorPtr);
+	    ckfree(cursorPtr);
 	}
 	objPtr->internalRep.twoPtrValue.ptr1 = NULL;
     }
@@ -699,7 +700,7 @@ GetCursorFromObj(
     Tcl_HashEntry *hashPtr;
     TkDisplay *dispPtr = ((TkWindow *) tkwin)->dispPtr;
 
-    if (objPtr->typePtr != &tkCursorObjType) {
+    if (objPtr->typePtr != &tkCursorObjType.objType) {
 	InitCursorObj(objPtr);
     }
 
@@ -776,7 +777,7 @@ InitCursorObj(
     if ((typePtr != NULL) && (typePtr->freeIntRepProc != NULL)) {
 	typePtr->freeIntRepProc(objPtr);
     }
-    objPtr->typePtr = &tkCursorObjType;
+    objPtr->typePtr = &tkCursorObjType.objType;
     objPtr->internalRep.twoPtrValue.ptr1 = NULL;
 }
 

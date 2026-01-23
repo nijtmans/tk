@@ -142,7 +142,7 @@ typedef struct {
     Tk_PhotoImageFormatVersion3 *formatListVersion3;
 				/* Pointer to the first in the list of known
 				 * photo image formats in Version3 format.*/
-    bool initialized;		/* Set to true if we've initialized the
+    int initialized;		/* Set to 1 if we've initialized the
 				 * structure. */
 } ThreadSpecificData;
 static Tcl_ThreadDataKey dataKey;
@@ -185,7 +185,8 @@ static const Tk_ConfigSpec configSpecs[] = {
  */
 
 static void		PhotoFormatThreadExitProc(void *clientData);
-static Tcl_ObjCmdProc2 ImgPhotoCmd;
+static int		ImgPhotoCmd(void *clientData, Tcl_Interp *interp,
+			    int objc, Tcl_Obj *const objv[]);
 static int		ParseSubcommandOptions(
 			    struct SubcommandOptions *optPtr,
 			    Tcl_Interp *interp, int allowedOptions,
@@ -244,14 +245,14 @@ PhotoFormatThreadExitProc(
     while (tsdPtr->formatList != NULL) {
 	freePtr = tsdPtr->formatList;
 	tsdPtr->formatList = tsdPtr->formatList->nextPtr;
-	Tcl_Free((void *)freePtr->name);
-	Tcl_Free(freePtr);
+	ckfree((void *)freePtr->name);
+	ckfree(freePtr);
     }
     while (tsdPtr->formatListVersion3 != NULL) {
 	freePtrVersion3 = tsdPtr->formatListVersion3;
 	tsdPtr->formatListVersion3 = tsdPtr->formatListVersion3->nextPtr;
-	Tcl_Free((void *)freePtrVersion3->name);
-	Tcl_Free(freePtrVersion3);
+	ckfree((void *)freePtrVersion3->name);
+	ckfree(freePtrVersion3);
     }
 }
 
@@ -287,14 +288,14 @@ Tk_CreatePhotoImageFormat(
 	    Tcl_GetThreadData(&dataKey, sizeof(ThreadSpecificData));
 
     if (!tsdPtr->initialized) {
-	tsdPtr->initialized = true;
+	tsdPtr->initialized = 1;
 	Tcl_CreateThreadExitHandler(PhotoFormatThreadExitProc, NULL);
     }
-    copyPtr = (Tk_PhotoImageFormat *)Tcl_Alloc(sizeof(Tk_PhotoImageFormat));
+    copyPtr = (Tk_PhotoImageFormat *)ckalloc(sizeof(Tk_PhotoImageFormat));
     *copyPtr = *formatPtr;
     {
 	/* for compatibility with aMSN: make a copy of formatPtr->name */
-	char *name = (char *)Tcl_Alloc(strlen(formatPtr->name) + 1);
+	char *name = (char *)ckalloc(strlen(formatPtr->name) + 1);
 	strcpy(name, formatPtr->name);
 	copyPtr->name = name;
 	copyPtr->nextPtr = tsdPtr->formatList;
@@ -314,14 +315,14 @@ Tk_CreatePhotoImageFormatVersion3(
 	    Tcl_GetThreadData(&dataKey, sizeof(ThreadSpecificData));
 
     if (!tsdPtr->initialized) {
-	tsdPtr->initialized = true;
+	tsdPtr->initialized = 1;
 	Tcl_CreateThreadExitHandler(PhotoFormatThreadExitProc, NULL);
     }
     copyPtr = (Tk_PhotoImageFormatVersion3 *)
-	    Tcl_Alloc(sizeof(Tk_PhotoImageFormatVersion3));
+	    ckalloc(sizeof(Tk_PhotoImageFormatVersion3));
     *copyPtr = *formatPtr;
     /* for compatibility with aMSN: make a copy of formatPtr->name */
-    name = (char *)Tcl_Alloc(strlen(formatPtr->name) + 1);
+    name = (char *)ckalloc(strlen(formatPtr->name) + 1);
     strcpy(name, formatPtr->name);
     copyPtr->name = name;
     copyPtr->nextPtr = tsdPtr->formatListVersion3;
@@ -365,11 +366,11 @@ ImgPhotoCreate(
      * Allocate and initialize the photo image model record.
      */
 
-    modelPtr = (PhotoModel *)Tcl_Alloc(sizeof(PhotoModel));
+    modelPtr = (PhotoModel *)ckalloc(sizeof(PhotoModel));
     memset(modelPtr, 0, sizeof(PhotoModel));
     modelPtr->tkModel = model;
     modelPtr->interp = interp;
-    modelPtr->imageCmd = Tcl_CreateObjCommand2(interp, name, ImgPhotoCmd,
+    modelPtr->imageCmd = Tcl_CreateObjCommand(interp, name, ImgPhotoCmd,
 	    modelPtr, ImgPhotoCmdDeletedProc);
     modelPtr->palette = NULL;
     modelPtr->pix32 = NULL;
@@ -411,7 +412,7 @@ static int
 ImgPhotoCmd(
     void *clientData,	/* Information about photo model. */
     Tcl_Interp *interp,		/* Current interpreter. */
-    Tcl_Size objc,			/* Number of arguments. */
+    int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
     static const char *const photoOptions[] = {
@@ -855,7 +856,7 @@ ImgPhotoCmd(
 	    Tk_FreeColor(options.background);
 	}
 	if (data) {
-	    Tcl_Free(data);
+	    ckfree(data);
 	}
 	if (freeObj != NULL) {
 	    Tcl_DecrRefCount(freeObj);
@@ -867,7 +868,7 @@ ImgPhotoCmd(
 	    Tk_FreeColor(options.background);
 	}
 	if (data) {
-	    Tcl_Free(data);
+	    ckfree(data);
 	}
 	if (freeObj != NULL) {
 	    Tcl_DecrRefCount(freeObj);
@@ -1517,7 +1518,7 @@ readCleanup:
 	    Tk_FreeColor(options.background);
 	}
 	if (data) {
-	    Tcl_Free(data);
+	    ckfree(data);
 	}
 	return result;
     }
@@ -1534,7 +1535,7 @@ readCleanup:
  *
  *	Return the extension part of a path, or NULL if there is no extension.
  *	The returned string will be a substring of the argument string, so
- *	should not be Tcl_Free()d directly. No side effects.
+ *	should not be ckfree()d directly. No side effects.
  *
  *----------------------------------------------------------------------
  */
@@ -2364,7 +2365,7 @@ ImgPhotoDelete(
 	Tcl_DeleteCommandFromToken(modelPtr->interp, modelPtr->imageCmd);
     }
     if (modelPtr->pix32 != NULL) {
-	Tcl_Free(modelPtr->pix32);
+	ckfree(modelPtr->pix32);
     }
     if (modelPtr->validRegion != NULL) {
 	TkDestroyRegion(modelPtr->validRegion);
@@ -2379,7 +2380,7 @@ ImgPhotoDelete(
 	Tcl_DecrRefCount(modelPtr->metadata);
     }
     Tk_FreeOptions(configSpecs, modelPtr, NULL, 0);
-    Tcl_Free(modelPtr);
+    ckfree(modelPtr);
 }
 
 /*
@@ -2477,7 +2478,7 @@ ImgPhotoSetSize(
 	if (newPixSize == 0) {
 	    newPix32 = NULL;
 	} else {
-	    newPix32 = (unsigned char *)Tcl_AttemptAlloc(newPixSize);
+	    newPix32 = (unsigned char *)attemptckalloc(newPixSize);
 	    if (newPix32 == NULL) {
 		return TCL_ERROR;
 	    }
@@ -2561,7 +2562,7 @@ ImgPhotoSetSize(
 		}
 	    }
 
-	    Tcl_Free(modelPtr->pix32);
+	    ckfree(modelPtr->pix32);
 	}
 
 	modelPtr->pix32 = newPix32;
@@ -3123,7 +3124,7 @@ Tk_PhotoPutBlock(
 	unsigned int cpyLen = (sourceBlock.height - 1) * sourceBlock.pitch +
 		sourceBlock.width * sourceBlock.pixelSize;
 
-	sourceBlock.pixelPtr = (unsigned char *)Tcl_AttemptAlloc(cpyLen);
+	sourceBlock.pixelPtr = (unsigned char *)attemptckalloc(cpyLen);
 	if (sourceBlock.pixelPtr == NULL) {
 	    if (interp != NULL) {
 		Tcl_SetObjResult(interp, Tcl_NewStringObj(
@@ -3451,12 +3452,12 @@ Tk_PhotoPutBlock(
     Tk_ImageChanged(modelPtr->tkModel, x, y, width, height,
 	    modelPtr->width, modelPtr->height);
 
-    if (memToFree) Tcl_Free(memToFree);
+    if (memToFree) ckfree(memToFree);
 
     return TCL_OK;
 
   errorExit:
-    if (memToFree) Tcl_Free(memToFree);
+    if (memToFree) ckfree(memToFree);
 
     return TCL_ERROR;
 }
@@ -3569,7 +3570,7 @@ Tk_PhotoPutZoomedBlock(
 	unsigned int cpyLen = (sourceBlock.height - 1) * sourceBlock.pitch +
 		sourceBlock.width * sourceBlock.pixelSize;
 
-	sourceBlock.pixelPtr = (unsigned char *)Tcl_AttemptAlloc(cpyLen);
+	sourceBlock.pixelPtr = (unsigned char *)attemptckalloc(cpyLen);
 	if (sourceBlock.pixelPtr == NULL) {
 	    if (interp != NULL) {
 		Tcl_SetObjResult(interp, Tcl_NewStringObj(
@@ -3807,12 +3808,12 @@ Tk_PhotoPutZoomedBlock(
     Tk_ImageChanged(modelPtr->tkModel, x, y, width, height, modelPtr->width,
 	    modelPtr->height);
 
-    if (memToFree) Tcl_Free(memToFree);
+    if (memToFree) ckfree(memToFree);
 
     return TCL_OK;
 
   errorExit:
-    if (memToFree) Tcl_Free(memToFree);
+    if (memToFree) ckfree(memToFree);
 
     return TCL_ERROR;
 }
@@ -4192,7 +4193,7 @@ ImgGetPhoto(
 	if (blockPtr->height > (int)((UINT_MAX/newPixelSize)/blockPtr->width)) {
 	    return NULL;
 	}
-	data = (char *)Tcl_AttemptAlloc(newPixelSize*blockPtr->width*blockPtr->height);
+	data = (char *)attemptckalloc(newPixelSize*blockPtr->width*blockPtr->height);
 	if (data == NULL) {
 	    return NULL;
 	}

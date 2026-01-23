@@ -176,7 +176,7 @@ static void		GetTearoffEntryGeometry(TkMenu *menuPtr,
 			    const Tk_FontMetrics *fmPtr, int *widthPtr,
 			    int *heightPtr);
 static int		GetNewID(TkMenuEntry *mePtr, WORD *menuIDPtr);
-static Tcl_ObjCmdProc2 TkWinMenuKeyObjCmd;
+static Tcl_ObjCmdProc TkWinMenuKeyObjCmd;
 static void		MenuSelectEvent(TkMenu *menuPtr);
 static void		ReconfigureWindowsMenu(void *clientData);
 static void		RecursivelyClearActiveMenu(TkMenu *menuPtr);
@@ -490,16 +490,16 @@ GetEntryText(
     char *itemText;
 
     if (mePtr->type == TEAROFF_ENTRY) {
-	itemText = (char *)Tcl_Alloc(sizeof("(Tear-off)"));
+	itemText = (char *)ckalloc(sizeof("(Tear-off)"));
 	strcpy(itemText, "(Tear-off)");
     } else if (mePtr->imagePtr != NULL) {
-	itemText = (char *)Tcl_Alloc(sizeof("(Image)"));
+	itemText = (char *)ckalloc(sizeof("(Image)"));
 	strcpy(itemText, "(Image)");
     } else if (mePtr->bitmapPtr != NULL) {
-	itemText = (char *)Tcl_Alloc(sizeof("(Pixmap)"));
+	itemText = (char *)ckalloc(sizeof("(Pixmap)"));
 	strcpy(itemText, "(Pixmap)");
     } else if (mePtr->labelPtr == NULL || mePtr->labelLength == 0) {
-	itemText = (char *)Tcl_Alloc(sizeof("( )"));
+	itemText = (char *)ckalloc(sizeof("( )"));
 	strcpy(itemText, "( )");
     } else {
 	int i;
@@ -541,7 +541,7 @@ GetEntryText(
 	    }
 	}
 
-	itemText = (char *)Tcl_Alloc(Tcl_DStringLength(&itemString) + 1);
+	itemText = (char *)ckalloc(Tcl_DStringLength(&itemString) + 1);
 	strcpy(itemText, Tcl_DStringValue(&itemString));
 	Tcl_DStringFree(&itemString);
     }
@@ -572,12 +572,12 @@ ReconfigureWindowsMenu(
     TkMenu *menuPtr = (TkMenu *)clientData;
     TkMenuEntry *mePtr;
     HMENU winMenuHdl = (HMENU) menuPtr->platformData;
+    char *itemText = NULL;
     LPCWSTR lpNewItem;
     UINT flags;
     UINT itemID;
-    Tcl_Size i, count;
-    int systemMenu = 0, base;
-    MENUITEMINFOW itemInfo;
+    int i, count, systemMenu = 0, base;
+    Tcl_DString translatedText;
 
     if (NULL == winMenuHdl) {
 	return;
@@ -596,9 +596,6 @@ ReconfigureWindowsMenu(
 
     count = menuPtr->numEntries;
     for (i = 0; i < count; i++) {
-	char *itemText = NULL;
-	Tcl_DString translatedText;
-
 	mePtr = menuPtr->entries[i];
 	lpNewItem = NULL;
 	flags = MF_BYPOSITION;
@@ -612,6 +609,7 @@ ReconfigureWindowsMenu(
 	itemText = GetEntryText(menuPtr, mePtr);
 	if ((menuPtr->menuType == MENUBAR)
 		|| (menuPtr->menuFlags & MENU_SYSTEM_MENU)) {
+		Tcl_DStringInit(&translatedText);
 		Tcl_UtfToWCharDString(itemText, TCL_INDEX_NONE, &translatedText);
 	    lpNewItem = (LPCWSTR) Tcl_DStringValue(&translatedText);
 	    flags |= MF_STRING;
@@ -654,7 +652,7 @@ ReconfigureWindowsMenu(
 	    flags |= MF_MENUBREAK;
 	}
 
-	itemID = (UINT)PTR2INT(mePtr->platformEntryData);
+	itemID = PTR2INT(mePtr->platformEntryData);
 	if ((mePtr->type == CASCADE_ENTRY)
 		&& (mePtr->childMenuRefPtr != NULL)
 		&& (mePtr->childMenuRefPtr->menuPtr != NULL)) {
@@ -674,7 +672,7 @@ ReconfigureWindowsMenu(
 		     * If the MF_POPUP flag is set, then the id is interpreted
 		     * as the handle of a submenu.
 		     */
-		    itemID = (UINT)PTR2INT(childMenuHdl);
+		    itemID = PTR2INT(childMenuHdl);
 		}
 	    }
 	    if ((menuPtr->menuType == MENUBAR)
@@ -721,35 +719,13 @@ ReconfigureWindowsMenu(
 	if (!systemMenu) {
 	    InsertMenuW(winMenuHdl, 0xFFFFFFFF, flags, itemID, lpNewItem);
 	}
-	/*
-	 * For owner-drawn items, set the menu item string data
-	 * so screen readers can access the label text.
-	 */
-	if ((flags & MF_OWNERDRAW) && itemText != NULL) {
-	    Tcl_DString accessText;
-
-	    memset(&itemInfo, 0, sizeof(itemInfo));
-	    itemInfo.cbSize = sizeof(MENUITEMINFOW);
-	    itemInfo.fMask = MIIM_STRING | MIIM_DATA;
-
-	    /* Convert to wide string for accessibility. */
-	    Tcl_DStringInit(&accessText);
-	    Tcl_UtfToWCharDString(itemText, TCL_INDEX_NONE, &accessText);
-	    itemInfo.dwTypeData = (LPWSTR)Tcl_DStringValue(&accessText);
-	    itemInfo.cch = (UINT)Tcl_DStringLength(&accessText) / sizeof(WCHAR);
-	    itemInfo.dwItemData = (ULONG_PTR)mePtr;
-
-	    /* Set the menu item info - this makes text available to screen readers. */
-	    SetMenuItemInfoW(winMenuHdl, (UINT)i, TRUE, &itemInfo);
-
-	    Tcl_DStringFree(&accessText);
-	}
 	Tcl_DStringFree(&translatedText);
 	if (itemText != NULL) {
-	    Tcl_Free(itemText);
+	    ckfree(itemText);
 	    itemText = NULL;
 	}
     }
+
 
     if ((menuPtr->menuType == MENUBAR)
 	    && (menuPtr->parentTopLevelPtr != NULL)) {
@@ -1359,7 +1335,7 @@ TkWinHandleMenuEvent(
 	    }
 	    mePtr = (TkMenuEntry *) itemPtr->itemData;
 	    menuPtr = mePtr->menuPtr;
-	    twdPtr = (TkWinDrawable *)Tcl_Alloc(sizeof(TkWinDrawable));
+	    twdPtr = (TkWinDrawable *)ckalloc(sizeof(TkWinDrawable));
 	    twdPtr->type = TWD_WINDC;
 	    twdPtr->winDC.hdc = itemPtr->hDC;
 
@@ -1402,7 +1378,7 @@ TkWinHandleMenuEvent(
 		    itemPtr->rcItem.bottom - itemPtr->rcItem.top,
 		    0, drawingParameters);
 
-	    Tcl_Free(twdPtr);
+	    ckfree(twdPtr);
 	}
 	*plResult = 1;
 	returnResult = 1;
@@ -1949,16 +1925,18 @@ DrawMenuEntryAccelerator(
      * Draw disabled 3D text highlight only with the Win95/98 look.
      */
 
-    if ((mePtr->state == ENTRY_DISABLED)
-	    && (menuPtr->disabledFgPtr != NULL) && (accel != NULL)) {
-	COLORREF oldFgColor = gc->foreground;
+    if (TkWinGetPlatformTheme() != TK_THEME_WIN_XP) {
+	if ((mePtr->state == ENTRY_DISABLED)
+		&& (menuPtr->disabledFgPtr != NULL) && (accel != NULL)) {
+	    COLORREF oldFgColor = gc->foreground;
 
-	gc->foreground = GetSysColor(COLOR_3DHILIGHT);
-	if (!(mePtr->entryFlags & ENTRY_PLATFORM_FLAG1)) {
-	    Tk_DrawChars(menuPtr->display, d, gc, tkfont, accel,
-		    mePtr->accelLength, leftEdge + 1, baseline + 1);
+	    gc->foreground = GetSysColor(COLOR_3DHILIGHT);
+	    if (!(mePtr->entryFlags & ENTRY_PLATFORM_FLAG1)) {
+		Tk_DrawChars(menuPtr->display, d, gc, tkfont, accel,
+			mePtr->accelLength, leftEdge + 1, baseline + 1);
+	    }
+	    gc->foreground = oldFgColor;
 	}
-	gc->foreground = oldFgColor;
     }
 
     if (accel != NULL) {
@@ -2085,9 +2063,9 @@ DrawMenuSeparator(
     XPoint points[2];
     Tk_3DBorder border;
 
-    points[0].x = (short)x;
-    points[0].y = (short)(y + height / 2);
-    points[1].x = (short)(x + width - 1);
+    points[0].x = x;
+    points[0].y = y + height / 2;
+    points[1].x = x + width - 1;
     points[1].y = points[0].y;
     border = Tk_Get3DBorderFromObj(menuPtr->tkwin, menuPtr->borderPtr);
     Tk_Draw3DPolygon(menuPtr->tkwin, d, border, points, 2, 1,
@@ -2124,7 +2102,7 @@ DrawMenuUnderline(
     int height)			/* Height of entry */
 {
     if ((mePtr->underline >= 0) && (mePtr->labelPtr != NULL)) {
-	Tcl_Size len;
+	int len;
 
 	len = Tcl_GetCharLength(mePtr->labelPtr);
 	if (mePtr->underline < len) {
@@ -2167,7 +2145,7 @@ static int
 TkWinMenuKeyObjCmd(
     TCL_UNUSED(void *),
     Tcl_Interp *interp,		/* Current interpreter. */
-    Tcl_Size objc,			/* Number of arguments. */
+    int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
     UINT scanCode;
@@ -2307,7 +2285,7 @@ TkpInitializeMenuBindings(
      * binding in Tcl code.
      */
 
-    (void) Tcl_CreateObjCommand2(interp, "tk::WinMenuKey",
+    (void) Tcl_CreateObjCommand(interp, "tk::WinMenuKey",
 	    TkWinMenuKeyObjCmd, Tk_MainWindow(interp), NULL);
 
     (void) Tk_CreateBinding(interp, bindingTable, (void *)uid,
@@ -2491,20 +2469,22 @@ DrawMenuEntryLabel(
 	    int baseline = y + (height + fmPtr->ascent - fmPtr->descent) / 2;
 	    const char *label = Tcl_GetString(mePtr->labelPtr);
 
-	    /*
-	     * Win 95/98 systems draw disabled menu text with a 3D
-	     * highlight, unless the menu item is highlighted,
-	     */
+	    if (TkWinGetPlatformTheme() != TK_THEME_WIN_XP) {
+		/*
+		 * Win 95/98 systems draw disabled menu text with a 3D
+		 * highlight, unless the menu item is highlighted,
+		 */
 
-	    if ((mePtr->state == ENTRY_DISABLED) &&
-		    !(mePtr->entryFlags & ENTRY_PLATFORM_FLAG1)) {
-		COLORREF oldFgColor = gc->foreground;
+		if ((mePtr->state == ENTRY_DISABLED) &&
+			!(mePtr->entryFlags & ENTRY_PLATFORM_FLAG1)) {
+		    COLORREF oldFgColor = gc->foreground;
 
-		gc->foreground = GetSysColor(COLOR_3DHILIGHT);
-		Tk_DrawChars(menuPtr->display, d, gc, tkfont, label,
-			mePtr->labelLength, leftEdge + textXOffset + 1,
-			baseline + textYOffset + 1);
-		gc->foreground = oldFgColor;
+		    gc->foreground = GetSysColor(COLOR_3DHILIGHT);
+		    Tk_DrawChars(menuPtr->display, d, gc, tkfont, label,
+			    mePtr->labelLength, leftEdge + textXOffset + 1,
+			    baseline + textYOffset + 1);
+		    gc->foreground = oldFgColor;
+		}
 	    }
 	    Tk_DrawChars(menuPtr->display, d, gc, tkfont, label,
 		    mePtr->labelLength, leftEdge + textXOffset,
@@ -2590,21 +2570,21 @@ DrawTearoffEntry(
 	return;
     }
 
-    points[0].x = (short)x;
-    points[0].y = (short)(y + height/2);
+    points[0].x = x;
+    points[0].y = y + height/2;
     points[1].y = points[0].y;
     segmentWidth = 6;
     maxX = x + width - 1;
     border = Tk_Get3DBorderFromObj(menuPtr->tkwin, menuPtr->borderPtr);
 
     while (points[0].x < maxX) {
-	points[1].x = points[0].x + (short)segmentWidth;
+	points[1].x = points[0].x + segmentWidth;
 	if (points[1].x > maxX) {
-	    points[1].x = (short)maxX;
+	    points[1].x = maxX;
 	}
 	Tk_Draw3DPolygon(menuPtr->tkwin, d, border, points, 2, 1,
 		TK_RELIEF_RAISED);
-	points[0].x += (short)(2*segmentWidth);
+	points[0].x += 2*segmentWidth;
     }
 }
 
@@ -3402,6 +3382,10 @@ SetDefaults(
     Tcl_DStringInit(&menuFontDString);
 
     metrics.cbSize = sizeof(metrics);
+
+    if (TkWinGetPlatformTheme() != TK_THEME_WIN_VISTA) {
+	metrics.cbSize -= sizeof(int);
+    }
 
     SystemParametersInfoW(SPI_GETNONCLIENTMETRICS, metrics.cbSize,
 	    &metrics, 0);

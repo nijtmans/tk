@@ -167,7 +167,7 @@ MacSystrayDestroy(
     StatusItemInfo info = (StatusItemInfo)clientData;
     if (info) {
 	[*info release];
-	Tcl_Free(info);
+	ckfree(info);
     }
 }
 
@@ -194,7 +194,7 @@ static int
 MacSystrayObjCmd(
     void *clientData,
     Tcl_Interp * interp,
-    Tcl_Size objc,
+    int objc,
     Tcl_Obj *const *objv)
 {
     Tk_Image tk_image;
@@ -400,7 +400,7 @@ MacSystrayObjCmd(
 static int SysNotifyObjCmd(
     TCL_UNUSED(void *),
     Tcl_Interp * interp,
-    Tcl_Size objc,
+    int objc,
     Tcl_Obj *const *objv)
 {
     if (objc < 3) {
@@ -476,12 +476,12 @@ MacSystrayInit(Tcl_Interp *interp)
      * Initialize the TkStatusItem for this interpreter.
      */
 
-    StatusItemInfo info = (StatusItemInfo)Tcl_Alloc(sizeof(StatusItemInfo));
+    StatusItemInfo info = (StatusItemInfo) ckalloc(sizeof(StatusItemInfo));
     *info = 0;
 
-    Tcl_CreateObjCommand2(interp, "::tk::systray::_systray", MacSystrayObjCmd, info,
+    Tcl_CreateObjCommand(interp, "::tk::systray::_systray", MacSystrayObjCmd, info,
 	    MacSystrayDestroy);
-    Tcl_CreateObjCommand2(interp, "::tk::sysnotify::_sysnotify", SysNotifyObjCmd, NULL, NULL);
+    Tcl_CreateObjCommand(interp, "::tk::sysnotify::_sysnotify", SysNotifyObjCmd, NULL, NULL);
     return TCL_OK;
 }
 

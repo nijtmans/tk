@@ -53,7 +53,7 @@ typedef struct SendEvent {
 
 #ifdef TK_SEND_ENABLED_ON_WINDOWS
 typedef struct {
-    bool initialized;
+    int initialized;
 } ThreadSpecificData;
 static Tcl_ThreadDataKey dataKey;
 #endif /* TK_SEND_ENABLED_ON_WINDOWS */
@@ -142,7 +142,7 @@ Tk_SetAppName(
      * Initialise the COM library for this interpreter just once.
      */
 
-    if (!tsdPtr->initialized) {
+    if (tsdPtr->initialized == 0) {
 	hr = CoInitialize(0);
 	if (FAILED(hr)) {
 	    Tcl_SetObjResult(interp, Tcl_NewStringObj(
@@ -150,7 +150,7 @@ Tk_SetAppName(
 	    Tcl_SetErrorCode(interp, "TK", "SEND", "COM", (char *)NULL);
 	    return "";
 	}
-	tsdPtr->initialized = true;
+	tsdPtr->initialized = 1;
 	TRACE("Initialized COM library for interp 0x%" TCL_Z_MODIFIER "x\n", (size_t)interp);
     }
 
@@ -164,7 +164,7 @@ Tk_SetAppName(
     if (riPtr == NULL) {
 	LPUNKNOWN *objPtr;
 
-	riPtr = (RegisteredInterp *)Tcl_Alloc(sizeof(RegisteredInterp));
+	riPtr = (RegisteredInterp *)ckalloc(sizeof(RegisteredInterp));
 	memset(riPtr, 0, sizeof(RegisteredInterp));
 	riPtr->interp = interp;
 
@@ -172,7 +172,7 @@ Tk_SetAppName(
 	hr = TkWinSendCom_CreateInstance(interp, &IID_IUnknown,
 		(void **) objPtr);
 
-	Tcl_CreateObjCommand2(interp, "send", Tk_SendObjCmd, riPtr,
+	Tcl_CreateObjCommand(interp, "send", Tk_SendObjCmd, riPtr,
 		CmdDeleteProc);
 	if (Tcl_IsSafe(interp)) {
 	    Tcl_HideCommand(interp, "send", "send");
@@ -323,7 +323,7 @@ Tk_SendObjCmd(
     void *clientData,	/* Information about sender (only dispPtr
 				 * field is used). */
     Tcl_Interp *interp,		/* Current interpreter. */
-    Tcl_Size objc,			/* Number of arguments. */
+    int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument strings. */
 {
     enum {
@@ -334,8 +334,7 @@ Tk_SendObjCmd(
     };
     const char *stringRep;
     int result = TCL_OK;
-    int async = 0, index;
-    Tcl_Size i;
+    int i, async = 0, index;
 
     /*
      * Process the command options.
@@ -511,7 +510,7 @@ CmdDeleteProc(
 
     Tcl_Release(clientData);
 
-    Tcl_Free(clientData);
+    ckfree(clientData);
 }
 
 /*
@@ -894,7 +893,7 @@ TkWinSend_QueueCommand(
 
     TRACE("SendQueueCommand()\n");
 
-    evPtr = (SendEvent *)Tcl_Alloc(sizeof(SendEvent));
+    evPtr = (SendEvent *)ckalloc(sizeof(SendEvent));
     evPtr->header.proc = SendEventProc;
     evPtr->header.nextPtr = NULL;
     evPtr->interp = interp;

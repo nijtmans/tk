@@ -363,7 +363,7 @@ static int		TextSearchCmd(TkText *textPtr, Tcl_Interp *interp,
 			    Tcl_Size objc, Tcl_Obj *const objv[]);
 static int		TextEditCmd(TkText *textPtr, Tcl_Interp *interp,
 			    Tcl_Size objc, Tcl_Obj *const objv[]);
-static Tcl_ObjCmdProc2 TextWidgetObjCmd;
+static Tcl_ObjCmdProc TextWidgetObjCmd;
 static Tcl_ObjCmdProc2 SharedTextObjCmd;
 static void		TextWorldChangedCallback(void *instanceData);
 static void		TextWorldChanged(TkText *textPtr, int mask);
@@ -436,7 +436,7 @@ int
 Tk_TextObjCmd(
     void *clientData,	/* Main window associated with interpreter. */
     Tcl_Interp *interp,		/* Current interpreter. */
-    Tcl_Size objc,			/* Number of arguments. */
+    int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
     Tk_Window tkwin = (Tk_Window)clientData;
@@ -501,18 +501,18 @@ CreateWidget(
      * and 'insert', 'current' mark pointers are all NULL to start.
      */
 
-    textPtr = (TkText *)Tcl_Alloc(sizeof(TkText));
+    textPtr = (TkText *)ckalloc(sizeof(TkText));
     memset(textPtr, 0, sizeof(TkText));
 
     textPtr->tkwin = newWin;
     textPtr->display = Tk_Display(newWin);
     textPtr->interp = interp;
-    textPtr->widgetCmd = Tcl_CreateObjCommand2(interp,
+    textPtr->widgetCmd = Tcl_CreateObjCommand(interp,
 	    Tk_PathName(textPtr->tkwin), TextWidgetObjCmd,
 	    textPtr, TextCmdDeletedProc);
 
     if (sharedPtr == NULL) {
-	sharedPtr = (TkSharedText *)Tcl_Alloc(sizeof(TkSharedText));
+	sharedPtr = (TkSharedText *)ckalloc(sizeof(TkSharedText));
 	memset(sharedPtr, 0, sizeof(TkSharedText));
 
 	sharedPtr->refCount = 0;
@@ -671,7 +671,7 @@ static int
 TextWidgetObjCmd(
     void *clientData,	/* Information about text widget. */
     Tcl_Interp *interp,		/* Current interpreter. */
-    Tcl_Size objc,			/* Number of arguments. */
+    int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
     TkText *textPtr = (TkText *)clientData;
@@ -1101,7 +1101,7 @@ TextWidgetObjCmd(
 
 		objc -= 2;
 		objv += 2;
-		indices = (TkTextIndex *)Tcl_Alloc((objc + 1) * sizeof(TkTextIndex));
+		indices = (TkTextIndex *)ckalloc((objc + 1) * sizeof(TkTextIndex));
 
 		/*
 		 * First pass verifies that all indices are valid.
@@ -1113,7 +1113,7 @@ TextWidgetObjCmd(
 
 		    if (indexPtr == NULL) {
 			result = TCL_ERROR;
-			Tcl_Free(indices);
+			ckfree(indices);
 			goto done;
 		    }
 		    indices[i] = *indexPtr;
@@ -1129,7 +1129,7 @@ TextWidgetObjCmd(
 			    COUNT_INDICES);
 		    objc++;
 		}
-		useIdx = (char *)Tcl_Alloc(objc);
+		useIdx = (char *)ckalloc(objc);
 		memset(useIdx, 0, objc);
 
 		/*
@@ -1193,7 +1193,7 @@ TextWidgetObjCmd(
 				&indices[i+1], 1);
 		    }
 		}
-		Tcl_Free(indices);
+		ckfree(indices);
 	    }
 	}
 	break;
@@ -1555,7 +1555,7 @@ TextWidgetObjCmd(
 
   done:
     if (textPtr->refCount-- <= 1) {
-	Tcl_Free(textPtr);
+	ckfree(textPtr);
     }
     return result;
 }
@@ -1934,10 +1934,10 @@ DestroyText(
     TkTextDeleteTag(textPtr, textPtr->selTagPtr);
     TkBTreeUnlinkSegment(textPtr->insertMarkPtr,
 	    textPtr->insertMarkPtr->body.mark.linePtr);
-    Tcl_Free(textPtr->insertMarkPtr);
+    ckfree(textPtr->insertMarkPtr);
     TkBTreeUnlinkSegment(textPtr->currentMarkPtr,
 	    textPtr->currentMarkPtr->body.mark.linePtr);
-    Tcl_Free(textPtr->currentMarkPtr);
+    ckfree(textPtr->currentMarkPtr);
 
     /*
      * Now we've cleaned up everything of relevance to us in the B-tree, so we
@@ -2001,7 +2001,7 @@ DestroyText(
 	Tcl_DeleteHashTable(&sharedTextPtr->tagTable);
 	for (hPtr = Tcl_FirstHashEntry(&sharedTextPtr->markTable, &search);
 	     hPtr != NULL; hPtr = Tcl_NextHashEntry(&search)) {
-	    Tcl_Free(Tcl_GetHashValue(hPtr));
+	    ckfree(Tcl_GetHashValue(hPtr));
 	}
 	Tcl_DeleteHashTable(&sharedTextPtr->markTable);
 	TkUndoFreeStack(sharedTextPtr->undoStack);
@@ -2012,11 +2012,11 @@ DestroyText(
 	if (sharedTextPtr->bindingTable != NULL) {
 	    Tk_DeleteBindingTable(sharedTextPtr->bindingTable);
 	}
-	Tcl_Free(sharedTextPtr);
+	ckfree(sharedTextPtr);
     }
 
     if (textPtr->tabArrayPtr != NULL) {
-	Tcl_Free(textPtr->tabArrayPtr);
+	ckfree(textPtr->tabArrayPtr);
     }
     if (textPtr->insertBlinkHandler != NULL) {
 	Tcl_DeleteTimerHandler(textPtr->insertBlinkHandler);
@@ -2029,7 +2029,7 @@ DestroyText(
 	textPtr->afterSyncCmd = NULL;
     }
     if (textPtr->refCount-- <= 1) {
-	Tcl_Free(textPtr);
+	ckfree(textPtr);
     }
 }
 
@@ -2062,7 +2062,9 @@ ConfigureText(
 {
     Tk_SavedOptions savedOptions;
     int oldExport = (textPtr->exportSelection) && (!Tcl_IsSafe(textPtr->interp));
-    int mask = 0;
+    int mask = 0, selBorderWidth = 0, height, highlightWidth;
+    int borderWidth, spacing1, spacing2, spacing3;
+    int insertBorderWidth, insertWidth, padX, padY;
 
     if (Tk_SetOptions(interp, (char *) textPtr, textPtr->optionTable,
 	    objc, objv, textPtr->tkwin, &savedOptions, &mask) != TCL_OK) {
@@ -2199,11 +2201,95 @@ ConfigureText(
     }
 
     /*
+     * Don't allow negative spacings.
+     */
+
+    Tk_GetPixelsFromObj(NULL, textPtr->tkwin, textPtr->borderWidthObj, &borderWidth);
+    if (borderWidth < 0) {
+	borderWidth = 0;
+	Tcl_DecrRefCount(textPtr->borderWidthObj);
+	textPtr->borderWidthObj = Tcl_NewIntObj(0);
+	Tcl_IncrRefCount(textPtr->borderWidthObj);
+    }
+    Tk_GetPixelsFromObj(NULL, textPtr->tkwin, textPtr->heightObj, &height);
+    if (height < 0) {
+	height = 0;
+	Tcl_DecrRefCount(textPtr->heightObj);
+	textPtr->heightObj = Tcl_NewIntObj(0);
+	Tcl_IncrRefCount(textPtr->heightObj);
+    }
+    Tk_GetPixelsFromObj(NULL, textPtr->tkwin, textPtr->highlightWidthObj, &highlightWidth);
+    if (highlightWidth < 0) {
+	highlightWidth = 0;
+	Tcl_DecrRefCount(textPtr->highlightWidthObj);
+	textPtr->highlightWidthObj = Tcl_NewIntObj(0);
+	Tcl_IncrRefCount(textPtr->highlightWidthObj);
+    }
+    Tk_GetPixelsFromObj(NULL, textPtr->tkwin, textPtr->insertBorderWidthObj, &insertBorderWidth);
+    if (insertBorderWidth < 0) {
+	insertBorderWidth = 0;
+	Tcl_DecrRefCount(textPtr->insertBorderWidthObj);
+	textPtr->insertBorderWidthObj = Tcl_NewIntObj(0);
+	Tcl_IncrRefCount(textPtr->insertBorderWidthObj);
+    }
+    Tk_GetPixelsFromObj(NULL, textPtr->tkwin, textPtr->insertWidthObj, &insertWidth);
+    if (insertWidth < 0) {
+	insertWidth = 0;
+	Tcl_DecrRefCount(textPtr->insertWidthObj);
+	textPtr->insertWidthObj = Tcl_NewIntObj(0);
+	Tcl_IncrRefCount(textPtr->insertWidthObj);
+    }
+    Tk_GetPixelsFromObj(NULL, textPtr->tkwin, textPtr->padXObj, &padX);
+    if (padX < 0) {
+	Tcl_DecrRefCount(textPtr->padXObj);
+	textPtr->padXObj = Tcl_NewIntObj(0);
+	Tcl_IncrRefCount(textPtr->padXObj);
+    }
+    Tk_GetPixelsFromObj(NULL, textPtr->tkwin, textPtr->padYObj, &padY);
+    if (padY < 0) {
+	Tcl_DecrRefCount(textPtr->padYObj);
+	textPtr->padYObj = Tcl_NewIntObj(0);
+	Tcl_IncrRefCount(textPtr->padYObj);
+    }
+    if (textPtr->selBorderWidthObj) {
+	Tk_GetPixelsFromObj(NULL, textPtr->tkwin, textPtr->selBorderWidthObj, &selBorderWidth);
+    }
+    if (selBorderWidth < 0) {
+	selBorderWidth = 0;
+	if (textPtr->selBorderWidthObj) {
+	    Tcl_DecrRefCount(textPtr->selBorderWidthObj);
+	}
+	textPtr->selBorderWidthObj = Tcl_NewIntObj(0);
+	Tcl_IncrRefCount(textPtr->selBorderWidthObj);
+    }
+    Tk_GetPixelsFromObj(NULL, textPtr->tkwin, textPtr->spacing1Obj, &spacing1);
+    if (spacing1 < 0) {
+	spacing1 = 0;
+	Tcl_DecrRefCount(textPtr->spacing1Obj);
+	textPtr->spacing1Obj = Tcl_NewIntObj(0);
+	Tcl_IncrRefCount(textPtr->spacing1Obj);
+    }
+    Tk_GetPixelsFromObj(NULL, textPtr->tkwin, textPtr->spacing2Obj, &spacing2);
+    if (spacing2 < 0) {
+	spacing2 = 0;
+	Tcl_DecrRefCount(textPtr->spacing2Obj);
+	textPtr->spacing2Obj = Tcl_NewIntObj(0);
+	Tcl_IncrRefCount(textPtr->spacing2Obj);
+    }
+    Tk_GetPixelsFromObj(NULL, textPtr->tkwin, textPtr->spacing3Obj, &spacing3);
+    if (spacing3 < 0) {
+	spacing3 = 0;
+	Tcl_DecrRefCount(textPtr->spacing3Obj);
+	textPtr->spacing3Obj = Tcl_NewIntObj(0);
+	Tcl_IncrRefCount(textPtr->spacing3Obj);
+    }
+
+    /*
      * Parse tab stops.
      */
 
     if (textPtr->tabArrayPtr != NULL) {
-	Tcl_Free(textPtr->tabArrayPtr);
+	ckfree(textPtr->tabArrayPtr);
 	textPtr->tabArrayPtr = NULL;
     }
     if (textPtr->tabOptionObj != NULL) {
@@ -2641,7 +2727,7 @@ InsertChars(
 
     resetViewCount = 0;
     if (sharedTextPtr->refCount > PIXEL_CLIENTS) {
-	lineAndByteIndex = (int *)Tcl_Alloc(sizeof(int) * 2 * sharedTextPtr->refCount);
+	lineAndByteIndex = (int *)ckalloc(sizeof(int) * 2 * sharedTextPtr->refCount);
     } else {
 	lineAndByteIndex = pixels;
     }
@@ -2703,7 +2789,7 @@ InsertChars(
 	resetViewCount += 2;
     }
     if (sharedTextPtr->refCount > PIXEL_CLIENTS) {
-	Tcl_Free(lineAndByteIndex);
+	ckfree(lineAndByteIndex);
     }
 
     /*
@@ -3167,7 +3253,7 @@ DeleteIndexRange(
 	    for (i = 0; i < arraySize; i++) {
 		TkBTreeTag(&index2, &oldIndex2, arrayPtr[i], 0);
 	    }
-	    Tcl_Free(arrayPtr);
+	    ckfree(arrayPtr);
 	}
     }
 
@@ -3213,7 +3299,7 @@ DeleteIndexRange(
 
     resetViewCount = 0;
     if (sharedTextPtr->refCount > PIXEL_CLIENTS) {
-	lineAndByteIndex = (int *)Tcl_Alloc(sizeof(int) * 2 * sharedTextPtr->refCount);
+	lineAndByteIndex = (int *)ckalloc(sizeof(int) * 2 * sharedTextPtr->refCount);
     } else {
 	lineAndByteIndex = pixels;
     }
@@ -3346,7 +3432,7 @@ DeleteIndexRange(
 	resetViewCount += 2;
     }
     if (sharedTextPtr->refCount > PIXEL_CLIENTS) {
-	Tcl_Free(lineAndByteIndex);
+	ckfree(lineAndByteIndex);
     }
 
     if (line1 >= line2) {
@@ -3726,7 +3812,7 @@ TextInsertCmd(
 		for (i = 0; i < numTags; i++) {
 		    TkBTreeTag(&index1, &index2, oldTagArrayPtr[i], 0);
 		}
-		Tcl_Free(oldTagArrayPtr);
+		ckfree(oldTagArrayPtr);
 	    }
 	    if (Tcl_ListObjGetElements(interp, objv[j+1], &numTags,
 		    &tagNamePtrs) != TCL_OK) {
@@ -4513,7 +4599,7 @@ TkTextGetTabs(
      * Parse the elements of the list one at a time to fill in the array.
      */
 
-    tabArrayPtr = (TkTextTabArray *)Tcl_Alloc(offsetof(TkTextTabArray, tabs)
+    tabArrayPtr = (TkTextTabArray *)ckalloc(offsetof(TkTextTabArray, tabs)
 	    + count * sizeof(TkTextTab));
     tabArrayPtr->numTabs = 0;
     prevStop = 0.0;
@@ -4600,7 +4686,7 @@ TkTextGetTabs(
     return tabArrayPtr;
 
   error:
-    Tcl_Free(tabArrayPtr);
+    ckfree(tabArrayPtr);
     return NULL;
 }
 
@@ -4862,7 +4948,7 @@ DumpLine(
 		 */
 
 		int length = last - first;
-		char *range = (char *)Tcl_Alloc(length + 1);
+		char *range = (char *)ckalloc(length + 1);
 
 		memcpy(range, segPtr->body.chars + first, length);
 		range[length] = '\0';
@@ -4871,7 +4957,7 @@ DumpLine(
 			lineno, offset + first, &index);
 		lineChanged = DumpSegment(textPtr, interp, "text", range,
 			command, &index, what);
-		Tcl_Free(range);
+		ckfree(range);
 	    } else {
 		TkTextMakeByteIndex(textPtr->sharedTextPtr->tree, textPtr,
 			lineno, offset + first, &index);
@@ -5575,7 +5661,7 @@ TkTextRunAfterSyncCmd(
 	*/
 
 	if (textPtr->refCount-- <= 1) {
-	    Tcl_Free(textPtr);
+	    ckfree(textPtr);
 	}
 	return;
     }
@@ -6052,7 +6138,7 @@ SearchCore(
 			     * exact searches.
 			     */
 
-			    if (lastTotal - skipFirst >= matchLength) {
+			    if ((Tcl_Size)lastTotal - skipFirst >= matchLength) {
 				/*
 				 * We now have enough text to match, so we
 				 * make a final test and break whatever the
@@ -6134,7 +6220,7 @@ SearchCore(
 			}
 		    } else {
 			firstOffset = matchLength ? p - startOfLine + matchLength
-						  : p - startOfLine + 1;
+						  : p - startOfLine + (Tcl_Size)1;
 			if (firstOffset >= lastOffset) {
 			    /*
 			     * Now, we have to be careful not to find
@@ -6192,7 +6278,7 @@ SearchCore(
 
 		if (!match ||
 			((info.extendStart == info.matches[0].start)
-			&& (info.matches[0].end == (lastOffset - firstOffset)))) {
+			&& (info.matches[0].end == (Tcl_Size) (lastOffset - firstOffset)))) {
 		    int extraLines = 0;
 		    Tcl_Size prevFullLine;
 
@@ -6307,7 +6393,7 @@ SearchCore(
 			 */
 
 			if ((match &&
-				firstOffset + info.matches[0].end != lastTotal &&
+				firstOffset + info.matches[0].end != (Tcl_Size) lastTotal &&
 				firstOffset + info.matches[0].end < prevFullLine)
 				|| info.extendStart < 0) {
 			    break;
@@ -6369,7 +6455,7 @@ SearchCore(
 			     * Possible overlap or inclusion.
 			     */
 
-			    Tcl_Size thisOffset = firstOffset + info.matches[0].end
+			    int thisOffset = firstOffset + info.matches[0].end
 				    - info.matches[0].start;
 
 			    if (lastNonOverlap != -1) {
@@ -6377,7 +6463,7 @@ SearchCore(
 				 * Possible overlap or enclosure.
 				 */
 
-				if (thisOffset - lastNonOverlap >=
+				if ((Tcl_Size)thisOffset - lastNonOverlap >=
 					lastBackwardsMatchOffset + matchLength){
 				    /*
 				     * Totally encloses previous match, so
@@ -6483,12 +6569,12 @@ SearchCore(
 			     */
 
 			    Tcl_Size *newArray = (Tcl_Size *)
-				    Tcl_Alloc(4 * matchNum * sizeof(Tcl_Size));
+				    ckalloc(4 * matchNum * sizeof(Tcl_Size));
 			    memcpy(newArray, storeMatch, matchNum*sizeof(Tcl_Size));
 			    memcpy(newArray + 2*matchNum, storeLength,
 				    matchNum * sizeof(Tcl_Size));
 			    if (storeMatch != smArray) {
-				Tcl_Free(storeMatch);
+				ckfree(storeMatch);
 			    }
 			    matchNum *= 2;
 			    storeMatch = newArray;
@@ -6718,7 +6804,7 @@ SearchCore(
      */
 
     if (storeMatch != smArray) {
-	Tcl_Free(storeMatch);
+	ckfree(storeMatch);
     }
 
     return code;
@@ -6885,7 +6971,7 @@ TkpTesttextCmd(
     if (Tcl_GetCommandInfo(interp, Tcl_GetString(objv[1]), &info) == 0) {
 	return TCL_ERROR;
     }
-    textPtr = (TkText *)info.objClientData2;
+    textPtr = (TkText *)info.objClientData;
     len = strlen(Tcl_GetString(objv[2]));
     if (strncmp(Tcl_GetString(objv[2]), "byteindex", len) == 0) {
 	if (objc != 5) {

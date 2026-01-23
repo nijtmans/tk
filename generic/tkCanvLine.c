@@ -187,7 +187,7 @@ static const Tk_ConfigSpec configSpecs[] = {
 	NULL, offsetof(LineItem, outline.dash),
 	TK_CONFIG_NULL_OK, &dashOption},
     {TK_CONFIG_PIXELS, "-dashoffset", NULL, NULL,
-	"0", offsetof(LineItem, outline.offsetObj), TK_CONFIG_OBJS|TK_OPTION_NEG_OK, NULL},
+	"0", offsetof(LineItem, outline.offsetObj), TK_CONFIG_OBJS, NULL},
     {TK_CONFIG_CUSTOM, "-disableddash", NULL, NULL,
 	NULL, offsetof(LineItem, outline.disabledDash),
 	TK_CONFIG_NULL_OK, &dashOption},
@@ -413,9 +413,9 @@ LineCoords(
 
     numPoints = objc/2;
     if (linePtr->numPoints != numPoints) {
-	coordPtr = (double *)Tcl_Alloc(sizeof(double) * objc);
+	coordPtr = (double *)ckalloc(sizeof(double) * objc);
 	if (linePtr->coordPtr != NULL) {
-	    Tcl_Free(linePtr->coordPtr);
+	    ckfree(linePtr->coordPtr);
 	}
 	linePtr->coordPtr = coordPtr;
 	linePtr->numPoints = numPoints;
@@ -434,11 +434,11 @@ LineCoords(
      */
 
     if (linePtr->firstArrowPtr != NULL) {
-	Tcl_Free(linePtr->firstArrowPtr);
+	ckfree(linePtr->firstArrowPtr);
 	linePtr->firstArrowPtr = NULL;
     }
     if (linePtr->lastArrowPtr != NULL) {
-	Tcl_Free(linePtr->lastArrowPtr);
+	ckfree(linePtr->lastArrowPtr);
 	linePtr->lastArrowPtr = NULL;
     }
     if (linePtr->arrow != ARROWS_NONE) {
@@ -564,7 +564,7 @@ ConfigureLine(
 	    && (linePtr->arrow != ARROWS_BOTH)) {
 	linePtr->coordPtr[0] = linePtr->firstArrowPtr[0];
 	linePtr->coordPtr[1] = linePtr->firstArrowPtr[1];
-	Tcl_Free(linePtr->firstArrowPtr);
+	ckfree(linePtr->firstArrowPtr);
 	linePtr->firstArrowPtr = NULL;
     }
     if ((linePtr->lastArrowPtr != NULL) && (linePtr->arrow != ARROWS_LAST)
@@ -574,7 +574,7 @@ ConfigureLine(
 	i = 2*(linePtr->numPoints-1);
 	linePtr->coordPtr[i] = linePtr->lastArrowPtr[0];
 	linePtr->coordPtr[i+1] = linePtr->lastArrowPtr[1];
-	Tcl_Free(linePtr->lastArrowPtr);
+	ckfree(linePtr->lastArrowPtr);
 	linePtr->lastArrowPtr = NULL;
     }
     if (linePtr->arrow != ARROWS_NONE) {
@@ -617,16 +617,16 @@ DeleteLine(
 
     Tk_DeleteOutline(display, &linePtr->outline);
     if (linePtr->coordPtr != NULL) {
-	Tcl_Free(linePtr->coordPtr);
+	ckfree(linePtr->coordPtr);
     }
     if (linePtr->arrowGC != NULL) {
 	Tk_FreeGC(display, linePtr->arrowGC);
     }
     if (linePtr->firstArrowPtr != NULL) {
-	Tcl_Free(linePtr->firstArrowPtr);
+	ckfree(linePtr->firstArrowPtr);
     }
     if (linePtr->lastArrowPtr != NULL) {
-	Tcl_Free(linePtr->lastArrowPtr);
+	ckfree(linePtr->lastArrowPtr);
     }
 }
 
@@ -724,7 +724,7 @@ ComputeLineBbox(
 		coordPtr = linePtr->firstArrowPtr;
 	    }
 	}
-	if (tsoffset->flags > (int)(linePtr->numPoints * 2)) {
+	if (tsoffset->flags > (linePtr->numPoints * 2)) {
 	    coordPtr = linePtr->coordPtr + (linePtr->numPoints * 2);
 	    if ((linePtr->arrow == ARROWS_LAST)
 		    || (linePtr->arrow == ARROWS_BOTH)) {
@@ -884,7 +884,7 @@ DisplayLine(
     if (numPoints <= MAX_STATIC_POINTS) {
 	pointPtr = staticPoints;
     } else {
-	pointPtr = (XPoint *)Tcl_Alloc(numPoints * 3 * sizeof(XPoint));
+	pointPtr = (XPoint *)ckalloc(numPoints * 3 * sizeof(XPoint));
     }
 
     if ((linePtr->smooth) && (linePtr->numPoints > 2)) {
@@ -920,7 +920,7 @@ DisplayLine(
 		(unsigned) intwidth+1, (unsigned) intwidth+1, 0, 64*360);
     }
     if (pointPtr != staticPoints) {
-	Tcl_Free(pointPtr);
+	ckfree(pointPtr);
     }
 
     /*
@@ -1001,7 +1001,7 @@ LineInsert(
 	linePtr->coordPtr[length-2] = linePtr->lastArrowPtr[0];
 	linePtr->coordPtr[length-1] = linePtr->lastArrowPtr[1];
     }
-    newCoordPtr = (double *)Tcl_Alloc(sizeof(double) * (length + objc));
+    newCoordPtr = (double *)ckalloc(sizeof(double) * (length + objc));
     for (i=0; i<beforeThis; i++) {
 	newCoordPtr[i] = linePtr->coordPtr[i];
     }
@@ -1009,7 +1009,7 @@ LineInsert(
 	if (Tcl_GetDoubleFromObj(NULL, objv[i],
 		&newCoordPtr[i + beforeThis]) != TCL_OK) {
 	    Tcl_ResetResult(Canvas(canvas)->interp);
-	    Tcl_Free(newCoordPtr);
+	    ckfree(newCoordPtr);
 	    return;
 	}
     }
@@ -1018,7 +1018,7 @@ LineInsert(
 	newCoordPtr[i+objc] = linePtr->coordPtr[i];
     }
     if (linePtr->coordPtr) {
-	Tcl_Free(linePtr->coordPtr);
+	ckfree(linePtr->coordPtr);
     }
     linePtr->coordPtr = newCoordPtr;
     length += objc ;
@@ -1061,7 +1061,7 @@ LineInsert(
 		 * of the line, include a third point.
 		 */
 
-		if (beforeThis == -4) {
+		if (beforeThis == (Tcl_Size)-4) {
 		    objc += 2;
 		}
 		if (beforeThis + 4 == length - (objc - 8)) {
@@ -1134,11 +1134,11 @@ LineInsert(
     }
 
     if (linePtr->firstArrowPtr != NULL) {
-	Tcl_Free(linePtr->firstArrowPtr);
+	ckfree(linePtr->firstArrowPtr);
 	linePtr->firstArrowPtr = NULL;
     }
     if (linePtr->lastArrowPtr != NULL) {
-	Tcl_Free(linePtr->lastArrowPtr);
+	ckfree(linePtr->lastArrowPtr);
 	linePtr->lastArrowPtr = NULL;
     }
     if (linePtr->arrow != ARROWS_NONE) {
@@ -1373,11 +1373,11 @@ LineDeleteCoords(
     }
     linePtr->numPoints -= count/2;
     if (linePtr->firstArrowPtr != NULL) {
-	Tcl_Free(linePtr->firstArrowPtr);
+	ckfree(linePtr->firstArrowPtr);
 	linePtr->firstArrowPtr = NULL;
     }
     if (linePtr->lastArrowPtr != NULL) {
-	Tcl_Free(linePtr->lastArrowPtr);
+	ckfree(linePtr->lastArrowPtr);
 	linePtr->lastArrowPtr = NULL;
     }
     if (linePtr->arrow != ARROWS_NONE) {
@@ -1496,7 +1496,7 @@ LineToPoint(
 	if (numPoints <= MAX_STATIC_POINTS) {
 	    linePoints = staticSpace;
 	} else {
-	    linePoints = (double *)Tcl_Alloc(2 * numPoints * sizeof(double));
+	    linePoints = (double *)ckalloc(2 * numPoints * sizeof(double));
 	}
 	numPoints = linePtr->smooth->coordProc(canvas, linePtr->coordPtr,
 		linePtr->numPoints, linePtr->splineSteps, NULL, linePoints);
@@ -1655,7 +1655,7 @@ LineToPoint(
 
   done:
     if ((linePoints != staticSpace) && (linePoints != linePtr->coordPtr)) {
-	Tcl_Free(linePoints);
+	ckfree(linePoints);
     }
     return bestDist;
 }
@@ -1730,7 +1730,7 @@ LineToArea(
 	if (numPoints <= MAX_STATIC_POINTS) {
 	    linePoints = staticSpace;
 	} else {
-	    linePoints = (double *)Tcl_Alloc(2 * numPoints * sizeof(double));
+	    linePoints = (double *)ckalloc(2 * numPoints * sizeof(double));
 	}
 	numPoints = linePtr->smooth->coordProc(canvas, linePtr->coordPtr,
 		linePtr->numPoints, linePtr->splineSteps, NULL, linePoints);
@@ -1776,7 +1776,7 @@ LineToArea(
 
   done:
     if ((linePoints != staticSpace) && (linePoints != linePtr->coordPtr)) {
-	Tcl_Free(linePoints);
+	ckfree(linePoints);
     }
     return result;
 }
@@ -1821,14 +1821,14 @@ ScaleLine(
     if (linePtr->firstArrowPtr != NULL) {
 	linePtr->coordPtr[0] = linePtr->firstArrowPtr[0];
 	linePtr->coordPtr[1] = linePtr->firstArrowPtr[1];
-	Tcl_Free(linePtr->firstArrowPtr);
+	ckfree(linePtr->firstArrowPtr);
 	linePtr->firstArrowPtr = NULL;
     }
     if (linePtr->lastArrowPtr != NULL) {
 	i = 2*(linePtr->numPoints-1);
 	linePtr->coordPtr[i] = linePtr->lastArrowPtr[0];
 	linePtr->coordPtr[i+1] = linePtr->lastArrowPtr[1];
-	Tcl_Free(linePtr->lastArrowPtr);
+	ckfree(linePtr->lastArrowPtr);
 	linePtr->lastArrowPtr = NULL;
     }
     for (i = 0, coordPtr = linePtr->coordPtr; i < linePtr->numPoints;
@@ -1878,8 +1878,8 @@ GetLineIndex(
     if (TCL_OK == TkGetIntForIndex(obj, 2*linePtr->numPoints - 1, 1, &idx)) {
 	if (idx < 0) {
 	    idx = 0;
-	} else if (idx > (2 * linePtr->numPoints)) {
-	    idx = 2 * linePtr->numPoints;
+	} else if (idx > (2*(Tcl_Size)linePtr->numPoints)) {
+	    idx = 2*linePtr->numPoints;
 	} else {
 	    idx &= (Tcl_Size)-2;	/* If index is odd, make it even. */
 	}
@@ -2087,7 +2087,7 @@ ParseArrowShape(
     linePtr->arrowShapeA = (float) a;
     linePtr->arrowShapeB = (float) b;
     linePtr->arrowShapeC = (float) c;
-    Tcl_Free(argv);
+    ckfree(argv);
     return TCL_OK;
 
   syntaxError:
@@ -2097,7 +2097,7 @@ ParseArrowShape(
 	    value));
     Tcl_SetErrorCode(interp, "TK", "CANVAS", "ARROW_SHAPE", (char *)NULL);
     if (argv != NULL) {
-	Tcl_Free(argv);
+	ckfree(argv);
     }
     return TCL_ERROR;
 }
@@ -2130,7 +2130,7 @@ PrintArrowShape(
 				 * string here. */
 {
     LineItem *linePtr = (LineItem *) recordPtr;
-    char *buffer = (char *)Tcl_Alloc(120);
+    char *buffer = (char *)ckalloc(120);
 
     snprintf(buffer, 120, "%.5g %.5g %.5g", linePtr->arrowShapeA,
 	    linePtr->arrowShapeB, linePtr->arrowShapeC);
@@ -2327,7 +2327,7 @@ ConfigureArrows(
     if (linePtr->arrow != ARROWS_LAST) {
 	poly = linePtr->firstArrowPtr;
 	if (poly == NULL) {
-	    poly = (double *)Tcl_Alloc(2 * PTS_IN_ARROW * sizeof(double));
+	    poly = (double *)ckalloc(2 * PTS_IN_ARROW * sizeof(double));
 	    poly[0] = poly[10] = linePtr->coordPtr[0];
 	    poly[1] = poly[11] = linePtr->coordPtr[1];
 	    linePtr->firstArrowPtr = poly;
@@ -2371,7 +2371,7 @@ ConfigureArrows(
 	coordPtr = linePtr->coordPtr + 2*(linePtr->numPoints-2);
 	poly = linePtr->lastArrowPtr;
 	if (poly == NULL) {
-	    poly = (double *)Tcl_Alloc(2 * PTS_IN_ARROW * sizeof(double));
+	    poly = (double *)ckalloc(2 * PTS_IN_ARROW * sizeof(double));
 	    poly[0] = poly[10] = coordPtr[2];
 	    poly[1] = poly[11] = coordPtr[3];
 	    linePtr->lastArrowPtr = poly;
@@ -2536,13 +2536,13 @@ LineToPostscript(
 		linePtr->numPoints, linePtr->splineSteps, NULL, NULL);
 	pointPtr = staticPoints;
 	if (numPoints > MAX_STATIC_POINTS) {
-	    pointPtr = (double *)Tcl_Alloc(numPoints * 2 * sizeof(double));
+	    pointPtr = (double *)ckalloc(numPoints * 2 * sizeof(double));
 	}
 	numPoints = linePtr->smooth->coordProc(canvas, linePtr->coordPtr,
 		linePtr->numPoints, linePtr->splineSteps, NULL, pointPtr);
 	Tk_CanvasPsPath(interp, canvas, pointPtr, numPoints);
 	if (pointPtr != staticPoints) {
-	    Tcl_Free(pointPtr);
+	    ckfree(pointPtr);
 	}
     }
     Tcl_AppendObjToObj(psObj, Tcl_GetObjResult(interp));

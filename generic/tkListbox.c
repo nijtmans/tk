@@ -409,7 +409,7 @@ static int		ListboxSelect(Listbox *listPtr,
 			    int first, int last, int select);
 static void		ListboxUpdateHScrollbar(Listbox *listPtr);
 static void		ListboxUpdateVScrollbar(Listbox *listPtr);
-static Tcl_ObjCmdProc2 ListboxWidgetObjCmd;
+static Tcl_ObjCmdProc ListboxWidgetObjCmd;
 static int		ListboxBboxSubCmd(Tcl_Interp *interp,
 			    Listbox *listPtr, int index);
 static int		ListboxSelectionSubCmd(Tcl_Interp *interp,
@@ -462,7 +462,7 @@ int
 Tk_ListboxObjCmd(
     TCL_UNUSED(void *),
     Tcl_Interp *interp,		/* Current interpreter. */
-    Tcl_Size objc,			/* Number of arguments. */
+    int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
     Listbox *listPtr;
@@ -488,7 +488,7 @@ Tk_ListboxObjCmd(
 	 * command, so future invocations will have access to it.
 	 */
 
-	optionTables = (ListboxOptionTables *)Tcl_Alloc(sizeof(ListboxOptionTables));
+	optionTables = (ListboxOptionTables *)ckalloc(sizeof(ListboxOptionTables));
 
 	/*
 	 * Set up an exit handler to free the optionTables struct.
@@ -513,20 +513,20 @@ Tk_ListboxObjCmd(
      * already (e.g. resource pointers).
      */
 
-    listPtr			 = (Listbox *)Tcl_Alloc(sizeof(Listbox));
+    listPtr			 = (Listbox *)ckalloc(sizeof(Listbox));
     memset(listPtr, 0, sizeof(Listbox));
 
     listPtr->tkwin		 = tkwin;
     listPtr->display		 = Tk_Display(tkwin);
     listPtr->interp		 = interp;
-    listPtr->widgetCmd		 = Tcl_CreateObjCommand2(interp,
+    listPtr->widgetCmd		 = Tcl_CreateObjCommand(interp,
 	    Tk_PathName(listPtr->tkwin), ListboxWidgetObjCmd, listPtr,
 	    ListboxCmdDeletedProc);
     listPtr->optionTable	 = optionTables->listboxOptionTable;
     listPtr->itemAttrOptionTable = optionTables->itemAttrOptionTable;
-    listPtr->selection		 = (Tcl_HashTable *)Tcl_Alloc(sizeof(Tcl_HashTable));
+    listPtr->selection		 = (Tcl_HashTable *)ckalloc(sizeof(Tcl_HashTable));
     Tcl_InitHashTable(listPtr->selection, TCL_ONE_WORD_KEYS);
-    listPtr->itemAttrTable	 = (Tcl_HashTable *)Tcl_Alloc(sizeof(Tcl_HashTable));
+    listPtr->itemAttrTable	 = (Tcl_HashTable *)ckalloc(sizeof(Tcl_HashTable));
     Tcl_InitHashTable(listPtr->itemAttrTable, TCL_ONE_WORD_KEYS);
     listPtr->relief		 = TK_RELIEF_RAISED;
     listPtr->textGC		 = NULL;
@@ -591,7 +591,7 @@ static int
 ListboxWidgetObjCmd(
     void *clientData,	/* Information about listbox widget. */
     Tcl_Interp *interp,		/* Current interpreter. */
-    Tcl_Size objc,			/* Number of arguments. */
+    int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Arguments as Tcl_Obj's. */
 {
     Listbox *listPtr = (Listbox *)clientData;
@@ -1404,7 +1404,7 @@ ListboxGetItemAttributes(
 
     entry = Tcl_CreateHashEntry(listPtr->itemAttrTable, KEY(index), &isNew);
     if (isNew) {
-	attrs = (ItemAttr *)Tcl_Alloc(sizeof(ItemAttr));
+	attrs = (ItemAttr *)ckalloc(sizeof(ItemAttr));
 	attrs->border = NULL;
 	attrs->selBorder = NULL;
 	attrs->fgColor = NULL;
@@ -1464,7 +1464,7 @@ DestroyListbox(
      */
 
     Tcl_DeleteHashTable(listPtr->selection);
-    Tcl_Free(listPtr->selection);
+    ckfree(listPtr->selection);
 
     /*
      * Free the item attribute hash table.
@@ -1472,10 +1472,10 @@ DestroyListbox(
 
     for (entry = Tcl_FirstHashEntry(listPtr->itemAttrTable, &search);
 	    entry != NULL; entry = Tcl_NextHashEntry(&search)) {
-	Tcl_Free(Tcl_GetHashValue(entry));
+	ckfree(Tcl_GetHashValue(entry));
     }
     Tcl_DeleteHashTable(listPtr->itemAttrTable);
-    Tcl_Free(listPtr->itemAttrTable);
+    ckfree(listPtr->itemAttrTable);
 
     /*
      * Free up all the stuff that requires special handling, then let
@@ -1496,7 +1496,7 @@ DestroyListbox(
 	    listPtr->tkwin);
     Tcl_Release(listPtr->tkwin);
     listPtr->tkwin = NULL;
-    Tcl_Free(listPtr);
+    ckfree(listPtr);
 }
 
 /*
@@ -1522,7 +1522,7 @@ DestroyListboxOptionTables(
     void *clientData,	/* Pointer to the OptionTables struct */
     TCL_UNUSED(Tcl_Interp *))		/* Pointer to the calling interp */
 {
-    Tcl_Free(clientData);
+    ckfree(clientData);
     return;
 }
 
@@ -1558,7 +1558,7 @@ ConfigureListbox(
     Tcl_Obj *oldListObj = NULL;
     Tcl_Obj *errorResult = NULL;
     int oldExport, error;
-    int borderWidth, highlightWidth;
+    int borderWidth, selBorderWidth, highlightWidth;
 
     oldExport = (listPtr->exportSelection) && (!Tcl_IsSafe(listPtr->interp));
     if (listPtr->listVarNameObj != NULL) {
@@ -1596,7 +1596,26 @@ ConfigureListbox(
 	Tk_SetBackgroundFromBorder(listPtr->tkwin, listPtr->normalBorder);
 
 	Tk_GetPixelsFromObj(NULL, listPtr->tkwin, listPtr->borderWidthObj, &borderWidth);
+	if (borderWidth < 0) {
+	    borderWidth = 0;
+	    Tcl_DecrRefCount(listPtr->borderWidthObj);
+	    listPtr->borderWidthObj = Tcl_NewIntObj(0);
+	    Tcl_IncrRefCount(listPtr->borderWidthObj);
+	}
 	Tk_GetPixelsFromObj(NULL, listPtr->tkwin, listPtr->highlightWidthObj, &highlightWidth);
+	if (highlightWidth < 0) {
+	    highlightWidth = 0;
+	    Tcl_DecrRefCount(listPtr->highlightWidthObj);
+	    listPtr->highlightWidthObj = Tcl_NewIntObj(0);
+	    Tcl_IncrRefCount(listPtr->highlightWidthObj);
+	}
+	Tk_GetPixelsFromObj(NULL, listPtr->tkwin, listPtr->selBorderWidthObj, &selBorderWidth);
+	if (selBorderWidth < 0) {
+	    selBorderWidth = 0;
+	    Tcl_DecrRefCount(listPtr->selBorderWidthObj);
+	    listPtr->selBorderWidthObj = Tcl_NewIntObj(0);
+	    Tcl_IncrRefCount(listPtr->selBorderWidthObj);
+	}
 	listPtr->inset = highlightWidth + borderWidth;
 
 	/*
@@ -2447,7 +2466,7 @@ ListboxDeleteSubCmd(
 
 	entry = Tcl_FindHashEntry(listPtr->itemAttrTable, KEY(i));
 	if (entry != NULL) {
-	    Tcl_Free(Tcl_GetHashValue(entry));
+	    ckfree(Tcl_GetHashValue(entry));
 	    Tcl_DeleteHashEntry(entry);
 	}
 
@@ -3500,7 +3519,7 @@ ListboxListVarProc(
 
 	    entry = Tcl_FindHashEntry(listPtr->itemAttrTable, KEY(i));
 	    if (entry != NULL) {
-		Tcl_Free(Tcl_GetHashValue(entry));
+		ckfree(Tcl_GetHashValue(entry));
 		Tcl_DeleteHashEntry(entry);
 	    }
 	}

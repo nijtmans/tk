@@ -327,7 +327,7 @@ Tk_GetVisual(
 		    goto done;
 		}
 	    }
-	    cmapPtr = (TkColormap *)Tcl_Alloc(sizeof(TkColormap));
+	    cmapPtr = (TkColormap *)ckalloc(sizeof(TkColormap));
 	    cmapPtr->colormap = XCreateColormap(Tk_Display(tkwin),
 		    RootWindowOfScreen(Tk_Screen(tkwin)), visual,
 		    AllocNone);
@@ -382,7 +382,7 @@ Tk_GetColormap(
      */
 
     if (strcmp(string, "new") == 0) {
-	cmapPtr = (TkColormap *)Tcl_Alloc(sizeof(TkColormap));
+	cmapPtr = (TkColormap *)ckalloc(sizeof(TkColormap));
 	cmapPtr->colormap = XCreateColormap(Tk_Display(tkwin),
 		RootWindowOfScreen(Tk_Screen(tkwin)), Tk_Visual(tkwin),
 		AllocNone);
@@ -482,7 +482,7 @@ Tk_FreeColormap(
 		} else {
 		    prevPtr->nextPtr = cmapPtr->nextPtr;
 		}
-		Tcl_Free(cmapPtr);
+		ckfree(cmapPtr);
 	    }
 	    return;
 	}

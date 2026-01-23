@@ -40,11 +40,9 @@ static char scriptPath[PATH_MAX + 1] = "";
  * Forward declarations...
  */
 
-static Tcl_ObjCmdProc2 TkMacOSXGetAppPathObjCmd;
-static Tcl_ObjCmdProc2 TkMacOSVersionObjCmd;
-int TkMacOSXAccessibility_Init(Tcl_Interp *interp);
-static Tcl_ObjCmdProc2 TkMacOSXGetInfoAsJSONObjCmd;
-
+static Tcl_ObjCmdProc TkMacOSXGetAppPathObjCmd;
+static Tcl_ObjCmdProc TkMacOSVersionObjCmd;
+
 #pragma mark TKApplication(TKInit)
 
 @implementation TKApplication
@@ -404,7 +402,7 @@ static void closePanels(
 static bool doCleanupFromExit = false;
 
 int TkpWantsExitProc(void) {
-    return doCleanupFromExit;
+    return doCleanupFromExit ? 1 : 0;
 }
 
 TCL_NORETURN void TkpExitProc(
@@ -482,7 +480,7 @@ int
 TkpInit(
     Tcl_Interp *interp)
 {
-    static bool initialized = false;
+    static int initialized = 0;
 
     /*
      * TkpInit can be called multiple times with different interpreters. But
@@ -503,7 +501,7 @@ TkpInit(
 #   error Mac OS X 10.9 required
 #endif
 
-	initialized = true;
+	initialized = 1;
 
 #ifdef TK_FRAMEWORK
 
@@ -644,7 +642,6 @@ TkpInit(
 
 	TkMacOSXServices_Init(interp);
 	TkMacOSXNSImage_Init(interp);
-	TkMacOSXAccessibility_Init(interp);
 
 	/*
 	 * The root window has been created and mapped, but XMapWindow deferred its
@@ -699,17 +696,15 @@ TkpInit(
 	Tcl_SetVar2(interp, "auto_path", NULL, scriptPath,
 		TCL_GLOBAL_ONLY|TCL_LIST_ELEMENT|TCL_APPEND_VALUE);
     }
-    Tcl_CreateObjCommand2(interp, "nsimage",
+    Tcl_CreateObjCommand(interp, "nsimage",
 	    TkMacOSXNSImageObjCmd, NULL, NULL);
-    Tcl_CreateObjCommand2(interp, "::tk::mac::standardAboutPanel",
+    Tcl_CreateObjCommand(interp, "::tk::mac::standardAboutPanel",
 	    TkMacOSXStandardAboutPanelObjCmd, NULL, NULL);
-    Tcl_CreateObjCommand2(interp, "::tk::mac::iconBitmap",
+    Tcl_CreateObjCommand(interp, "::tk::mac::iconBitmap",
 	    TkMacOSXIconBitmapObjCmd, NULL, NULL);
-    Tcl_CreateObjCommand2(interp, "::tk::mac::GetAppPath",
+    Tcl_CreateObjCommand(interp, "::tk::mac::GetAppPath",
 	    TkMacOSXGetAppPathObjCmd, NULL, NULL);
-    Tcl_CreateObjCommand2(interp, "::tk::mac::GetInfoAsJSON",
-	    TkMacOSXGetInfoAsJSONObjCmd, NULL, NULL);
-    Tcl_CreateObjCommand2(interp, "::tk::mac::macOSVersion",
+    Tcl_CreateObjCommand(interp, "::tk::mac::macOSVersion",
 	    TkMacOSVersionObjCmd, NULL, NULL);
     MacSystrayInit(interp);
     MacPrint_Init(interp);
@@ -735,9 +730,9 @@ TkpInit(
 
 static int
 TkMacOSXGetAppPathObjCmd(
-    TCL_UNUSED(void *), /* clientData */
+    TCL_UNUSED(void *),
     Tcl_Interp *interp,
-    Tcl_Size objc,
+    int objc,
     Tcl_Obj *const objv[])
 {
     if (objc != 1) {
@@ -823,9 +818,9 @@ TkpGetAppName(
 
 static int
 TkMacOSVersionObjCmd(
-    TCL_UNUSED(void *), /* clientData */
+    TCL_UNUSED(void *),
     Tcl_Interp *interp,
-    Tcl_Size objc,
+    int objc,
     Tcl_Obj *const objv[])
 {
     static char version[16] = "";
@@ -838,58 +833,6 @@ TkMacOSVersionObjCmd(
     }
     Tcl_SetResult(interp, version, NULL);
     return TCL_OK;
-}
-
-/*
- *----------------------------------------------------------------------
- *
- * TkMacOSXGetInfoAsJSONObjCmd --
- *
- *	Returns the contents of the Info.plist file in the application
- *      bundle as a JSON-encoded Tcl string.
- *
- * Results:
- *	Returns the JSON encoding of the Info.plist file..
- *
- * Side effects:
- *	None.
- *
- *----------------------------------------------------------------------
- */
-
-static int
-TkMacOSXGetInfoAsJSONObjCmd(
-    TCL_UNUSED(void *), /* clientData */
-    Tcl_Interp *interp,
-    Tcl_Size objc,
-    Tcl_Obj *const objv[])
-{
-    static char *bytes = NULL;
-
-    if (objc != 1) {
-	Tcl_WrongNumArgs(interp, 1, objv, NULL);
-	return TCL_ERROR;
-    }
-
-    if (bytes == NULL) {
-	NSJSONWritingOptions opt = NSJSONWritingPrettyPrinted;
-	NSDictionary<NSString *, id> *infoDict = [[NSBundle mainBundle]
-						     infoDictionary];
-	NSData *infoAsJSON = [NSJSONSerialization
-				 dataWithJSONObject: infoDict
-					    options:opt
-					      error:nil];
-	if (infoAsJSON.length) {
-	    int buffer_size = (int) infoAsJSON.length + 1;
-	    bytes = malloc(buffer_size);
-	    strlcpy(bytes, infoAsJSON.bytes, buffer_size);
-	}
-    }
-    if (bytes) {
-	Tcl_SetObjResult(interp, Tcl_NewStringObj(bytes, TCL_INDEX_NONE));
-	return TCL_OK;
-    }
-    return TCL_ERROR;
 }
 
 /*

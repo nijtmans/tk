@@ -23,7 +23,7 @@
  */
 
 typedef struct {
-    bool initialized;
+    int initialized;
 } ThreadSpecificData;
 static Tcl_ThreadDataKey dataKey;
 
@@ -66,7 +66,7 @@ TkCreateXEventSource(void)
 	    Tcl_GetThreadData(&dataKey, sizeof(ThreadSpecificData));
 
     if (!tsdPtr->initialized) {
-	tsdPtr->initialized = true;
+	tsdPtr->initialized = 1;
 	Tcl_CreateEventSource(DisplaySetupProc, DisplayCheckProc, NULL);
 	TkCreateExitHandler(DisplayExitHandler, NULL);
     }
@@ -98,7 +98,7 @@ DisplayExitHandler(
     (void)dummy;
 
     Tcl_DeleteEventSource(DisplaySetupProc, DisplayCheckProc, NULL);
-    tsdPtr->initialized = false;
+    tsdPtr->initialized = 0;
 }
 
 /*
@@ -163,7 +163,7 @@ TkpOpenDisplay(
     if (display == NULL) {
 	return NULL;
     }
-    dispPtr = (TkDisplay *)Tcl_Alloc(sizeof(TkDisplay));
+    dispPtr = (TkDisplay *)ckalloc(sizeof(TkDisplay));
     memset(dispPtr, 0, sizeof(TkDisplay));
     dispPtr->display = display;
 #ifdef TK_USE_INPUT_METHODS
@@ -184,13 +184,13 @@ TkpOpenDisplay(
     if (WidthMMOfScreen(DefaultScreenOfDisplay(display)) <= 0) {
 	int mm;
 
-	mm = (int)(WidthOfScreen(DefaultScreenOfDisplay(display)) * (25.4 / 75.0));
+	mm = WidthOfScreen(DefaultScreenOfDisplay(display)) * (25.4 / 75.0);
 	WidthMMOfScreen(DefaultScreenOfDisplay(display)) = mm;
     }
     if (HeightMMOfScreen(DefaultScreenOfDisplay(display)) <= 0) {
 	int mm;
 
-	mm = (int)(HeightOfScreen(DefaultScreenOfDisplay(display)) * (25.4 / 75.0));
+	mm = HeightOfScreen(DefaultScreenOfDisplay(display)) * (25.4 / 75.0);
 	HeightMMOfScreen(DefaultScreenOfDisplay(display)) = mm;
     }
 
@@ -592,8 +592,8 @@ TkUnixDoOneXEvent(
 	    blockTime.tv_usec = 0;
 	}
 	fd = ConnectionNumber(dispPtr->display);
-	index = fd/(NBBY*(int)sizeof(fd_mask));
-	bit = ((fd_mask)1) << (fd%(NBBY*(int)sizeof(fd_mask)));
+	index = fd/(NBBY*sizeof(fd_mask));
+	bit = ((fd_mask)1) << (fd%(NBBY*sizeof(fd_mask)));
 	readMask[index] |= bit;
 	if (numFdBits <= fd) {
 	    numFdBits = fd+1;
@@ -618,8 +618,8 @@ TkUnixDoOneXEvent(
     for (dispPtr = TkGetDisplayList(); dispPtr != NULL;
 	    dispPtr = dispPtr->nextPtr) {
 	fd = ConnectionNumber(dispPtr->display);
-	index = fd/(NBBY*(int)sizeof(fd_mask));
-	bit = ((fd_mask)1) << (fd%(NBBY*(int)sizeof(fd_mask)));
+	index = fd/(NBBY*sizeof(fd_mask));
+	bit = ((fd_mask)1) << (fd%(NBBY*sizeof(fd_mask)));
 	if ((readMask[index] & bit) || (QLength(dispPtr->display) > 0)) {
 	    DisplayFileProc(dispPtr, TCL_READABLE);
 	}

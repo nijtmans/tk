@@ -382,7 +382,7 @@ DoConfig(
 		Tcl_IncrRefCount(arg);
 		newStr = (char *)arg;
 	    } else {
-		newStr = (char *)Tcl_Alloc(strlen(value) + 1);
+		newStr = (char *)ckalloc(strlen(value) + 1);
 		strcpy(newStr, value);
 	    }
 	    oldStr = *((char **)ptr);
@@ -390,7 +390,7 @@ DoConfig(
 		if (specPtr->specFlags & TK_CONFIG_OBJS) {
 		    Tcl_DecrRefCount((Tcl_Obj *)oldStr);
 		} else {
-		    Tcl_Free(oldStr);
+		    ckfree(oldStr);
 		}
 	    }
 	    *((char **)ptr) = newStr;
@@ -536,13 +536,6 @@ DoConfig(
 				Tcl_GetString(arg), "\"", (char *)NULL);
 		    }
 		    return TCL_ERROR;
-		} else if (!(specPtr->specFlags & TK_OPTION_NEG_OK) && (dummy < 0)) {
-			if (interp) {
-			    Tcl_AppendResult(interp, "expected screen distance ",
-				    nullOK ? " or \"\"" : "",
-				    "but got \"", Tcl_GetString(arg), "\"", (char *)NULL);
-			}
-			return TCL_ERROR;
 		} else {
 		    Tcl_IncrRefCount(arg);
 		    if (*(Tcl_Obj **)ptr != NULL) {
@@ -668,7 +661,7 @@ Tk_ConfigureInfo(
 	}
 	list = FormatConfigInfo(interp, tkwin, specPtr, widgRec);
 	Tcl_SetObjResult(interp, Tcl_NewStringObj(list, TCL_INDEX_NONE));
-	Tcl_Free(list);
+	ckfree(list);
 	return TCL_OK;
     }
 
@@ -690,7 +683,7 @@ Tk_ConfigureInfo(
 	}
 	list = FormatConfigInfo(interp, tkwin, specPtr, widgRec);
 	Tcl_AppendResult(interp, leader, list, "}", (char *)NULL);
-	Tcl_Free(list);
+	ckfree(list);
 	leader = " {";
     }
     return TCL_OK;
@@ -754,7 +747,7 @@ FormatConfigInfo(
     result = Tcl_Merge(5, argv);
     if (freeProc != NULL) {
 	if (freeProc == TCL_DYNAMIC) {
-	    Tcl_Free((void *)argv[4]);
+	    ckfree((void *)argv[4]);
 	} else {
 	    freeProc((void *)argv[4]);
 	}
@@ -985,7 +978,7 @@ Tk_ConfigureValue(
     Tcl_SetObjResult(interp, Tcl_NewStringObj(result, TCL_INDEX_NONE));
     if (freeProc != NULL) {
 	if (freeProc == TCL_DYNAMIC) {
-	    Tcl_Free((void *)result);
+	    ckfree((void *)result);
 	} else {
 	    freeProc((void *)result);
 	}
@@ -1044,7 +1037,7 @@ Tk_FreeOptions(
 	switch (specPtr->type) {
 	case TK_CONFIG_STRING:
 	    if (*((char **)ptr) != NULL) {
-		Tcl_Free(*((char **)ptr));
+		ckfree(*((char **)ptr));
 		*((char **)ptr) = NULL;
 	    }
 	    break;
@@ -1124,7 +1117,7 @@ GetCachedSpecs(
     specCacheTablePtr = (Tcl_HashTable *)
 	    Tcl_GetAssocData(interp, "tkConfigSpec.threadTable", NULL);
     if (specCacheTablePtr == NULL) {
-	specCacheTablePtr = (Tcl_HashTable *)Tcl_Alloc(sizeof(Tcl_HashTable));
+	specCacheTablePtr = (Tcl_HashTable *)ckalloc(sizeof(Tcl_HashTable));
 	Tcl_InitHashTable(specCacheTablePtr, TCL_ONE_WORD_KEYS);
 	Tcl_SetAssocData(interp, "tkConfigSpec.threadTable",
 		DeleteSpecCacheTable, specCacheTablePtr);
@@ -1157,7 +1150,7 @@ GetCachedSpecs(
 	 * from the origin.
 	 */
 
-	cachedSpecs = (Tk_ConfigSpec *)Tcl_Alloc(entrySpace);
+	cachedSpecs = (Tk_ConfigSpec *)ckalloc(entrySpace);
 	memcpy(cachedSpecs, staticSpecs, entrySpace);
 	Tcl_SetHashValue(entryPtr, cachedSpecs);
 
@@ -1219,10 +1212,10 @@ DeleteSpecCacheTable(
 	 * Someone else deallocates the Tk_Uids themselves.
 	 */
 
-	Tcl_Free(Tcl_GetHashValue(entryPtr));
+	ckfree(Tcl_GetHashValue(entryPtr));
     }
     Tcl_DeleteHashTable(tablePtr);
-    Tcl_Free(tablePtr);
+    ckfree(tablePtr);
 }
 
 /*

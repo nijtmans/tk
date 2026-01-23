@@ -34,7 +34,7 @@
  *----------------------------------------------------------------------
  */
 
-size_t
+int
 TkpChangeFocus(
     TkWindow *winPtr,		/* Window that is to receive the X focus. */
     int force)			/* Non-zero means claim the focus even if it
@@ -44,8 +44,7 @@ TkpChangeFocus(
     TkDisplay *dispPtr = winPtr->dispPtr;
     Tk_ErrorHandler errHandler;
     Window window, root, parent, *children;
-    unsigned int numChildren;
-    size_t serial;
+    unsigned int numChildren, serial;
     TkWindow *winPtr2;
     int dummy;
 

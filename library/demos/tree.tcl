@@ -26,9 +26,8 @@ pack [addSeeDismiss $w.seeDismiss $w] -side bottom -fill x
 ## Code to populate the roots of the tree (can be more than one on Windows)
 proc populateRoots {tree} {
     foreach dir [lsort -dictionary [file volumes]] {
-	populateTree $tree [$tree insert {} end -text $dir  \
-				-image [tk fileicon [file normalize $dir] 16] \
-				-values [list $dir directory]]
+	populateTree $tree [$tree insert {} end -text $dir \
+		-values [list $dir directory]]
     }
 }
 
@@ -43,8 +42,7 @@ proc populateTree {tree node} {
 	set f [file normalize $f]
 	set type [file type $f]
 	set id [$tree insert $node end -text [file tail $f] \
-		    -image [tk fileicon $f 16]\
-		    -values [list $f $type]]
+		-values [list $f $type]]
 
 	if {$type eq "directory"} {
 	    ## Make it so that this node is openable

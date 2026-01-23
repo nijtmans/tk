@@ -15,8 +15,6 @@ namespace eval ::ttk {
 source -encoding utf-8 [file join $::ttk::library fonts.tcl]
 source -encoding utf-8 [file join $::ttk::library cursors.tcl]
 source -encoding utf-8 [file join $::ttk::library utils.tcl]
-source -encoding utf-8 [file join $::ttk::library elements.tcl]
-source -encoding utf-8 [file join $::ttk::library wideSpinbox.tcl]
 
 ## ttk::deprecated $old $new --
 #	Define $old command as a deprecated alias for $new command
@@ -56,13 +54,9 @@ package ifneeded tile 0.8.6 { package provide tile 0.8.6 }
 
 ### ::ttk::ThemeChanged --
 #	Called from [::ttk::style theme use].
-#	Updates the elements of the Toggleswitch* and Wide.TSpinbox styles,
-#	and sends a <<ThemeChanged>> virtual event to all widgets.
+#	Sends a <<ThemeChanged>> virtual event to all widgets.
 #
 proc ::ttk::ThemeChanged {} {
-    toggleswitch::CondUpdateElements			;# see elements.tcl
-    wideSpinbox::MakeOrUpdateElements			;# see wideSpinbox.tcl
-
     set Q .
     while {[llength $Q]} {
 	set QN [list]
@@ -74,17 +68,6 @@ proc ::ttk::ThemeChanged {} {
 	}
 	set Q $QN
     }
-}
-
-### ::ttk::AppearanceChanged --
-#	Called from the C code for macOSX, after sending the virtual events
-#	<<LightAqua>>/<<DarkAqua>> and <<AppearanceChanged>> to "." and the
-#	toplevel windows.
-#	Updates the elements of the Toggleswitch* and Wide.TSpinbox styles.
-#
-proc ::ttk::AppearanceChanged {} {
-    toggleswitch::CondUpdateElements			;# see elements.tcl
-    wideSpinbox::MakeOrUpdateElements			;# see wideSpinbox.tcl
 }
 
 ### Public API.
@@ -156,7 +139,6 @@ proc ::ttk::setTreeviewRowHeight {} {
 #
 source -encoding utf-8 [file join $::ttk::library button.tcl]
 source -encoding utf-8 [file join $::ttk::library menubutton.tcl]
-source -encoding utf-8 [file join $::ttk::library toggleswitch.tcl]
 source -encoding utf-8 [file join $::ttk::library scrollbar.tcl]
 source -encoding utf-8 [file join $::ttk::library scale.tcl]
 source -encoding utf-8 [file join $::ttk::library progress.tcl]
@@ -188,7 +170,7 @@ proc ttk::LoadThemes {} {
 	alt		altTheme.tcl
 	clam		clamTheme.tcl
 	winnative	winTheme.tcl
-	vista		vistaTheme.tcl
+	xpnative	{xpTheme.tcl vistaTheme.tcl}
 	aqua		aquaTheme.tcl
     } {
 	if {[lsearch -exact $builtinThemes $theme] >= 0} {
@@ -205,14 +187,14 @@ ttk::LoadThemes; rename ::ttk::LoadThemes {}
 #
 # Notes:
 #	+ On OSX, aqua theme is the default
-#	+ On Windows, vista takes precedence over winnative if available.
+#	+ On Windows, xpnative takes precedence over winnative if available.
 #	+ On X11, users can use the X resource database to
 #	  specify a preferred theme (*TkTheme: themeName);
 #	  otherwise "default" is used.
 #
 
 proc ttk::DefaultTheme {} {
-    set preferred [list aqua vista winnative]
+    set preferred [list aqua vista xpnative winnative]
 
     set userTheme [option get . tkTheme TkTheme]
     if {$userTheme ne {} && ![catch {

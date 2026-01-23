@@ -150,13 +150,14 @@ static int		SetStyleFromAny(Tcl_Interp *interp, Tcl_Obj *objPtr);
  * style object points to the Style structure for the stylefont, or NULL.
  */
 
-static const Tcl_ObjType styleObjType = {
-    "style",			/* name */
+static const TkObjType styleObjType = {
+    {"style",			/* name */
     FreeStyleObjProc,		/* freeIntRepProc */
     DupStyleObjProc,		/* dupIntRepProc */
     NULL,			/* updateStringProc */
     NULL,			/* setFromAnyProc */
-    TCL_OBJTYPE_V0
+    TCL_OBJTYPE_V0},
+    0
 };
 
 /*
@@ -254,7 +255,7 @@ TkStylePkgFree(
 
     entryPtr = Tcl_FirstHashEntry(&tsdPtr->styleTable, &search);
     while (entryPtr != NULL) {
-	Tcl_Free(Tcl_GetHashValue(entryPtr));
+	ckfree(Tcl_GetHashValue(entryPtr));
 	entryPtr = Tcl_NextHashEntry(&search);
     }
     Tcl_DeleteHashTable(&tsdPtr->styleTable);
@@ -267,7 +268,7 @@ TkStylePkgFree(
     while (entryPtr != NULL) {
 	enginePtr = (StyleEngine *)Tcl_GetHashValue(entryPtr);
 	FreeStyleEngine(enginePtr);
-	Tcl_Free(enginePtr);
+	ckfree(enginePtr);
 	entryPtr = Tcl_NextHashEntry(&search);
     }
     Tcl_DeleteHashTable(&tsdPtr->engineTable);
@@ -280,7 +281,7 @@ TkStylePkgFree(
 	FreeElement(tsdPtr->elements+i);
     }
     Tcl_DeleteHashTable(&tsdPtr->elementTable);
-    Tcl_Free(tsdPtr->elements);
+    ckfree(tsdPtr->elements);
 }
 
 /*
@@ -332,7 +333,7 @@ Tk_RegisterStyleEngine(
      * Allocate and intitialize a new engine.
      */
 
-    enginePtr = (StyleEngine *)Tcl_Alloc(sizeof(StyleEngine));
+    enginePtr = (StyleEngine *)ckalloc(sizeof(StyleEngine));
     InitStyleEngine(enginePtr, (const char *)Tcl_GetHashKey(&tsdPtr->engineTable, entryPtr),
 	    (StyleEngine *) parent);
     Tcl_SetHashValue(entryPtr, enginePtr);
@@ -390,7 +391,7 @@ InitStyleEngine(
      */
 
     if (tsdPtr->nbElements > 0) {
-	enginePtr->elements = (StyledElement *)Tcl_Alloc(
+	enginePtr->elements = (StyledElement *)ckalloc(
 		sizeof(StyledElement) * tsdPtr->nbElements);
 	for (elementId = 0; elementId < tsdPtr->nbElements; elementId++) {
 	    InitStyledElement(enginePtr->elements+elementId);
@@ -431,7 +432,7 @@ FreeStyleEngine(
     for (elementId = 0; elementId < tsdPtr->nbElements; elementId++) {
 	FreeStyledElement(enginePtr->elements+elementId);
     }
-    Tcl_Free(enginePtr->elements);
+    ckfree(enginePtr->elements);
 }
 
 /*
@@ -579,7 +580,7 @@ FreeStyledElement(
     for (i = 0; i < elementPtr->nbWidgetSpecs; i++) {
 	FreeWidgetSpec(elementPtr->widgetSpecs+i);
     }
-    Tcl_Free(elementPtr->widgetSpecs);
+    ckfree(elementPtr->widgetSpecs);
 }
 
 /*
@@ -643,7 +644,7 @@ CreateElement(
      * Reallocate element table.
      */
 
-    tsdPtr->elements = (Element *)Tcl_Realloc(tsdPtr->elements,
+    tsdPtr->elements = (Element *)ckrealloc(tsdPtr->elements,
 	    sizeof(Element) * tsdPtr->nbElements);
     InitElement(tsdPtr->elements+elementId,
 	    (const char *)Tcl_GetHashKey(&tsdPtr->elementTable, entryPtr), elementId,
@@ -657,7 +658,7 @@ CreateElement(
     while (engineEntryPtr != NULL) {
 	enginePtr = (StyleEngine *)Tcl_GetHashValue(engineEntryPtr);
 
-	enginePtr->elements = (StyledElement *)Tcl_Realloc(enginePtr->elements,
+	enginePtr->elements = (StyledElement *)ckrealloc(enginePtr->elements,
 		sizeof(StyledElement) * tsdPtr->nbElements);
 	InitStyledElement(enginePtr->elements+elementId);
 
@@ -787,9 +788,9 @@ Tk_RegisterStyledElement(
 
     elementPtr = ((StyleEngine *) engine)->elements+elementId;
 
-    specPtr = (Tk_ElementSpec *)Tcl_Alloc(sizeof(Tk_ElementSpec));
+    specPtr = (Tk_ElementSpec *)ckalloc(sizeof(Tk_ElementSpec));
     specPtr->version = templatePtr->version;
-    specPtr->name = (char *)Tcl_Alloc(strlen(templatePtr->name)+1);
+    specPtr->name = (char *)ckalloc(strlen(templatePtr->name)+1);
     strcpy(specPtr->name, templatePtr->name);
     nbOptions = 0;
     for (nbOptions = 0, srcOptions = templatePtr->options;
@@ -797,7 +798,7 @@ Tk_RegisterStyledElement(
 	/* empty body */
     }
     specPtr->options = (Tk_ElementOptionSpec *)
-	    Tcl_Alloc(sizeof(Tk_ElementOptionSpec) * (nbOptions+1));
+	    ckalloc(sizeof(Tk_ElementOptionSpec) * (nbOptions+1));
     for (srcOptions = templatePtr->options, dstOptions = specPtr->options;
 	    /* End condition within loop */; srcOptions++, dstOptions++) {
 	if (srcOptions->name == NULL) {
@@ -805,7 +806,7 @@ Tk_RegisterStyledElement(
 	    break;
 	}
 
-	dstOptions->name = (char *)Tcl_Alloc(strlen(srcOptions->name)+1);
+	dstOptions->name = (char *)ckalloc(strlen(srcOptions->name)+1);
 	strcpy(dstOptions->name, srcOptions->name);
 	dstOptions->type = srcOptions->type;
     }
@@ -925,7 +926,7 @@ InitWidgetSpec(
      */
 
     widgetSpecPtr->optionsPtr =
-	    (const Tk_OptionSpec **)Tcl_Alloc(sizeof(Tk_OptionSpec *) * nbOptions);
+	    (const Tk_OptionSpec **)ckalloc(sizeof(Tk_OptionSpec *) * nbOptions);
     for (i = 0, elementOptionPtr = elementPtr->specPtr->options;
 	    i < nbOptions; i++, elementOptionPtr++) {
 	widgetOptionPtr = TkGetOptionSpec(elementOptionPtr->name, optionTable);
@@ -965,7 +966,7 @@ FreeWidgetSpec(
     StyledWidgetSpec *widgetSpecPtr)
 				/* The widget spec to free. */
 {
-    Tcl_Free(widgetSpecPtr->optionsPtr);
+    ckfree(widgetSpecPtr->optionsPtr);
 }
 
 /*
@@ -1009,7 +1010,7 @@ GetWidgetSpec(
      */
 
     i = elementPtr->nbWidgetSpecs++;
-    elementPtr->widgetSpecs = (StyledWidgetSpec *)Tcl_Realloc(elementPtr->widgetSpecs,
+    elementPtr->widgetSpecs = (StyledWidgetSpec *)ckrealloc(elementPtr->widgetSpecs,
 	    sizeof(StyledWidgetSpec) * elementPtr->nbWidgetSpecs);
     widgetSpecPtr = elementPtr->widgetSpecs+i;
     InitWidgetSpec(widgetSpecPtr, elementPtr, optionTable);
@@ -1254,7 +1255,7 @@ Tk_CreateStyle(
      * Allocate and intitialize a new style.
      */
 
-    stylePtr = (Style *)Tcl_Alloc(sizeof(Style));
+    stylePtr = (Style *)ckalloc(sizeof(Style));
     InitStyle(stylePtr, (const char *)Tcl_GetHashKey(&tsdPtr->styleTable, entryPtr),
 	    (engine!=NULL ? (StyleEngine*) engine : tsdPtr->defaultEnginePtr),
 	    clientData);
@@ -1403,7 +1404,7 @@ Tk_AllocStyleFromObj(
     Tcl_Obj *objPtr)		/* Object containing name of the style to
 				 * retrieve. */
 {
-    if (objPtr->typePtr != &styleObjType) {
+    if (objPtr->typePtr != &styleObjType.objType) {
 	if (SetStyleFromAny(interp, objPtr) != TCL_OK) {
 	    return NULL;
 	}
@@ -1452,7 +1453,7 @@ SetStyleFromAny(
     if (style == NULL) {
 	return TCL_ERROR;
     }
-    objPtr->typePtr = &styleObjType;
+    objPtr->typePtr = &styleObjType.objType;
     objPtr->internalRep.twoPtrValue.ptr1 = style;
 
     return TCL_OK;

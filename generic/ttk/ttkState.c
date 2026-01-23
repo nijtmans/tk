@@ -16,16 +16,12 @@ static const struct {
     int value;
 } stateNames[] = {
     {"active", TTK_STATE_ACTIVE},		/* Mouse cursor is over widget or element */
-    {"alternate", TTK_STATE_ALTERNATE},		/* Widget-specific alternate display style */
+    {"alternate", TTK_STATE_ALTERNATE},	/* Widget-specific alternate display style */
     {"background", TTK_STATE_BACKGROUND},	/* Top-level window lost focus (Mac,Win "inactive") */
     {"disabled", TTK_STATE_DISABLED},		/* Widget is disabled */
-    {"first", TTK_STATE_FIRST},			/* First */
-    {"focus", TTK_STATE_FOCUS},			/* Widget has keyboard focus */
-    {"hover", TTK_STATE_HOVER},			/* Mouse cursor is over widget */
+    {"focus", TTK_STATE_FOCUS},		/* Widget has keyboard focus */
+    {"hover", TTK_STATE_HOVER},		/* Mouse cursor is over widget */
     {"invalid", TTK_STATE_INVALID},		/* Bad value */
-    {"last", TTK_STATE_LAST},			/* Last */
-    {"leaf", TTK_STATE_LEAF},			/* Leaf */
-    {"open", TTK_STATE_OPEN},			/* Open */
     {"pressed", TTK_STATE_PRESSED},		/* Pressed or "armed" */
     {"readonly", TTK_STATE_READONLY},		/* Editing/modification disabled */
     {"selected", TTK_STATE_SELECTED},		/* "on", "true", "current", etc. */
@@ -54,20 +50,21 @@ static void StateSpecDupIntRep(Tcl_Obj *, Tcl_Obj *);
 static void StateSpecUpdateString(Tcl_Obj *);
 
 static const
-Tcl_ObjType StateSpecObjType =
+TkObjType StateSpecObjType =
 {
-    "StateSpec",		/* name */
-    NULL,			/* freeIntRepProc */
-    StateSpecDupIntRep,	/* dupIntRepProc */
-    StateSpecUpdateString,	/* updateStringProc */
-    StateSpecSetFromAny,	/* setFromAnyProc */
-    TCL_OBJTYPE_V0
+    {"StateSpec",
+    0,
+    StateSpecDupIntRep,
+    StateSpecUpdateString,
+    StateSpecSetFromAny,
+    TCL_OBJTYPE_V0},
+    0
 };
 
 static void StateSpecDupIntRep(Tcl_Obj *srcPtr, Tcl_Obj *copyPtr)
 {
     copyPtr->internalRep.wideValue = srcPtr->internalRep.wideValue;
-    copyPtr->typePtr = &StateSpecObjType;
+    copyPtr->typePtr = &StateSpecObjType.objType;
 }
 
 static int StateSpecSetFromAny(Tcl_Interp *interp, Tcl_Obj *objPtr)
@@ -124,7 +121,7 @@ static int StateSpecSetFromAny(Tcl_Interp *interp, Tcl_Obj *objPtr)
 	}
     }
 
-    objPtr->typePtr = &StateSpecObjType;
+    objPtr->typePtr = &StateSpecObjType.objType;
     objPtr->internalRep.wideValue = ((Tcl_WideInt)onbits << 32) | offbits;
 
     return TCL_OK;
@@ -154,14 +151,14 @@ static void StateSpecUpdateString(Tcl_Obj *objPtr)
     len = Tcl_DStringLength(&result);
     if (len) {
 	/* 'len' includes extra trailing ' ' */
-	objPtr->bytes = (char *)Tcl_Alloc(len);
+	objPtr->bytes = (char *)ckalloc(len);
 	objPtr->length = len-1;
 	strncpy(objPtr->bytes, Tcl_DStringValue(&result), len-1);
 	objPtr->bytes[len-1] = '\0';
     } else {
 	/* empty string */
 	objPtr->length = 0;
-	objPtr->bytes = (char *)Tcl_Alloc(1);
+	objPtr->bytes = (char *)ckalloc(1);
 	*objPtr->bytes = '\0';
     }
 
@@ -173,7 +170,7 @@ Tcl_Obj *Ttk_NewStateSpecObj(unsigned int onbits, unsigned int offbits)
     Tcl_Obj *objPtr = Tcl_NewObj();
 
     Tcl_InvalidateStringRep(objPtr);
-    objPtr->typePtr = &StateSpecObjType;
+    objPtr->typePtr = &StateSpecObjType.objType;
     objPtr->internalRep.wideValue = ((Tcl_WideInt)onbits << 32) | offbits;
 
     return objPtr;
@@ -184,7 +181,7 @@ int Ttk_GetStateSpecFromObj(
     Tcl_Obj *objPtr,
     Ttk_StateSpec *spec)
 {
-    if (objPtr->typePtr != &StateSpecObjType) {
+    if (objPtr->typePtr != &StateSpecObjType.objType) {
 	int status = StateSpecSetFromAny(interp, objPtr);
 	if (status != TCL_OK) {
 	    return status;

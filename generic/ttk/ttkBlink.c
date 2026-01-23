@@ -41,7 +41,7 @@ static void CursorManagerDeleteProc(
     if (cm->timer) {
 	Tcl_DeleteTimerHandler(cm->timer);
     }
-    Tcl_Free(clientData);
+    ckfree(clientData);
 }
 
 /* GetCursorManager --
@@ -56,7 +56,7 @@ static CursorManager *GetCursorManager(Tcl_Interp *interp)
     int intValue;
 
     if (!cm) {
-	cm = (CursorManager *)Tcl_Alloc(sizeof(*cm));
+	cm = (CursorManager *)ckalloc(sizeof(*cm));
 	cm->timer = 0;
 	cm->owner = 0;
 	cm->onTime = DEF_CURSOR_ON_TIME;
@@ -97,7 +97,7 @@ CursorBlinkProc(void *clientData)
     int blinkTime;
 
     if (cm->owner->flags & CURSOR_ON) {
-	cm->owner->flags &= ~(unsigned)CURSOR_ON;
+	cm->owner->flags &= ~CURSOR_ON;
 	blinkTime = cm->offTime;
     } else {
 	cm->owner->flags |= CURSOR_ON;
@@ -113,7 +113,7 @@ CursorBlinkProc(void *clientData)
 static void LoseCursor(CursorManager *cm, WidgetCore *corePtr)
 {
     if (corePtr->flags & CURSOR_ON) {
-	corePtr->flags &= ~(unsigned)CURSOR_ON;
+	corePtr->flags &= ~CURSOR_ON;
 	TtkRedisplayWidget(corePtr);
     }
     if (cm->owner == corePtr) {

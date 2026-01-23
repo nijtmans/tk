@@ -442,13 +442,13 @@ static int
 startOfClusterObjCmd(
     TCL_UNUSED(void *),
     Tcl_Interp *interp,         /* Current interpreter. */
-    Tcl_Size objc,              /* Number of arguments. */
+    int objc,                   /* Number of arguments. */
     Tcl_Obj *const objv[])      /* Argument objects. */
 {
     TKNSString *S;
     const char *stringArg;
     Tcl_Size len, idx;
-    if ((size_t)(objc - 3) > 1) {
+    if ((unsigned)(objc - 3) > 1) {
 	Tcl_WrongNumArgs(interp, 1 , objv, "str start ?locale?");
 	return TCL_ERROR;
     }
@@ -500,14 +500,14 @@ static int
 endOfClusterObjCmd(
     TCL_UNUSED(void *),
     Tcl_Interp *interp,         /* Current interpreter. */
-    Tcl_Size objc,              /* Number of arguments. */
+    int objc,                   /* Number of arguments. */
     Tcl_Obj *const objv[])      /* Argument objects. */
 {
     TKNSString *S;
     char *stringArg;
     Tcl_Size idx, len;
 
-    if ((size_t)(objc - 3) > 1) {
+    if ((unsigned)(objc - 3) > 1) {
 	Tcl_WrongNumArgs(interp, 1 , objv, "str start ?locale?");
 	return TCL_ERROR;
     }
@@ -651,8 +651,8 @@ TkpFontPkgInit(
 	[cs release];
     }
     [pool drain];
-    Tcl_CreateObjCommand2(interp, "::tk::startOfCluster", startOfClusterObjCmd, NULL, NULL);
-    Tcl_CreateObjCommand2(interp, "::tk::endOfCluster", endOfClusterObjCmd, NULL, NULL);
+    Tcl_CreateObjCommand(interp, "::tk::startOfCluster", startOfClusterObjCmd, NULL, NULL);
+    Tcl_CreateObjCommand(interp, "::tk::endOfCluster", endOfClusterObjCmd, NULL, NULL);
 }
 
 /*
@@ -702,7 +702,7 @@ TkpGetNativeFont(
     ctFont = CTFontCreateUIFontForLanguage(
 	    HIThemeGetUIFontType(themeFontId), 0, NULL);
     if (ctFont) {
-	fontPtr = (MacFont *)Tcl_Alloc(sizeof(MacFont));
+	fontPtr = (MacFont *)ckalloc(sizeof(MacFont));
 	InitFont((NSFont*) ctFont, NULL, fontPtr);
     }
 
@@ -770,7 +770,7 @@ TkpGetFontFromAttributes(
 	Tcl_Panic("Could not determine NSFont from TkFontAttributes");
     }
     if (tkFontPtr == NULL) {
-	fontPtr = (MacFont *)Tcl_Alloc(sizeof(MacFont));
+	fontPtr = (MacFont *)ckalloc(sizeof(MacFont));
     } else {
 	fontPtr = (MacFont *)tkFontPtr;
 	TkpDeleteFont(tkFontPtr);
@@ -1341,7 +1341,7 @@ TkpDrawAngledCharsInContext(
     }
 
     context = drawingContext.context;
-    TkSetMacColor2(gc->foreground, &fg, TkMacOSXInDarkMode((Tk_Window)macWin->winPtr));
+    TkSetMacColor(gc->foreground, &fg);
     attributes = [fontPtr->nsAttributes mutableCopy];
     if (fg) {
 	[attributes setObject:(id)fg forKey:(id)kCTForegroundColorAttributeName];
@@ -1527,10 +1527,10 @@ TkMacOSXUseAntialiasedText(
 				 * variable.*/
     int enable)			/* Initial value. */
 {
-    static bool initialized = false;
+    static Boolean initialized = FALSE;
 
     if (!initialized) {
-	initialized = true;
+	initialized = TRUE;
 
 	if (Tcl_CreateNamespace(interp, "::tk::mac", NULL, NULL) == NULL) {
 	    Tcl_ResetResult(interp);

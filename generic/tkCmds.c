@@ -36,23 +36,18 @@ static void		WaitWindowProc(void *clientData,
 			    XEvent *eventPtr);
 static int		AppnameCmd(void *dummy, Tcl_Interp *interp,
 			    Tcl_Size objc, Tcl_Obj *const *objv);
-static int		AttribtableCmd(void *dummy, Tcl_Interp *interp,
-			    Tcl_Size objc, Tcl_Obj *const *objv);
-static int		AttribTableProc(void *dummy, Tcl_Interp *interp,
-			    Tcl_Size objc, Tcl_Obj *const *objv);
-static void		AttribTableDeleteProc(void *dummy);
-static void		AttribTableDestroyHandler(void *dummy,
-			    XEvent *eventPtr);
 static int		CaretCmd(void *dummy, Tcl_Interp *interp,
 			    Tcl_Size objc, Tcl_Obj *const *objv);
 static int		InactiveCmd(void *dummy, Tcl_Interp *interp,
 			    Tcl_Size objc, Tcl_Obj *const *objv);
 static int		ScalingCmd(void *dummy, Tcl_Interp *interp,
 			    Tcl_Size objc, Tcl_Obj *const *objv);
-static int		UseinputmethodsCmd(void *dummy, Tcl_Interp *interp,
-			    Tcl_Size objc, Tcl_Obj *const *objv);
-static int		WindowingsystemCmd(void *dummy, Tcl_Interp *interp,
-			    Tcl_Size objc, Tcl_Obj *const *objv);
+static int		UseinputmethodsCmd(void *dummy,
+			    Tcl_Interp *interp, Tcl_Size objc,
+			    Tcl_Obj *const *objv);
+static int		WindowingsystemCmd(void *dummy,
+			    Tcl_Interp *interp, Tcl_Size objc,
+			    Tcl_Obj *const *objv);
 
 #if defined(_WIN32) || defined(MAC_OSX_TK)
 MODULE_SCOPE const TkEnsemble tkFontchooserEnsemble[];
@@ -67,7 +62,6 @@ MODULE_SCOPE const TkEnsemble tkFontchooserEnsemble[];
 static const TkEnsemble tkCmdMap[] = {
     {"fontchooser",	NULL, tkFontchooserEnsemble},
     {"appname",		AppnameCmd, NULL },
-    {"attribtable",	AttribtableCmd, NULL },
     {"busy",		Tk_BusyObjCmd, NULL },
     {"caret",		CaretCmd, NULL },
     {"inactive",	InactiveCmd, NULL },
@@ -98,7 +92,7 @@ int
 Tk_BellObjCmd(
     void *clientData,		/* Main window associated with interpreter. */
     Tcl_Interp *interp,		/* Current interpreter. */
-    Tcl_Size objc,			/* Number of arguments. */
+    int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
     static const char *const bellOptions[] = {
@@ -167,7 +161,7 @@ int
 Tk_BindObjCmd(
     void *clientData,		/* Main window associated with interpreter. */
     Tcl_Interp *interp,		/* Current interpreter. */
-    Tcl_Size objc,			/* Number of arguments. */
+    int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
     Tk_Window tkwin = (Tk_Window)clientData;
@@ -292,7 +286,7 @@ TkBindEventProc(
 	 */
 
 	if (winPtr->numTags > MAX_OBJS) {
-	    objPtr = (void **)Tcl_Alloc(winPtr->numTags * sizeof(void *));
+	    objPtr = (void **)ckalloc(winPtr->numTags * sizeof(void *));
 	}
 	for (i = 0; i < winPtr->numTags; i++) {
 	    p = (char *)winPtr->tagPtr[i];
@@ -326,7 +320,7 @@ TkBindEventProc(
     Tk_BindEvent(winPtr->mainPtr->bindingTable, eventPtr, (Tk_Window) winPtr,
 	    count, objPtr);
     if (objPtr != objects) {
-	Tcl_Free(objPtr);
+	ckfree(objPtr);
     }
 }
 
@@ -351,7 +345,7 @@ int
 Tk_BindtagsObjCmd(
     void *clientData,		/* Main window associated with interpreter. */
     Tcl_Interp *interp,		/* Current interpreter. */
-    Tcl_Size objc,			/* Number of arguments. */
+    int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
     Tk_Window tkwin = (Tk_Window)clientData;
@@ -406,7 +400,7 @@ Tk_BindtagsObjCmd(
     }
 
     winPtr->numTags = length;
-    winPtr->tagPtr = (void **)Tcl_Alloc(length * sizeof(void *));
+    winPtr->tagPtr = (void **)ckalloc(length * sizeof(void *));
     for (i = 0; i < length; i++) {
 	p = Tcl_GetString(tags[i]);
 	if (p[0] == '.') {
@@ -419,7 +413,7 @@ Tk_BindtagsObjCmd(
 	     * is one.
 	     */
 
-	    copy = (char *)Tcl_Alloc(strlen(p) + 1);
+	    copy = (char *)ckalloc(strlen(p) + 1);
 	    strcpy(copy, p);
 	    winPtr->tagPtr[i] = copy;
 	} else {
@@ -462,10 +456,10 @@ TkFreeBindingTags(
 	     * have to be freed.
 	     */
 
-	    Tcl_Free(p);
+	    ckfree(p);
 	}
     }
-    Tcl_Free(winPtr->tagPtr);
+    ckfree(winPtr->tagPtr);
     winPtr->numTags = 0;
     winPtr->tagPtr = NULL;
 }
@@ -491,7 +485,7 @@ int
 Tk_DestroyObjCmd(
     void *clientData,		/* Main window associated with interpreter. */
     Tcl_Interp *interp,		/* Current interpreter. */
-    Tcl_Size objc,			/* Number of arguments. */
+    int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
     Tk_Window window;
@@ -538,7 +532,7 @@ int
 Tk_LowerObjCmd(
     void *clientData,		/* Main window associated with interpreter. */
     Tcl_Interp *interp,		/* Current interpreter. */
-    Tcl_Size objc,			/* Number of arguments. */
+    int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
     Tk_Window mainwin = (Tk_Window)clientData;
@@ -597,7 +591,7 @@ int
 Tk_RaiseObjCmd(
     void *clientData,		/* Main window associated with interpreter. */
     Tcl_Interp *interp,		/* Current interpreter. */
-    Tcl_Size objc,			/* Number of arguments. */
+    int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
     Tk_Window mainwin = (Tk_Window)clientData;
@@ -670,8 +664,8 @@ TkInitTkCmd(
 /*
  *----------------------------------------------------------------------
  *
- * AppnameCmd, AttribtableCmd, CaretCmd, InactiveCmd, ScalingCmd,
- * UseinputmethodsCmd, WindowingsystemCmd --
+ * AppnameCmd, CaretCmd, ScalingCmd, UseinputmethodsCmd,
+ * WindowingsystemCmd, InactiveCmd --
  *
  *	These functions are invoked to process the "tk" ensemble subcommands.
  *	See the user documentation for details on what they do.
@@ -714,422 +708,6 @@ AppnameCmd(
     }
     Tcl_SetObjResult(interp, Tcl_NewStringObj(winPtr->nameUid, TCL_INDEX_NONE));
     return TCL_OK;
-}
-
-typedef struct AttribTableData {
-    Tcl_HashTable *tablePtr;
-} AttribTableData;
-
-typedef struct AttribTableValue {
-    Tk_Window tkwin;
-    Tcl_HashTable *tablePtr;
-    Tcl_Obj *dictPtr;
-} AttribTableValue;
-
-int
-AttribtableCmd(
-    TCL_UNUSED(void *),		/* Main window associated with interpreter. */
-    Tcl_Interp *interp,		/* Current interpreter. */
-    Tcl_Size objc,		/* Number of arguments. */
-    Tcl_Obj *const objv[])	/* Argument objects. */
-{
-    const char *tableName;
-    Tcl_Size nameLen;
-    Tcl_DString dsCmdName;
-    const char *cmdName;
-    AttribTableData *tblData;
-
-    if (objc != 2) {
-	Tcl_WrongNumArgs(interp, 1, objv, "tableName");
-	return TCL_ERROR;
-    }
-
-    /*
-     * Get tableName and build the fully qualified name cmdName from it
-     */
-
-    tableName = Tcl_GetStringFromObj(objv[1], &nameLen);
-    Tcl_DStringInit(&dsCmdName);
-    if (nameLen < 2 || tableName[0] != ':' || tableName[1] != ':') {
-	Tcl_Namespace *curNs = Tcl_GetCurrentNamespace(interp);
-
-	Tcl_DStringAppend(&dsCmdName, curNs->fullName, TCL_INDEX_NONE);
-	if (strlen(curNs->fullName) != 2) {
-	    Tcl_DStringAppend(&dsCmdName, "::", TCL_INDEX_NONE);
-	}
-    }
-    Tcl_DStringAppend(&dsCmdName, tableName, TCL_INDEX_NONE);
-    cmdName = Tcl_DStringValue(&dsCmdName);
-
-    /*
-     * Create an attribute table command of the name cmdName
-     */
-
-    tblData = (AttribTableData *)Tcl_Alloc(sizeof(AttribTableData));
-    tblData->tablePtr = (Tcl_HashTable *)Tcl_Alloc(sizeof(Tcl_HashTable));
-    Tcl_InitHashTable(tblData->tablePtr, TCL_ONE_WORD_KEYS);
-
-    Tcl_CreateObjCommand2(interp, cmdName,
-	    AttribTableProc, tblData, AttribTableDeleteProc);
-
-    Tcl_SetObjResult(interp, Tcl_NewStringObj(cmdName, TCL_INDEX_NONE));
-    Tcl_DStringFree(&dsCmdName);
-
-    return TCL_OK;
-}
-
-/*
- * Called whenever the attribute table is invoked as command.
- */
-
-int
-AttribTableProc(
-    void *clientData,		/* Pointer to an AttribTableData struct. */
-    Tcl_Interp *interp,		/* Current interpreter. */
-    Tcl_Size objc,		/* Number of arguments. */
-    Tcl_Obj *const objv[])	/* Argument objects. */
-{
-    AttribTableData *tblData = (AttribTableData *)clientData;
-    static const char *const optionStrings[] = {
-	"set", "get", "unset", "clear", "exists", "names", "pathnames", NULL
-    };
-    enum options {
-	TABLE_SET, TABLE_GET, TABLE_UNSET, TABLE_CLEAR,
-	TABLE_EXISTS, TABLE_NAMES, TABLE_PATHNAMES
-    };
-    int index;
-    Tk_Window tkwin = NULL;	/* Used in all subcommands except the last. */
-    Tcl_HashEntry *entryPtr;	/* Used in all subcommands. */
-    AttribTableValue *value = NULL;	/* Used in all subcommands. */
-
-    if (objc < 2) {
-	Tcl_WrongNumArgs(interp, 1, objv,
-		"set|get|unset|clear|exists|names|pathnames args");
-	return TCL_ERROR;
-    }
-
-    if (Tcl_GetIndexFromObj(interp, objv[1], optionStrings, "subcommand", 0,
-	    &index) != TCL_OK) {
-	return TCL_ERROR;
-    }
-
-    if (objc > 2) {
-	tkwin = Tk_NameToWindow(interp, Tcl_GetString(objv[2]),
-		Tk_MainWindow(interp));
-	if (tkwin == NULL) {
-	    if (index == TABLE_EXISTS || index == TABLE_PATHNAMES) {
-		 Tcl_ResetResult(interp);
-	    } else {
-		return TCL_ERROR;
-	    }
-	}
-    }
-
-    switch ((enum options) index) {
-    case TABLE_SET: {
-	int isNew;
-	Tcl_Size i;
-
-	if (objc < 5 || objc % 2 == 0) {
-	    Tcl_WrongNumArgs(interp, 2, objv,
-		    "pathName name value ?name value ...?");
-	    return TCL_ERROR;
-	}
-
-	entryPtr = Tcl_CreateHashEntry(tblData->tablePtr, tkwin, &isNew);
-	if (isNew) {
-	    /*
-	     * Create an AttribTableValue struct and insert it into the table.
-	     */
-
-	    value = (AttribTableValue *)Tcl_Alloc(sizeof(AttribTableValue));
-	    value->tkwin = tkwin;
-	    value->tablePtr = tblData->tablePtr;
-	    value->dictPtr = Tcl_NewDictObj();
-	    Tcl_IncrRefCount(value->dictPtr);
-	    Tcl_SetHashValue(entryPtr, value);
-
-	    /*
-	     * Arrange for AttribTableDestroyHandler to be invoked
-	     * when the window identified by tkwin gets destroyed.
-	     */
-
-	    Tk_CreateEventHandler(tkwin, StructureNotifyMask,
-		    AttribTableDestroyHandler, value);
-	} else {
-	    value = (AttribTableValue *)Tcl_GetHashValue(entryPtr);
-	    if (Tcl_IsShared(value->dictPtr)) {
-		/*
-		 * For Tcl_DictObjPut below the dictionary must not be shared.
-		 */
-
-		Tcl_DecrRefCount(value->dictPtr);
-		value->dictPtr = Tcl_DuplicateObj(value->dictPtr);
-		Tcl_IncrRefCount(value->dictPtr);
-	    }
-	}
-
-	for (i = 3; i < objc; i += 2) {
-	    Tcl_DictObjPut(NULL, value->dictPtr, objv[i], objv[i+1]);
-	}
-	break;
-    }
-
-    case TABLE_GET: {
-	if (objc < 3 || objc > 5) {
-	    Tcl_WrongNumArgs(interp, 2, objv,
-		    "pathName ?name ?defaultValue??");
-	    return TCL_ERROR;
-	}
-
-	entryPtr = Tcl_FindHashEntry(tblData->tablePtr, tkwin);
-	if (entryPtr != NULL) {
-	    value = (AttribTableValue *)Tcl_GetHashValue(entryPtr);
-	}
-
-	if (objc == 3) {
-	    if (entryPtr != NULL) {
-		Tcl_SetObjResult(interp, value->dictPtr);
-	    }
-	} else {
-	    Tcl_Obj *defaultValuePtr = (objc == 5 ? objv[4] : Tcl_NewObj());
-
-	    if (entryPtr == NULL) {
-		Tcl_SetObjResult(interp, defaultValuePtr);
-	    } else {
-		Tcl_Obj *resultPtr;
-
-		Tcl_DictObjGet(NULL, value->dictPtr, objv[3], &resultPtr);
-		if (resultPtr == NULL) {
-		    resultPtr = defaultValuePtr;
-		}
-		Tcl_SetObjResult(interp, resultPtr);
-	    }
-	}
-	break;
-    }
-
-    case TABLE_UNSET: {
-	Tcl_Size i;
-
-	if (objc < 4) {
-	    Tcl_WrongNumArgs(interp, 2, objv, "pathName name ?name ...?");
-	    return TCL_ERROR;
-	}
-
-	entryPtr = Tcl_FindHashEntry(tblData->tablePtr, tkwin);
-	if (entryPtr == NULL) {
-	    return TCL_OK;
-	}
-
-	value = (AttribTableValue *)Tcl_GetHashValue(entryPtr);
-	if (Tcl_IsShared(value->dictPtr)) {
-	    /*
-	     * For Tcl_DictObjRemove below the dictionary must not be shared.
-	     */
-
-	    Tcl_DecrRefCount(value->dictPtr);
-	    value->dictPtr = Tcl_DuplicateObj(value->dictPtr);
-	    Tcl_IncrRefCount(value->dictPtr);
-	}
-
-	for (i = 3; i < objc; i++) {
-	    Tcl_DictObjRemove(NULL, value->dictPtr, objv[i]);
-	}
-	break;
-    }
-
-    case TABLE_CLEAR: {
-	if (objc != 3) {
-	    Tcl_WrongNumArgs(interp, 2, objv, "pathName");
-	    return TCL_ERROR;
-	}
-
-	entryPtr = Tcl_FindHashEntry(tblData->tablePtr, tkwin);
-	if (entryPtr == NULL) {
-	    return TCL_OK;
-	}
-
-	/*
-	 * Delete the event handler associated with value->tkwin.
-	 */
-
-	value = (AttribTableValue *)Tcl_GetHashValue(entryPtr);
-	Tk_DeleteEventHandler(value->tkwin, StructureNotifyMask,
-		AttribTableDestroyHandler, value);
-
-	/*
-	 * Remove the entry from the hash table.
-	 */
-
-	Tcl_DecrRefCount(value->dictPtr);
-	Tcl_DeleteHashEntry(entryPtr);
-	Tcl_Free(value);
-	break;
-    }
-
-    case TABLE_EXISTS: {
-	Tcl_Obj *resultPtr;
-
-	if (objc != 3 && objc != 4) {
-	    Tcl_WrongNumArgs(interp, 2, objv, "pathName ?name?");
-	    return TCL_ERROR;
-	}
-
-	if (tkwin == NULL) {
-	    resultPtr = Tcl_NewIntObj(0);
-	} else {
-	    entryPtr = Tcl_FindHashEntry(tblData->tablePtr, tkwin);
-	    if (entryPtr == NULL) {
-		resultPtr = Tcl_NewIntObj(0);
-	    } else {
-		value = (AttribTableValue *)Tcl_GetHashValue(entryPtr);
-		if (objc == 3) {
-		    Tcl_Size size;
-
-		    Tcl_DictObjSize(interp, value->dictPtr, &size);
-		    resultPtr = Tcl_NewIntObj(size != 0);
-		} else {
-		    Tcl_Obj *testObj;
-
-		    Tcl_DictObjGet(NULL, value->dictPtr, objv[3], &testObj);
-		    resultPtr = Tcl_NewIntObj(testObj != NULL);
-		}
-	    }
-	}
-
-	Tcl_SetObjResult(interp, resultPtr);
-	break;
-    }
-
-    case TABLE_NAMES: {
-	Tcl_Obj *resultPtr;
-	Tcl_DictSearch search;
-	Tcl_Obj *key;
-	int done;
-
-	if (objc != 3) {
-	    Tcl_WrongNumArgs(interp, 2, objv, "pathName");
-	    return TCL_ERROR;
-	}
-
-	entryPtr = Tcl_FindHashEntry(tblData->tablePtr, tkwin);
-	if (entryPtr == NULL) {
-	    return TCL_OK;
-	}
-
-	resultPtr = Tcl_NewObj();
-	value = (AttribTableValue *)Tcl_GetHashValue(entryPtr);
-	Tcl_DictObjFirst(interp, value->dictPtr, &search, &key, NULL, &done);
-	while (!done) {
-	    Tcl_ListObjAppendElement(NULL, resultPtr, key);
-	    Tcl_DictObjNext(&search, &key, NULL, &done);
-	}
-	Tcl_DictObjDone(&search);
-
-	Tcl_SetObjResult(interp, resultPtr);
-	break;
-    }
-
-    case TABLE_PATHNAMES: {
-	Tcl_Obj *resultPtr;
-	Tcl_HashSearch search;
-
-	if (objc != 2) {
-	    Tcl_WrongNumArgs(interp, 2, objv, NULL);
-	    return TCL_ERROR;
-	}
-
-	resultPtr = Tcl_NewObj();
-	for (entryPtr = Tcl_FirstHashEntry(tblData->tablePtr, &search);
-		entryPtr != NULL; entryPtr = Tcl_NextHashEntry(&search)) {
-	    Tcl_Size size;
-
-	    value = (AttribTableValue *)Tcl_GetHashValue(entryPtr);
-	    Tcl_DictObjSize(interp, value->dictPtr, &size);
-	    if (size != 0) {
-		Tcl_ListObjAppendElement(NULL, resultPtr,
-			Tcl_NewStringObj(Tk_PathName(value->tkwin), -1));
-	    }
-	}
-
-	Tcl_SetObjResult(interp, resultPtr);
-	break;
-    }
-    } /* switch */
-
-    return TCL_OK;
-}
-
-/*
- * Called before the attribute table command is deleted from the interpreter.
- */
-
-void
-AttribTableDeleteProc(
-    void *clientData)		/* Pointer to an AttribTableData struct. */
-{
-    AttribTableData *tblData = (AttribTableData *)clientData;
-    Tcl_HashEntry *entryPtr;
-    Tcl_HashSearch search;
-
-    for (entryPtr = Tcl_FirstHashEntry(tblData->tablePtr, &search);
-	    entryPtr != NULL; entryPtr = Tcl_NextHashEntry(&search)) {
-	AttribTableValue *value = (AttribTableValue *)Tcl_GetHashValue(entryPtr);
-
-	/*
-	 * Delete the event handler associated with value->tkwin.
-	 */
-
-	Tk_DeleteEventHandler(value->tkwin, StructureNotifyMask,
-		AttribTableDestroyHandler, value);
-
-	/*
-	 * Remove the entry from the hash table.
-	 */
-
-	Tcl_DecrRefCount(value->dictPtr);
-	Tcl_DeleteHashEntry(entryPtr);
-	Tcl_Free(value);
-    }
-
-    /*
-     * Free up the memory used by the hash table.
-     */
-
-    Tcl_DeleteHashTable(tblData->tablePtr);
-    Tcl_Free(tblData->tablePtr);
-    Tcl_Free(tblData);
-}
-
-/*
- * Called when the window identified by the first argument gets destroyed.
- */
-
-void
-AttribTableDestroyHandler(
-    void *clientData,		/* Pointer to an AttribTableValue struct. */
-    XEvent *eventPtr)		/* Information about event. */
-{
-    AttribTableValue *value = (AttribTableValue *)clientData;
-    Tcl_HashEntry *entryPtr;
-
-    if (eventPtr->type != DestroyNotify) {
-	return;
-    }
-
-    entryPtr = Tcl_FindHashEntry(value->tablePtr, value->tkwin);
-    if (entryPtr == NULL) {
-	return;
-    }
-
-    /*
-     * Remove the entry from the hash table.
-     */
-
-    Tcl_DecrRefCount(value->dictPtr);
-    Tcl_DeleteHashEntry(entryPtr);
-    Tcl_Free(value);
 }
 
 int
@@ -1221,52 +799,6 @@ CaretCmd(
 	    height = Tk_Height(window);
 	}
 	Tk_SetCaretPos(window, x, y, height);
-    }
-    return TCL_OK;
-}
-
-int
-InactiveCmd(
-    void *clientData,		/* Main window associated with interpreter. */
-    Tcl_Interp *interp,		/* Current interpreter. */
-    Tcl_Size objc,		/* Number of arguments. */
-    Tcl_Obj *const objv[])	/* Argument objects. */
-{
-    Tk_Window tkwin = (Tk_Window)clientData;
-    Tcl_Size skip = TkGetDisplayOf(interp, objc - 1, objv + 1, &tkwin);
-
-    if (skip < 0) {
-	return TCL_ERROR;
-    }
-    if (objc == 1 + skip) {
-	Tcl_WideInt inactive;
-
-	inactive = (Tcl_IsSafe(interp) ? -1 :
-		Tk_GetUserInactiveTime(Tk_Display(tkwin)));
-	Tcl_SetObjResult(interp, Tcl_NewWideIntObj(inactive));
-    } else if (objc == 2 + skip) {
-	const char *string;
-
-	string = Tcl_GetString(objv[objc-1]);
-	if (strcmp(string, "reset") != 0) {
-	    Tcl_SetObjResult(interp, Tcl_ObjPrintf(
-		    "bad option \"%s\": must be reset", string));
-	    Tcl_SetErrorCode(interp, "TCL", "LOOKUP", "INDEX", "option",
-		    string, (char *)NULL);
-	    return TCL_ERROR;
-	}
-	if (Tcl_IsSafe(interp)) {
-	    Tcl_SetObjResult(interp, Tcl_NewStringObj(
-		    "resetting the user inactivity timer "
-		    "is not allowed in a safe interpreter", TCL_INDEX_NONE));
-	    Tcl_SetErrorCode(interp, "TK", "SAFE", "INACTIVITY_TIMER", (char *)NULL);
-	    return TCL_ERROR;
-	}
-	Tk_ResetUserInactiveTime(Tk_Display(tkwin));
-	Tcl_ResetResult(interp);
-    } else {
-	Tcl_WrongNumArgs(interp, 1, objv, "?-displayof window? ?reset?");
-	return TCL_ERROR;
     }
     return TCL_OK;
 }
@@ -1413,6 +945,52 @@ WindowingsystemCmd(
     Tcl_SetObjResult(interp, Tcl_NewStringObj(windowingsystem, TCL_INDEX_NONE));
     return TCL_OK;
 }
+
+int
+InactiveCmd(
+    void *clientData,		/* Main window associated with interpreter. */
+    Tcl_Interp *interp,		/* Current interpreter. */
+    Tcl_Size objc,		/* Number of arguments. */
+    Tcl_Obj *const objv[])	/* Argument objects. */
+{
+    Tk_Window tkwin = (Tk_Window)clientData;
+    Tcl_Size skip = TkGetDisplayOf(interp, objc - 1, objv + 1, &tkwin);
+
+    if (skip < 0) {
+	return TCL_ERROR;
+    }
+    if (objc == 1 + skip) {
+	Tcl_WideInt inactive;
+
+	inactive = (Tcl_IsSafe(interp) ? -1 :
+		Tk_GetUserInactiveTime(Tk_Display(tkwin)));
+	Tcl_SetObjResult(interp, Tcl_NewWideIntObj(inactive));
+    } else if (objc == 2 + skip) {
+	const char *string;
+
+	string = Tcl_GetString(objv[objc-1]);
+	if (strcmp(string, "reset") != 0) {
+	    Tcl_SetObjResult(interp, Tcl_ObjPrintf(
+		    "bad option \"%s\": must be reset", string));
+	    Tcl_SetErrorCode(interp, "TCL", "LOOKUP", "INDEX", "option",
+		    string, (char *)NULL);
+	    return TCL_ERROR;
+	}
+	if (Tcl_IsSafe(interp)) {
+	    Tcl_SetObjResult(interp, Tcl_NewStringObj(
+		    "resetting the user inactivity timer "
+		    "is not allowed in a safe interpreter", TCL_INDEX_NONE));
+	    Tcl_SetErrorCode(interp, "TK", "SAFE", "INACTIVITY_TIMER", (char *)NULL);
+	    return TCL_ERROR;
+	}
+	Tk_ResetUserInactiveTime(Tk_Display(tkwin));
+	Tcl_ResetResult(interp);
+    } else {
+	Tcl_WrongNumArgs(interp, 1, objv, "?-displayof window? ?reset?");
+	return TCL_ERROR;
+    }
+    return TCL_OK;
+}
 
 /*
  *----------------------------------------------------------------------
@@ -1435,7 +1013,7 @@ int
 Tk_TkwaitObjCmd(
     void *clientData,		/* Main window associated with interpreter. */
     Tcl_Interp *interp,		/* Current interpreter. */
-    Tcl_Size objc,			/* Number of arguments. */
+    int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
     Tk_Window tkwin = (Tk_Window)clientData;
@@ -1622,7 +1200,7 @@ int
 Tk_UpdateObjCmd(
     TCL_UNUSED(void *),		/* Main window associated with interpreter. */
     Tcl_Interp *interp,		/* Current interpreter. */
-    Tcl_Size objc,			/* Number of arguments. */
+    int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
     static const char *const updateOptions[] = {"idletasks", NULL};
@@ -1720,7 +1298,7 @@ int
 Tk_WinfoObjCmd(
     void *clientData,		/* Main window associated with interpreter. */
     Tcl_Interp *interp,		/* Current interpreter. */
-    Tcl_Size objc,			/* Number of arguments. */
+    int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
     int index, x, y, width, height, useX, useY, c_class;
@@ -2008,7 +1586,7 @@ Tk_WinfoObjCmd(
 
     case WIN_ATOM:
 	skip = TkGetDisplayOf(interp, objc - 2, objv + 2, &tkwin);
-	if (skip == TCL_INDEX_NONE) {
+	if (skip < 0) {
 	    return TCL_ERROR;
 	}
 	if (objc != 3 + skip) {
@@ -2025,7 +1603,7 @@ Tk_WinfoObjCmd(
 	Tcl_WideInt id;
 
 	skip = TkGetDisplayOf(interp, objc - 2, objv + 2, &tkwin);
-	if (skip == TCL_INDEX_NONE) {
+	if (skip < 0) {
 	    return TCL_ERROR;
 	}
 	if (objc != 3 + skip) {
@@ -2049,7 +1627,7 @@ Tk_WinfoObjCmd(
     }
     case WIN_CONTAINING:
 	skip = TkGetDisplayOf(interp, objc - 2, objv + 2, &tkwin);
-	if (skip == TCL_INDEX_NONE) {
+	if (skip < 0) {
 	    return TCL_ERROR;
 	}
 	if (objc != 4 + skip) {
@@ -2073,7 +1651,7 @@ Tk_WinfoObjCmd(
 	break;
     case WIN_INTERPS:
 	skip = TkGetDisplayOf(interp, objc - 2, objv + 2, &tkwin);
-	if (skip == TCL_INDEX_NONE) {
+	if (skip < 0) {
 	    return TCL_ERROR;
 	}
 	if (objc != 2 + skip) {
@@ -2085,7 +1663,7 @@ Tk_WinfoObjCmd(
 	Window id;
 
 	skip = TkGetDisplayOf(interp, objc - 2, objv + 2, &tkwin);
-	if (skip == TCL_INDEX_NONE) {
+	if (skip < 0) {
 	    return TCL_ERROR;
 	}
 	if (objc != 3 + skip) {
@@ -2354,7 +1932,7 @@ int
 TkDeadAppObjCmd(
     TCL_UNUSED(void *),
     Tcl_Interp *interp,		/* Current interpreter. */
-    TCL_UNUSED(Tcl_Size),		/* Number of arguments. */
+    TCL_UNUSED(int),		/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument strings. */
 {
     Tcl_SetObjResult(interp, Tcl_ObjPrintf(

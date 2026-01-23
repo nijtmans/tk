@@ -655,7 +655,7 @@ EXTERN int		Tk_GetReliefFromObj(Tcl_Interp *interp,
 				Tcl_Obj *objPtr, int *resultPtr);
 /* 210 */
 EXTERN int		Tk_GetScrollInfoObj(Tcl_Interp *interp,
-				Tcl_Size objc, Tcl_Obj *const *objv,
+				Tcl_Size objc, Tcl_Obj *const objv[],
 				double *dblPtr, int *intPtr);
 /* 211 */
 EXTERN int		Tk_InitOptions(Tcl_Interp *interp, void *recordPtr,
@@ -666,7 +666,7 @@ EXTERN void		Tk_RestoreSavedOptions(Tk_SavedOptions *savePtr);
 /* 214 */
 EXTERN int		Tk_SetOptions(Tcl_Interp *interp, void *recordPtr,
 				Tk_OptionTable optionTable, Tcl_Size objc,
-				Tcl_Obj *const *objv, Tk_Window tkwin,
+				Tcl_Obj *const objv[], Tk_Window tkwin,
 				Tk_SavedOptions *savePtr, int *maskPtr);
 /* 215 */
 EXTERN void		Tk_InitConsoleChannels(Tcl_Interp *interp);
@@ -1128,11 +1128,11 @@ typedef struct TkStubs {
     int (*tk_GetMMFromObj) (Tcl_Interp *interp, Tk_Window tkwin, Tcl_Obj *objPtr, double *doublePtr); /* 207 */
     int (*tk_GetPixelsFromObj) (Tcl_Interp *interp, Tk_Window tkwin, Tcl_Obj *objPtr, int *intPtr); /* 208 */
     int (*tk_GetReliefFromObj) (Tcl_Interp *interp, Tcl_Obj *objPtr, int *resultPtr); /* 209 */
-    int (*tk_GetScrollInfoObj) (Tcl_Interp *interp, Tcl_Size objc, Tcl_Obj *const *objv, double *dblPtr, int *intPtr); /* 210 */
+    int (*tk_GetScrollInfoObj) (Tcl_Interp *interp, Tcl_Size objc, Tcl_Obj *const objv[], double *dblPtr, int *intPtr); /* 210 */
     int (*tk_InitOptions) (Tcl_Interp *interp, void *recordPtr, Tk_OptionTable optionToken, Tk_Window tkwin); /* 211 */
     void (*reserved212)(void);
     void (*tk_RestoreSavedOptions) (Tk_SavedOptions *savePtr); /* 213 */
-    int (*tk_SetOptions) (Tcl_Interp *interp, void *recordPtr, Tk_OptionTable optionTable, Tcl_Size objc, Tcl_Obj *const *objv, Tk_Window tkwin, Tk_SavedOptions *savePtr, int *maskPtr); /* 214 */
+    int (*tk_SetOptions) (Tcl_Interp *interp, void *recordPtr, Tk_OptionTable optionTable, Tcl_Size objc, Tcl_Obj *const objv[], Tk_Window tkwin, Tk_SavedOptions *savePtr, int *maskPtr); /* 214 */
     void (*tk_InitConsoleChannels) (Tcl_Interp *interp); /* 215 */
     void (*reserved216)(void);
     void (*tk_CreateSmoothMethod) (Tcl_Interp *interp, const Tk_SmoothMethod *method); /* 217 */
@@ -1821,6 +1821,19 @@ EXTERN void  Tk_MainEx(Tcl_Size argc, char **argv,
 EXTERN int Tk_Init(Tcl_Interp *interp);
 EXTERN int Tk_SafeInit(Tcl_Interp *interp);
 EXTERN int Tk_CreateConsoleWindow(Tcl_Interp *interp);
+
+#if TK_MAJOR_VERSION < 9
+/* Restore 8.x signature of Tk_ConfigureWidget, but panic if TK_CONFIG_OBJS flag is not set */
+#undef Tk_ConfigureWidget
+#define Tk_ConfigureWidget(interp, tkwin, specs, argc, argv, widgRec, flags) \
+	((int (*)(Tcl_Interp *, Tk_Window, const Tk_ConfigSpec *, \
+	int, const char **, char *, int))(void *)(tkStubsPtr->tk_ConfigureWidget)) \
+	(((flags & TK_CONFIG_OBJS) ? interp : (Tcl_Panic("Flag TK_CONFIG_OBJS is mandatory in Tk_ConfigureWidget"), \
+	NULL)), tkwin, specs, argc, argv, widgRec, flags)
+#undef Tk_UnderlineCharsInContext
+#undef Tk_DrawCharsInContext
+#undef Tk_MeasureCharsInContext
+#endif
 
 #undef TCL_STORAGE_CLASS
 #define TCL_STORAGE_CLASS DLLIMPORT

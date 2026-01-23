@@ -133,8 +133,8 @@ static UniChar xvirtual2unichar[512];	/* virtual with index to unichar */
  * Flags.
  */
 
-static bool initialized = false;
-static bool keyboardChanged = true;
+static BOOL initialized = NO;
+static BOOL keyboardChanged = YES;
 
 /*
  * Prototypes for static functions used in this file.
@@ -155,7 +155,7 @@ static int	KeyDataToUnicode(UniChar *uniChars, int maxChars,
 #ifdef TK_MAC_DEBUG_NOTIFICATIONS
     TKLog(@"-[%@(%p) %s] %@", [self class], self, sel_getName(_cmd), notification);
 #endif
-    keyboardChanged = true;
+    keyboardChanged = YES;
     UpdateKeymaps();
 }
 @end
@@ -222,7 +222,7 @@ InitHashTables(void)
 	Tcl_SetHashValue(hPtr, INT2PTR(ksPtr->keysym));
     }
     UpdateKeymaps();
-    initialized = true;
+    initialized = YES;
 }
 
 /*
@@ -348,7 +348,7 @@ KeyDataToUnicode(
 	    }
 	    CFRelease(currentKeyboardLayout);
 	}
-	keyboardChanged = false;
+	keyboardChanged = 0;
     }
     if (layoutData) {
 	OptionBits options = 0;
@@ -532,7 +532,7 @@ XGetModifierMapping(
 {
     XModifierKeymap *modmap;
 
-    modmap = (XModifierKeymap *)Tcl_Alloc(sizeof(XModifierKeymap));
+    modmap = (XModifierKeymap *)ckalloc(sizeof(XModifierKeymap));
     modmap->max_keypermod = 0;
     modmap->modifiermap = NULL;
     return modmap;
@@ -560,9 +560,9 @@ XFreeModifiermap(
     XModifierKeymap *modmap)
 {
     if (modmap->modifiermap != NULL) {
-	Tcl_Free(modmap->modifiermap);
+	ckfree(modmap->modifiermap);
     }
-    Tcl_Free(modmap);
+    ckfree(modmap);
     return Success;
 }
 
@@ -903,10 +903,10 @@ TkpInitKeymapInfo(
      */
 
     if (dispPtr->modKeyCodes != NULL) {
-	Tcl_Free(dispPtr->modKeyCodes);
+	ckfree(dispPtr->modKeyCodes);
     }
     dispPtr->numModKeyCodes = NUM_MOD_KEYCODES;
-    dispPtr->modKeyCodes = (KeyCode *)Tcl_Alloc(NUM_MOD_KEYCODES * sizeof(KeyCode));
+    dispPtr->modKeyCodes = (KeyCode *)ckalloc(NUM_MOD_KEYCODES * sizeof(KeyCode));
     for (int i = 0; i < NUM_MOD_KEYCODES; i++) {
 	dispPtr->modKeyCodes[i] = XKeysymToKeycode(NULL, modKeyArray[i]);
     }

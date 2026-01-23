@@ -75,7 +75,7 @@ TkWinCleanupContainerList(void)
     for (; tsdPtr->firstContainerPtr != NULL;
 	    tsdPtr->firstContainerPtr = nextPtr) {
 	nextPtr = tsdPtr->firstContainerPtr->nextPtr;
-	Tcl_Free(tsdPtr->firstContainerPtr);
+	ckfree(tsdPtr->firstContainerPtr);
     }
     tsdPtr->firstContainerPtr = NULL;
 }
@@ -164,7 +164,7 @@ void Tk_MapEmbeddedWindow(
 {
     if(!(winPtr->flags & TK_ALREADY_DEAD)) {
 	HWND hwnd = (HWND)winPtr->privatePtr;
-	int state = (int)SendMessageW(hwnd, TK_STATE, -1, (WPARAM)-1) - 1;
+	int state = SendMessageW(hwnd, TK_STATE, -1, (WPARAM)-1) - 1;
 
 	if (state < 0 || state > 3) {
 	    state = NormalState;
@@ -238,7 +238,7 @@ Tk_UseWindow(
 				 * tkwin; must be an integer value. */
 {
     TkWindow *winPtr = (TkWindow *) tkwin;
-    Tcl_Size id;
+    int id;
     HWND hwnd;
 /*
     ThreadSpecificData *tsdPtr = (ThreadSpecificData *)
@@ -375,7 +375,7 @@ Tk_MakeContainer(
      */
 
     Tk_MakeWindowExist(tkwin);
-    containerPtr = (Container *)Tcl_Alloc(sizeof(Container));
+    containerPtr = (Container *)ckalloc(sizeof(Container));
     containerPtr->parentPtr = winPtr;
     containerPtr->parentHWnd = Tk_GetHWND(Tk_WindowId(tkwin));
     containerPtr->embeddedHWnd = NULL;
@@ -426,7 +426,7 @@ TkWinEmbeddedEventProc(
     WPARAM wParam,
     LPARAM lParam)
 {
-    Tcl_Size result = 1;
+    int result = 1;
     Container *containerPtr;
     ThreadSpecificData *tsdPtr = (ThreadSpecificData *)
 	    Tcl_GetThreadData(&dataKey, sizeof(ThreadSpecificData));
@@ -460,8 +460,8 @@ TkWinEmbeddedEventProc(
 	     *
 	     *	    TK_CONTAINER_VERIFY - request the container to verify its
 	     *		identification
-	     *		result =  (Tcl_Size)hwnd if this window is a container
-	     *			 -(Tcl_Size)hwnd otherwise
+	     *		result =  (long)hwnd if this window is a container
+	     *			 -(long)hwnd otherwise
 	     *
 	     * lParam - N/A
 	     */
@@ -550,7 +550,7 @@ TkWinEmbeddedEventProc(
 	     * others	- the message is processed.
 	     */
 
-	    EmbedGeometryRequest(containerPtr, (int)wParam, (int)lParam);
+	    EmbedGeometryRequest(containerPtr, (int)wParam, lParam);
 	    break;
 
 	case TK_RAISEWINDOW:
@@ -687,7 +687,7 @@ TkWinEmbeddedEventProc(
 	     */
 
 	    result = TkpWinToplevelMove(containerPtr->parentPtr,
-		    (int)wParam, (int)lParam);
+		    wParam, lParam);
 	    break;
 
 	case TK_OVERRIDEREDIRECT:
@@ -706,7 +706,7 @@ TkWinEmbeddedEventProc(
 	     * toplevel. Otherwise 0.
 	     */
 	    if (topwinPtr) {
-		result = 1 + TkpWinToplevelOverrideRedirect(topwinPtr, (int)wParam);
+		result = 1 + TkpWinToplevelOverrideRedirect(topwinPtr, wParam);
 	    } else {
 		result = 0;
 	    }
@@ -751,7 +751,7 @@ TkWinEmbeddedEventProc(
 
 	    if (topwinPtr) {
 		if (wParam <= 3) {
-		    TkpWmSetState(topwinPtr, (int)wParam);
+		    TkpWmSetState(topwinPtr, wParam);
 		}
 		result = 1+TkpWmGetState(topwinPtr);
 	    } else {
@@ -1120,7 +1120,7 @@ EmbedWindowDeleted(
 	} else {
 	    prevPtr->nextPtr = containerPtr->nextPtr;
 	}
-	Tcl_Free(containerPtr);
+	ckfree(containerPtr);
     }
 }
 

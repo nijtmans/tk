@@ -51,13 +51,13 @@ static int	ConsoleHandle(void *instanceData, int direction,
 		    void **handlePtr);
 static int	ConsoleInput(void *instanceData, char *buf, int toRead,
 		    int *errorCode);
-static Tcl_ObjCmdProc2 ConsoleObjCmd;
+static Tcl_ObjCmdProc ConsoleObjCmd;
 static int	ConsoleOutput(void *instanceData, const char *buf,
 		    int toWrite, int *errorCode);
 static void	ConsoleWatch(void *instanceData, int mask);
 static void	DeleteConsoleInterp(void *clientData);
 static void	InterpDeleteProc(void *clientData, Tcl_Interp *interp);
-static Tcl_ObjCmdProc2 InterpreterObjCmd;
+static Tcl_ObjCmdProc InterpreterObjCmd;
 
 /*
  * This structure describes the channel type structure for file based IO:
@@ -254,13 +254,13 @@ Tk_InitConsoleChannels(
      * interp for it to live in.
      */
 
-    info = (ConsoleInfo *)Tcl_Alloc(sizeof(ConsoleInfo));
+    info = (ConsoleInfo *) ckalloc(sizeof(ConsoleInfo));
     info->consoleInterp = NULL;
     info->interp = NULL;
     info->refCount = 0;
 
     if (doIn) {
-	ChannelData *data = (ChannelData *)Tcl_Alloc(sizeof(ChannelData));
+	ChannelData *data = (ChannelData *)ckalloc(sizeof(ChannelData));
 
 	data->info = info;
 	data->info->refCount++;
@@ -277,7 +277,7 @@ Tk_InitConsoleChannels(
     }
 
     if (doOut) {
-	ChannelData *data = (ChannelData *)Tcl_Alloc(sizeof(ChannelData));
+	ChannelData *data = (ChannelData *)ckalloc(sizeof(ChannelData));
 
 	data->info = info;
 	data->info->refCount++;
@@ -294,7 +294,7 @@ Tk_InitConsoleChannels(
     }
 
     if (doErr) {
-	ChannelData *data = (ChannelData *)Tcl_Alloc(sizeof(ChannelData));
+	ChannelData *data = (ChannelData *)ckalloc(sizeof(ChannelData));
 
 	data->info = info;
 	data->info->refCount++;
@@ -376,7 +376,7 @@ Tk_CreateConsoleWindow(
 	     * New ConsoleInfo for a new console window.
 	     */
 
-	    info = (ConsoleInfo *)Tcl_Alloc(sizeof(ConsoleInfo));
+	    info = (ConsoleInfo *)ckalloc(sizeof(ConsoleInfo));
 	    info->refCount = 0;
 
 	    /*
@@ -406,7 +406,7 @@ Tk_CreateConsoleWindow(
 	    }
 	}
     } else {
-	info = (ConsoleInfo *)Tcl_Alloc(sizeof(ConsoleInfo));
+	info = (ConsoleInfo *)ckalloc(sizeof(ConsoleInfo));
 	info->refCount = 0;
     }
 
@@ -421,7 +421,7 @@ Tk_CreateConsoleWindow(
      * Add console commands to the interp
      */
 
-    token = Tcl_CreateObjCommand2(interp, "console", ConsoleObjCmd, info,
+    token = Tcl_CreateObjCommand(interp, "console", ConsoleObjCmd, info,
 	    ConsoleDeleteProc);
     info->refCount++;
 
@@ -430,7 +430,7 @@ Tk_CreateConsoleWindow(
      * in the consoleInterp.  The ref held by the consoleInterp delete
      * handler takes care of us.
      */
-    Tcl_CreateObjCommand2(consoleInterp, "consoleinterp", InterpreterObjCmd,
+    Tcl_CreateObjCommand(consoleInterp, "consoleinterp", InterpreterObjCmd,
 	    info, NULL);
 
     mainWindow = Tk_MainWindow(interp);
@@ -456,7 +456,7 @@ Tk_CreateConsoleWindow(
 	    Tk_DeleteEventHandler(mainWindow, StructureNotifyMask,
 		    ConsoleEventProc, info);
 	    if (info->refCount-- <= 1) {
-		Tcl_Free(info);
+		ckfree(info);
 	    }
 	}
 	goto error;
@@ -597,10 +597,10 @@ ConsoleClose(
 	     * Assuming the Tcl_Interp * fields must already be NULL.
 	     */
 
-	    Tcl_Free(info);
+	    ckfree(info);
 	}
     }
-    Tcl_Free(data);
+    ckfree(data);
     return 0;
 }
 
@@ -692,7 +692,7 @@ static int
 ConsoleObjCmd(
     void *clientData,	/* Access to the console interp */
     Tcl_Interp *interp,		/* Current interpreter */
-    Tcl_Size objc,			/* Number of arguments */
+    int objc,			/* Number of arguments */
     Tcl_Obj *const objv[])	/* Argument objects */
 {
     int index, result;
@@ -784,7 +784,7 @@ static int
 InterpreterObjCmd(
     void *clientData,	/* */
     Tcl_Interp *interp,		/* Current interpreter */
-    Tcl_Size objc,			/* Number of arguments */
+    int objc,			/* Number of arguments */
     Tcl_Obj *const objv[])	/* Argument objects */
 {
     int index, result = TCL_OK;
@@ -892,7 +892,7 @@ InterpDeleteProc(
 	info->consoleInterp = NULL;
     }
     if (info->refCount-- <= 1) {
-	Tcl_Free(info);
+	ckfree(info);
     }
 }
 
@@ -923,7 +923,7 @@ ConsoleDeleteProc(
 	Tcl_DeleteInterp(info->consoleInterp);
     }
     if (info->refCount-- <= 1) {
-	Tcl_Free(info);
+	ckfree(info);
     }
 }
 
@@ -960,7 +960,7 @@ ConsoleEventProc(
 	}
 
 	if (info->refCount-- <= 1) {
-	    Tcl_Free(info);
+	    ckfree(info);
 	}
     }
 }

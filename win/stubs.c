@@ -403,7 +403,7 @@ XFree(
     void *data)
 {
 	if (data != NULL) {
-		Tcl_Free(data);
+		ckfree(data);
 	}
     return 0;
 }
@@ -439,4 +439,13 @@ XVisualIDFromVisual(
     Visual *visual)
 {
     return visual->visualid;
+}
+
+int
+XOffsetRegion(
+    TCL_UNUSED(Region),
+	TCL_UNUSED(int),
+	TCL_UNUSED(int))
+{
+	return 0;
 }

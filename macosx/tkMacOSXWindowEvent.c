@@ -26,7 +26,6 @@
 #endif
 */
 
-extern NSMutableArray<TkAccessibilityElement*> *_tkAccessibleElements;
 /*
  * Declaration of functions used only in this file
  */
@@ -168,19 +167,8 @@ extern NSString *NSWindowDidOrderOffScreenNotification;
 
 	flags |= TK_MACOSX_HANDLE_EVENT_IMMEDIATELY;
 	TkGenWMConfigureEvent((Tk_Window)winPtr, x, y, width, height, flags);
-
-	/*Resize accessibility frame if window is resized.*/
-	TKContentView *view = [w contentView];
-	if ([view isKindOfClass:[TKContentView class]]) {
-	    for (TkAccessibilityElement *element in view.accessibilityChildren) {
-		if  (movedOnly) {
-		    NSAccessibilityPostNotification(element, NSAccessibilityMovedNotification);
-		} else {
-		    NSAccessibilityPostNotification(element, NSAccessibilityResizedNotification);
-		}
-	    }
-	}
     }
+
 }
 
 - (void) windowExpanded: (NSNotification *) notification
@@ -304,24 +292,29 @@ extern NSString *NSWindowDidOrderOffScreenNotification;
     return (winPtr ? NO : YES);
 }
 
-// Not used by default - may be enabled for debugging.
 - (void) windowBecameVisible: (NSNotification *) notification
 {
     NSWindow *window = [notification object];
     TkWindow *winPtr = TkMacOSXGetTkWindow(window);
     if (winPtr) {
-	fprintf(stderr, "Window %s became visible.\n", Tk_PathName(winPtr));
+	TKContentView *view = [window contentView];
+	// fprintf(stderr, "Window %s became visible.\n", Tk_PathName(winPtr));
+
+#if MAC_OS_X_VERSION_MAX_ALLOWED >= 101400
+	if (@available(macOS 10.14, *)) {
+	    [view viewDidChangeEffectiveAppearance];
+	}
+#endif
     }
 }
 
-// Not used by default - may be enabled for debugging.
 - (void) windowMapped: (NSNotification *) notification
 {
     NSWindow *w = [notification object];
     TkWindow *winPtr = TkMacOSXGetTkWindow(w);
 
     if (winPtr) {
-	fprintf(stderr, "Window %s was ordered on screen.\n", Tk_PathName(winPtr));
+	// fprintf(stderr, "Window %s was ordered on screen.\n", Tk_PathName(winPtr));
     }
 }
 
@@ -367,11 +360,8 @@ extern NSString *NSWindowDidOrderOffScreenNotification;
     observe(NSWindowDidDeminiaturizeNotification, windowExpanded:);
     observe(NSWindowDidMiniaturizeNotification, windowCollapsed:);
     observe(NSWindowWillMiniaturizeNotification, windowCollapsed:);
-#if 0
-    // These can be useful for debugging.
     observe(NSWindowWillOrderOnScreenNotification, windowMapped:);
     observe(NSWindowDidOrderOnScreenNotification, windowBecameVisible:);
-#endif
     observe(NSWindowWillStartLiveResizeNotification, windowLiveResize:);
     observe(NSWindowDidEndLiveResizeNotification, windowLiveResize:);
     observe(NSWindowDidEnterFullScreenNotification, windowEnteredFullScreen:);
@@ -1267,16 +1257,6 @@ static const char *const accentNames[] = {
     Tk_SendVirtualEvent(tkwin, "AppearanceChanged", Tcl_NewStringObj(data, TCL_INDEX_NONE));
     // Force a redraw of the view.
     [self setFrameSize:self.frame.size];
-
-    /*
-     * Update some style elements
-     */
-    Tcl_Interp *interp = Tk_Interp(tkwin);
-    int code = Tcl_EvalEx(interp, "after 0 ttk::AppearanceChanged",
-	    TCL_INDEX_NONE, TCL_EVAL_GLOBAL);
-    if (code != TCL_OK) {
-	Tcl_BackgroundException(interp, code);
-    }
 }
 
 - (void)observeValueForKeyPath:(NSString *)keyPath
@@ -1409,44 +1389,6 @@ static const char *const accentNames[] = {
     CGContextRelease(self.tkLayerBitmapContext);
     self.tkLayerBitmapContext = newCtx;
 }
-
-/*Add support for accessibility in TKContentView.*/
-
-NSMutableArray *_tkAccessibleElements;
-
-+ (BOOL)isAccessibilityElement {
-    return NO;
-}
-
-- (NSArray *)accessibilityChildren {
-    return [_tkAccessibleElements copy];
-}
-
-
-- (void)accessibilityChildrenChanged {
-    NSAccessibilityPostNotification(self, NSAccessibilityCreatedNotification);
-}
-
-- (BOOL)accessibilityIsIgnored {
-    return YES;
-}
-
-- (void)accessibilityAddChildElement:(NSAccessibilityElement *)element {
-
-    if (!_tkAccessibleElements) {
-	_tkAccessibleElements = [[NSMutableArray alloc ] init];
-    }
-
-    if (element) {
-	[_tkAccessibleElements addObject:element];
-	[self accessibilityChildrenChanged];
-    }
-}
-
-- (void)setAccessibilityParentView:(NSView *)parentView {
-    [self setAccessibilityParent:self];
-}
-
 
 @end
 

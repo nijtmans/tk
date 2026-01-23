@@ -62,7 +62,7 @@ static void DrawCorner(
     Tk_3DBorder border,				/* get most GCs from here... */
     GC borderGC,				/* "window border" color GC */
     int x, int y, int width, int height,	/* where to draw */
-    bool corner,		/* false => top left; true => bottom right */
+    int corner,				/* 0 => top left; 1 => bottom right */
     enum BorderColor color)
 {
     XPoint points[3];
@@ -73,10 +73,10 @@ static void DrawCorner(
     points[1].x = corner ? x + width : x; points[1].y = corner ? y + height : y;
     points[2].x = x+width;		  points[2].y = y;
 
-    if (corner) {
-	points[2].y -= WIN32_XDRAWLINE_HACK;
-    } else {
+    if (corner == 0) {
 	points[2].x += WIN32_XDRAWLINE_HACK;
+    } else {
+	points[2].y -= WIN32_XDRAWLINE_HACK;
     }
 
     if (color == BRDR) {
@@ -97,19 +97,19 @@ static void DrawBorder(
     switch (borderWidth) {
 	case 2: /* "thick" border */
 	    DrawCorner(tkwin, d, border, borderGC,
-		b.x, b.y, b.width, b.height, false, shadowColors[relief][0]);
+		b.x, b.y, b.width, b.height, 0,shadowColors[relief][0]);
 	    DrawCorner(tkwin, d, border, borderGC,
-		b.x+1, b.y+1, b.width-2, b.height-2, false, shadowColors[relief][1]);
+		b.x+1, b.y+1, b.width-2, b.height-2, 0,shadowColors[relief][1]);
 	    DrawCorner(tkwin, d, border, borderGC,
-		b.x+1, b.y+1, b.width-2, b.height-2, true, shadowColors[relief][2]);
+		b.x+1, b.y+1, b.width-2, b.height-2, 1,shadowColors[relief][2]);
 	    DrawCorner(tkwin, d, border, borderGC,
-		b.x, b.y, b.width, b.height, true, shadowColors[relief][3]);
+		b.x, b.y, b.width, b.height, 1,shadowColors[relief][3]);
 	    break;
 	case 1: /* "thin" border */
 	    DrawCorner(tkwin, d, border, borderGC,
-		b.x, b.y, b.width, b.height, false, thinShadowColors[relief][0]);
+		b.x, b.y, b.width, b.height, 0, thinShadowColors[relief][0]);
 	    DrawCorner(tkwin, d, border, borderGC,
-		b.x, b.y, b.width, b.height, true, thinShadowColors[relief][1]);
+		b.x, b.y, b.width, b.height, 1, thinShadowColors[relief][1]);
 	    break;
 	case 0:	/* no border -- do nothing */
 	    break;
@@ -129,13 +129,13 @@ static void DrawFieldBorder(
 {
     GC borderGC = Tk_GCForColor(borderColor, d);
     DrawCorner(tkwin, d, border, borderGC,
-	b.x, b.y, b.width, b.height, false, DARK);
+	b.x, b.y, b.width, b.height, 0, DARK);
     DrawCorner(tkwin, d, border, borderGC,
-	b.x+1, b.y+1, b.width-2, b.height-2, false, BRDR);
+	b.x+1, b.y+1, b.width-2, b.height-2, 0, BRDR);
     DrawCorner(tkwin, d, border, borderGC,
-	b.x+1, b.y+1, b.width-2, b.height-2, true, LITE);
+	b.x+1, b.y+1, b.width-2, b.height-2, 1, LITE);
     DrawCorner(tkwin, d, border, borderGC,
-	b.x, b.y, b.width, b.height, true, FLAT);
+	b.x, b.y, b.width, b.height, 1, FLAT);
     return;
 }
 
@@ -653,7 +653,7 @@ static void IndicatorElementDraw(
 	 * a newly allocated memory area svgDataCopy
 	 */
 	svgDataLen = strlen(svgDataPtr);
-	svgDataCopy = (char *)Tcl_AttemptAlloc(svgDataLen + 1);
+	svgDataCopy = (char *)attemptckalloc(svgDataLen + 1);
 	if (svgDataCopy == NULL) {
 	    return;
 	}
@@ -691,15 +691,15 @@ static void IndicatorElementDraw(
 	 */
 	cmdFmt = "image create photo %s -format $::tk::svgFmt -data {%s}";
 	scriptSize = strlen(cmdFmt) + strlen(imgName) + svgDataLen;
-	script = (char *)Tcl_AttemptAlloc(scriptSize);
+	script = (char *)attemptckalloc(scriptSize);
 	if (script == NULL) {
-	    Tcl_Free(svgDataCopy);
+	    ckfree(svgDataCopy);
 	    return;
 	}
 	snprintf(script, scriptSize, cmdFmt, imgName, svgDataCopy);
-	Tcl_Free(svgDataCopy);
+	ckfree(svgDataCopy);
 	code = Tcl_EvalEx(interp, script, -1, TCL_EVAL_GLOBAL);
-	Tcl_Free(script);
+	ckfree(script);
 	if (code != TCL_OK) {
 	    Tcl_BackgroundException(interp, code);
 	    return;

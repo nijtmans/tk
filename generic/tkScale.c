@@ -151,7 +151,7 @@ enum command {
 static void		ComputeFormat(TkScale *scalePtr, int forTicks);
 static void		ComputeScaleGeometry(TkScale *scalePtr);
 static int		ConfigureScale(Tcl_Interp *interp, TkScale *scalePtr,
-			    Tcl_Size objc, Tcl_Obj *const objv[]);
+			    int objc, Tcl_Obj *const objv[]);
 static void		DestroyScale(void *memPtr);
 static double		MaxTickRoundingError(TkScale *scalePtr,
 			    double tickResolution);
@@ -161,7 +161,7 @@ static void		ScaleEventProc(void *clientData,
 static char *		ScaleVarProc(void *clientData,
 			    Tcl_Interp *interp, const char *name1,
 			    const char *name2, int flags);
-static Tcl_ObjCmdProc2 ScaleWidgetObjCmd;
+static Tcl_ObjCmdProc ScaleWidgetObjCmd;
 static void		ScaleWorldChanged(void *instanceData);
 static void		ScaleSetVariable(TkScale *scalePtr);
 
@@ -239,7 +239,7 @@ int
 Tk_ScaleObjCmd(
     TCL_UNUSED(void *),
     Tcl_Interp *interp,		/* Current interpreter. */
-    Tcl_Size objc,			/* Number of arguments. */
+    int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument values. */
 {
     TkScale *scalePtr;
@@ -276,7 +276,7 @@ Tk_ScaleObjCmd(
     scalePtr->tkwin		= tkwin;
     scalePtr->display		= Tk_Display(tkwin);
     scalePtr->interp		= interp;
-    scalePtr->widgetCmd		= Tcl_CreateObjCommand2(interp,
+    scalePtr->widgetCmd		= Tcl_CreateObjCommand(interp,
 	    Tk_PathName(scalePtr->tkwin), ScaleWidgetObjCmd,
 	    scalePtr, ScaleCmdDeletedProc);
     scalePtr->optionTable	= optionTable;
@@ -372,7 +372,7 @@ static int
 ScaleWidgetObjCmd(
     void *clientData,	/* Information about scale widget. */
     Tcl_Interp *interp,		/* Current interpreter. */
-    Tcl_Size objc,			/* Number of arguments. */
+    int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument strings. */
 {
     TkScale *scalePtr = (TkScale *)clientData;
@@ -593,7 +593,7 @@ ConfigureScale(
     Tcl_Interp *interp,		/* Used for error reporting. */
     TkScale *scalePtr,	/* Information about widget; may or may not
 				 * already have values for some fields. */
-    Tcl_Size objc,			/* Number of valid entries in objv. */
+    int objc,			/* Number of valid entries in objv. */
     Tcl_Obj *const objv[])	/* Argument values. */
 {
     Tk_SavedOptions savedOptions;
@@ -675,6 +675,14 @@ ConfigureScale(
 	Tk_SetBackgroundFromBorder(scalePtr->tkwin, scalePtr->bgBorder);
 
 	Tk_GetPixelsFromObj(NULL, scalePtr->tkwin, scalePtr->highlightWidthObj, &highlightWidth);
+	if (highlightWidth < 0) {
+	    highlightWidth = 0;
+		if (scalePtr->highlightWidthObj) {
+		    Tcl_DecrRefCount(scalePtr->highlightWidthObj);
+		}
+		scalePtr->highlightWidthObj = Tcl_NewIntObj(0);
+		Tcl_IncrRefCount(scalePtr->highlightWidthObj);
+	}
 	Tk_GetPixelsFromObj(NULL, scalePtr->tkwin, scalePtr->borderWidthObj, &borderWidth);
 	scalePtr->inset = highlightWidth + borderWidth;
 	break;
