@@ -158,7 +158,7 @@ SquareObjCmd(
      * just the non-NULL/0 items.
      */
 
-    squarePtr = (Square *)Tcl_Alloc(sizeof(Square));
+    squarePtr = (Square *)ckalloc(sizeof(Square));
     memset(squarePtr, 0, sizeof(Square));
 
     squarePtr->tkwin = tkwin;
@@ -173,7 +173,7 @@ SquareObjCmd(
     if (Tk_InitOptions(interp, squarePtr, optionTable, tkwin)
 	    != TCL_OK) {
 	Tk_DestroyWindow(squarePtr->tkwin);
-	Tcl_Free(squarePtr);
+	ckfree(squarePtr);
 	return TCL_ERROR;
     }
 

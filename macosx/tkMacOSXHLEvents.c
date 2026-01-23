@@ -7,7 +7,7 @@
  * Copyright © 2001-2009 Apple Inc.
  * Copyright © 2006-2009 Daniel A. Steffen <das@users.sourceforge.net>
  * Copyright © 2015-2019 Marc Culler
- * Copyright © 2019 Kevin Walzer
+ * Copyright © 2019 Kevin Walzer.
  *
  * See the file "license.terms" for information on usage and redistribution
  * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
@@ -98,7 +98,7 @@ static const char getSdefProc[] = "::tk::mac::GetDynamicSdef";
 	 * quickly as possible.
 	 */
 
-	eventPtr = (KillEvent *)Tcl_Alloc(sizeof(KillEvent));
+	eventPtr = (KillEvent *)ckalloc(sizeof(KillEvent));
 	eventPtr->header.proc = ReallyKillMe;
 	eventPtr->interp = _eventInterp;
 
@@ -208,7 +208,7 @@ static const char getSdefProc[] = "::tk::mac::GetDynamicSdef";
      * procedure, passing the paths contained in the AppleEvent as arguments.
      */
 
-    AppleEventInfo *AEInfo = (AppleEventInfo *)Tcl_Alloc(sizeof(AppleEventInfo));
+    AppleEventInfo *AEInfo = (AppleEventInfo *)ckalloc(sizeof(AppleEventInfo));
     Tcl_DString *openCommand = &AEInfo->command;
     Tcl_DStringInit(openCommand);
     Tcl_DStringAppend(openCommand, openDocumentProc, TCL_INDEX_NONE);
@@ -252,7 +252,7 @@ static const char getSdefProc[] = "::tk::mac::GetDynamicSdef";
     NSString* file = [[event paramDescriptorForKeyword:keyDirectObject]
 			 stringValue];
     const char *printFile = [file UTF8String];
-    AppleEventInfo *AEInfo = (AppleEventInfo *)Tcl_Alloc(sizeof(AppleEventInfo));
+    AppleEventInfo *AEInfo = (AppleEventInfo *)ckalloc(sizeof(AppleEventInfo));
     Tcl_DString *printCommand = &AEInfo->command;
     (void)replyEvent;
 
@@ -316,7 +316,7 @@ static const char getSdefProc[] = "::tk::mac::GetDynamicSdef";
 		URLBuffer[actual] = '\0';
 		NSString *urlString = [NSString stringWithUTF8String:(char*)URLBuffer];
 		NSURL *fileURL = [NSURL URLWithString:urlString];
-		AppleEventInfo *AEInfo = (AppleEventInfo *)Tcl_Alloc(sizeof(AppleEventInfo));
+		AppleEventInfo *AEInfo = (AppleEventInfo *)ckalloc(sizeof(AppleEventInfo));
 		Tcl_DString *scriptFileCommand = &AEInfo->command;
 		Tcl_DStringInit(scriptFileCommand);
 		Tcl_DStringAppend(scriptFileCommand, scriptFileProc, TCL_INDEX_NONE);
@@ -337,12 +337,12 @@ static const char getSdefProc[] = "::tk::mac::GetDynamicSdef";
 	 */
 
 	if (actual > 0) {
-	    char *data = (char *)Tcl_Alloc(actual + 1);
+	    char *data = (char *)ckalloc(actual + 1);
 	    if (noErr == AEGetParamPtr(theDesc, keyDirectObject,
 				       typeUTF8Text, &type,
 				       data, actual, NULL)) {
 		data[actual] = '\0';
-		AppleEventInfo *AEInfo = (AppleEventInfo *)Tcl_Alloc(sizeof(AppleEventInfo));
+		AppleEventInfo *AEInfo = (AppleEventInfo *)ckalloc(sizeof(AppleEventInfo));
 		Tcl_DString *scriptTextCommand = &AEInfo->command;
 		Tcl_DStringInit(scriptTextCommand);
 		Tcl_DStringAppend(scriptTextCommand, scriptTextProc, TCL_INDEX_NONE);
@@ -368,7 +368,7 @@ static const char getSdefProc[] = "::tk::mac::GetDynamicSdef";
     NSString* url = [[event paramDescriptorForKeyword:keyDirectObject]
 			stringValue];
     const char *cURL=[url UTF8String];
-    AppleEventInfo *AEInfo = (AppleEventInfo *)Tcl_Alloc(sizeof(AppleEventInfo));
+    AppleEventInfo *AEInfo = (AppleEventInfo *)ckalloc(sizeof(AppleEventInfo));
     Tcl_DString *launchCommand = &AEInfo->command;
     (void)replyEvent;
 
@@ -383,7 +383,7 @@ static const char getSdefProc[] = "::tk::mac::GetDynamicSdef";
 }
 
 - (void)handleGetSDEFEvent:(NSAppleEventDescriptor *)event withReplyEvent:(NSAppleEventDescriptor *)replyEvent {
-     AppleEventInfo *AEInfo = (AppleEventInfo *)Tcl_Alloc(sizeof(AppleEventInfo));
+     AppleEventInfo *AEInfo = (AppleEventInfo *)ckalloc(sizeof(AppleEventInfo));
     Tcl_DString *sdefCommand = &AEInfo->command;
     (void)event;
     (void)replyEvent;
@@ -448,7 +448,7 @@ static void ProcessAppleEvent(
 	    AEInfo->retryCount++;
 	    Tcl_CreateTimerHandler(200, ProcessAppleEvent, clientData);
 	} else {
-	    Tcl_Free(clientData);
+	    ckfree(clientData);
 	}
 	return;
     }
@@ -461,21 +461,19 @@ static void ProcessAppleEvent(
 						  &reslen);
 	if (code == TCL_OK) {
 	    AEPutParamPtr((AppleEvent*)[AEInfo->replyEvent aeDesc],
-			  keyErrorNumber, typeSInt32, &code, 4);
-	    AEPutParamPtr((AppleEvent*)[AEInfo->replyEvent aeDesc],
 			  keyDirectObject, typeChar, result, reslen);
 	} else {
 	    AEPutParamPtr((AppleEvent*)[AEInfo->replyEvent aeDesc],
-			  keyErrorNumber, typeSInt32, &code, 4);
+			  keyErrorString, typeChar, result, reslen);
 	    AEPutParamPtr((AppleEvent*)[AEInfo->replyEvent aeDesc],
-	    			  keyErrorString, typeUTF8Text, result, reslen);
+			  keyErrorNumber, typeSInt32, (Ptr) &code, sizeof(int));
 	}
     } else if (code != TCL_OK) {
 	Tcl_BackgroundException(AEInfo->interp, code);
     }
 
     Tcl_DStringFree(&AEInfo->command);
-    Tcl_Free(clientData);
+    ckfree(clientData);
 }
 
 /*

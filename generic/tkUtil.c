@@ -22,13 +22,14 @@
  * object, used for quickly finding a mapping in a TkStateMap.
  */
 
-const Tcl_ObjType tkStateKeyObjType = {
-    "statekey",		/* name */
+const TkObjType tkStateKeyObjType = {
+    {"statekey",		/* name */
     NULL,			/* freeIntRepProc */
     NULL,			/* dupIntRepProc */
     NULL,			/* updateStringProc */
     NULL,			/* setFromAnyProc */
-    TCL_OBJTYPE_V0
+    TCL_OBJTYPE_V0},
+    0
 };
 
 /*
@@ -427,7 +428,7 @@ TkOffsetPrintProc(
 	if (offsetPtr->flags >= INT_MAX) {
 	    return "end";
 	}
-	p = (char *)Tcl_Alloc(32);
+	p = (char *)ckalloc(32);
 	snprintf(p, 32, "%d", offsetPtr->flags & ~TK_OFFSET_INDEX);
 	*freeProcPtr = TCL_DYNAMIC;
 	return p;
@@ -457,7 +458,7 @@ TkOffsetPrintProc(
 	    return "se";
 	}
     }
-    q = p = (char *)Tcl_Alloc(32);
+    q = p = (char *)ckalloc(32);
     if (offsetPtr->flags & TK_OFFSET_RELATIVE) {
 	*q++ = '#';
     }
@@ -522,7 +523,7 @@ TkPixelPrintProc(
     Tcl_FreeProc **freeProcPtr)	/* not used */
 {
     double *doublePtr = (double *) (widgRec + offset);
-    char *p = (char *)Tcl_Alloc(24);
+    char *p = (char *)ckalloc(24);
 
     Tcl_PrintDouble(NULL, *doublePtr, p);
     *freeProcPtr = TCL_DYNAMIC;
@@ -1041,7 +1042,7 @@ TkFindStateNumObj(
      * See if the value is in the object cache.
      */
 
-    if ((keyPtr->typePtr == &tkStateKeyObjType)
+    if ((keyPtr->typePtr == &tkStateKeyObjType.objType)
 	    && (keyPtr->internalRep.twoPtrValue.ptr1 == mapPtr)) {
 	return PTR2INT(keyPtr->internalRep.twoPtrValue.ptr2);
     }
@@ -1059,7 +1060,7 @@ TkFindStateNumObj(
 	    }
 	    keyPtr->internalRep.twoPtrValue.ptr1 = (void *) mapPtr;
 	    keyPtr->internalRep.twoPtrValue.ptr2 = INT2PTR(mPtr->numKey);
-	    keyPtr->typePtr = &tkStateKeyObjType;
+	    keyPtr->typePtr = &tkStateKeyObjType.objType;
 	    return mPtr->numKey;
 	}
     }

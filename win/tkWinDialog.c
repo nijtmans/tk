@@ -25,6 +25,25 @@
 #   pragma comment (lib, "uuid.lib")
 #endif
 
+/* These needed for compilation with VC++ 5.2 */
+/* XXX - remove these since need at least VC 6 */
+#ifndef BIF_EDITBOX
+#define BIF_EDITBOX 0x10
+#endif
+
+#ifndef BIF_VALIDATE
+#define BIF_VALIDATE 0x0020
+#endif
+
+/* This "new" dialog style is now actually the "old" dialog style post-Vista */
+#ifndef BIF_NEWDIALOGSTYLE
+#define BIF_NEWDIALOGSTYLE 0x0040
+#endif
+
+#ifndef BFFM_VALIDATEFAILEDW
+#define BFFM_VALIDATEFAILEDW 4
+#endif /* BFFM_VALIDATEFAILEDW */
+
 typedef struct {
     int debugFlag;		/* Flags whether we should output debugging
 				 * information while displaying a builtin
@@ -100,6 +119,30 @@ static const struct {int type; int btnIds[3];} allowedTypes[] = {
 	SetWindowLongPtrW((to), GWLP_USERDATA, (LPARAM)(what))
 
 /*
+ * The value of TK_MULTI_MAX_PATH dictates how many files can be retrieved
+ * with tk_get*File -multiple 1. It must be allocated on the stack, so make it
+ * large enough but not too large. - hobbs
+ *
+ * The data is stored as <dir>\0<file1>\0<file2>\0...<fileN>\0\0. Since
+ * MAX_PATH == 260 on Win2K/NT, *40 is ~10Kbytes.
+ */
+
+#define TK_MULTI_MAX_PATH	(MAX_PATH*40)
+
+/*
+ * The following structure is used to pass information between the directory
+ * chooser function, Tk_ChooseDirectoryObjCmd(), and its dialog hook proc.
+ */
+
+typedef struct {
+   WCHAR initDir[MAX_PATH];	/* Initial folder to use */
+   WCHAR retDir[MAX_PATH];	/* Returned folder to use */
+   Tcl_Interp *interp;
+   int mustExist;		/* True if file must exist to return from
+				 * callback */
+} ChooseDir;
+
+/*
  * The following structure is used to pass information between GetFileName
  * function and OFN dialog hook procedures. [Bug 2896501, Patch 2898255]
  */
@@ -129,7 +172,10 @@ typedef struct OFNOpts {
     int multi;                  /* Multiple selection enabled */
     int confirmOverwrite;       /* Confirm before overwriting */
     int mustExist;              /* Used only for  */
-    Tcl_DString utf16FileName;  /* File name */
+    WCHAR file[TK_MULTI_MAX_PATH]; /* File name
+				      XXX - fixed size because it was so
+				      historically. Why not malloc'ed ?
+				   */
 } OFNOpts;
 
 /* Define the operation for which option parsing is to be done. */
@@ -263,7 +309,7 @@ int
 Tk_ChooseColorObjCmd(
     void *clientData,	/* Main window associated with interpreter. */
     Tcl_Interp *interp,		/* Current interpreter. */
-    Tcl_Size objc,			/* Number of arguments. */
+    int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
     Tk_Window tkwin = (Tk_Window)clientData, parent;
@@ -472,7 +518,7 @@ int
 Tk_GetOpenFileObjCmd(
     void *clientData,	/* Main window associated with interpreter. */
     Tcl_Interp *interp,		/* Current interpreter. */
-    Tcl_Size objc,			/* Number of arguments. */
+    int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
     return GetFileName(clientData, interp, objc, objv, OFN_FILE_OPEN);
@@ -499,7 +545,7 @@ int
 Tk_GetSaveFileObjCmd(
     void *clientData,	/* Main window associated with interpreter. */
     Tcl_Interp *interp,		/* Current interpreter. */
-    Tcl_Size objc,			/* Number of arguments. */
+    int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
     return GetFileName(clientData, interp, objc, objv, OFN_FILE_SAVE);
@@ -522,7 +568,6 @@ Tk_GetSaveFileObjCmd(
 static void CleanupOFNOptions(OFNOpts *optsPtr)
 {
     Tcl_DStringFree(&optsPtr->utfDirString);
-    Tcl_DStringFree(&optsPtr->utf16FileName);
 }
 
 
@@ -605,7 +650,7 @@ ParseOFNOptions(
     optsPtr->tkwin = (Tk_Window)clientData;
     optsPtr->confirmOverwrite = 1; /* By default we ask for confirmation */
     Tcl_DStringInit(&optsPtr->utfDirString);
-    Tcl_DStringInit(&optsPtr->utf16FileName);
+    optsPtr->file[0] = 0;
 
     for (i = 1; i < objc; i += 2) {
 	int index;
@@ -640,9 +685,10 @@ ParseOFNOptions(
 	case FILE_INITFILE:
 	    if (Tcl_TranslateFileName(interp, string, &ds) == NULL)
 		goto error_return;
-	    Tcl_UtfToExternalDStringEx(interp, TkWinGetUnicodeEncoding(),
-		Tcl_DStringValue(&ds), Tcl_DStringLength(&ds),
-		TCL_ENCODING_PROFILE_REPLACE, &optsPtr->utf16FileName, NULL);
+	    Tcl_UtfToExternal(NULL, TkWinGetUnicodeEncoding(),
+			      Tcl_DStringValue(&ds), Tcl_DStringLength(&ds),
+			      TCL_ENCODING_PROFILE_TCL8, NULL, (char *)&optsPtr->file[0],
+			      sizeof(optsPtr->file), NULL, NULL, NULL);
 	    Tcl_DStringFree(&ds);
 	    break;
 	case FILE_PARENT:
@@ -832,9 +878,8 @@ static int GetFileNameVista(Tcl_Interp *interp, OFNOpts *optsPtr,
 	    goto vamoose;
     }
 
-    WCHAR *fileNamePtr = (WCHAR *)Tcl_DStringValue(&optsPtr->utf16FileName);
-    if (*fileNamePtr) {
-	hr = fdlgIf->lpVtbl->SetFileName(fdlgIf, fileNamePtr);
+    if (optsPtr->file[0]) {
+	hr = fdlgIf->lpVtbl->SetFileName(fdlgIf, optsPtr->file);
 	if (FAILED(hr))
 	    goto vamoose;
     }
@@ -1042,11 +1087,11 @@ static void FreeFilterVista(DWORD count, COMDLG_FILTERSPEC *dlgFilterPtr)
 	DWORD dw;
 	for (dw = 0; dw < count; ++dw) {
 	    if (dlgFilterPtr[dw].pszName != NULL)
-		Tcl_Free((void *)dlgFilterPtr[dw].pszName);
+		ckfree((void *)dlgFilterPtr[dw].pszName);
 	    if (dlgFilterPtr[dw].pszSpec != NULL)
-		Tcl_Free((void *)dlgFilterPtr[dw].pszSpec);
+		ckfree((void *)dlgFilterPtr[dw].pszSpec);
 	}
-	Tcl_Free(dlgFilterPtr);
+	ckfree(dlgFilterPtr);
     }
 }
 
@@ -1105,7 +1150,7 @@ static int MakeFilterVista(
 
     Tcl_DStringInit(&ds);
     Tcl_DStringInit(&patterns);
-    dlgFilterPtr = (COMDLG_FILTERSPEC *)Tcl_Alloc(flist.numFilters * sizeof(*dlgFilterPtr));
+    dlgFilterPtr = (COMDLG_FILTERSPEC *)ckalloc(flist.numFilters * sizeof(*dlgFilterPtr));
 
     for (i = 0, filterPtr = flist.filters;
 	 filterPtr;
@@ -1123,7 +1168,7 @@ static int MakeFilterVista(
 	Tcl_UtfToWCharDString(filterPtr->name, TCL_INDEX_NONE, &ds);
 	nbytes = Tcl_DStringLength(&ds); /* # bytes, not Unicode chars */
 	nbytes += sizeof(WCHAR);         /* Terminating \0 */
-	dlgFilterPtr[i].pszName = (LPCWSTR)Tcl_Alloc(nbytes);
+	dlgFilterPtr[i].pszName = (LPCWSTR)ckalloc(nbytes);
 	memmove((void *) dlgFilterPtr[i].pszName, Tcl_DStringValue(&ds), nbytes);
 	Tcl_DStringFree(&ds);
 
@@ -1152,7 +1197,7 @@ static int MakeFilterVista(
 	Tcl_UtfToWCharDString(Tcl_DStringValue(&patterns), TCL_INDEX_NONE, &ds);
 	nbytes = Tcl_DStringLength(&ds); /* # bytes, not Unicode chars */
 	nbytes += sizeof(WCHAR);         /* Terminating \0 */
-	dlgFilterPtr[i].pszSpec = (LPCWSTR)Tcl_Alloc(nbytes);
+	dlgFilterPtr[i].pszSpec = (LPCWSTR)ckalloc(nbytes);
 	memmove((void *)dlgFilterPtr[i].pszSpec, Tcl_DStringValue(&ds), nbytes);
 	Tcl_DStringFree(&ds);
 	Tcl_DStringSetLength(&patterns, 0);
@@ -1245,7 +1290,7 @@ int
 Tk_ChooseDirectoryObjCmd(
     void *clientData,	/* Main window associated with interpreter. */
     Tcl_Interp *interp,		/* Current interpreter. */
-    Tcl_Size objc,			/* Number of arguments. */
+    int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
     int result;
@@ -1283,7 +1328,7 @@ int
 Tk_MessageBoxObjCmd(
     void *clientData,	/* Main window associated with interpreter. */
     Tcl_Interp *interp,		/* Current interpreter. */
-    Tcl_Size objc,			/* Number of arguments. */
+    int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
     Tk_Window tkwin = (Tk_Window)clientData, parent;
@@ -1612,11 +1657,11 @@ ApplyLogfont(
     Tcl_Obj **objv, **tmpv;
 
     Tcl_ListObjGetElements(NULL, cmdObj, &objc, &objv);
-    tmpv = (Tcl_Obj **)Tcl_Alloc(sizeof(Tcl_Obj *) * (objc + 2));
+    tmpv = (Tcl_Obj **)ckalloc(sizeof(Tcl_Obj *) * (objc + 2));
     memcpy(tmpv, objv, sizeof(Tcl_Obj *) * objc);
     tmpv[objc] = GetFontObj(hdc, logfontPtr);
     TkBackgroundEvalObjv(interp, objc+1, tmpv, TCL_EVAL_GLOBAL);
-    Tcl_Free(tmpv);
+    ckfree(tmpv);
 }
 
 /*
@@ -2089,7 +2134,7 @@ DeleteHookData(
     if (hdPtr->cmdObj) {
 	Tcl_DecrRefCount(hdPtr->cmdObj);
     }
-    Tcl_Free(hdPtr);
+    ckfree(hdPtr);
 }
 
 /*
@@ -2116,7 +2161,7 @@ TkInitFontchooser(
     Tcl_Interp *interp,
     TCL_UNUSED(void *))
 {
-    HookData *hdPtr = (HookData *)Tcl_Alloc(sizeof(HookData));
+    HookData *hdPtr = (HookData *)ckalloc(sizeof(HookData));
 
     memset(hdPtr, 0, sizeof(HookData));
     Tcl_SetAssocData(interp, "::tk::fontchooser", DeleteHookData, hdPtr);

@@ -170,12 +170,12 @@ TkTextTagCmd(
 		*/
 		textPtr->sharedTextPtr->stateEpoch++;
 	}
-	for (i = 4; i < objc; i += 2) {
+	for (i = 4; i < (Tcl_Size)objc; i += 2) {
 	    if (TkTextGetObjIndex(interp, textPtr, objv[i],
 		    &index1) != TCL_OK) {
 		return TCL_ERROR;
 	    }
-	    if (objc > (i+1)) {
+	    if ((Tcl_Size)objc > (i+1)) {
 		if (TkTextGetObjIndex(interp, textPtr, objv[i+1],
 			&index2) != TCL_OK) {
 		    return TCL_ERROR;
@@ -364,7 +364,7 @@ TkTextTagCmd(
 	     */
 
 	    if (tagPtr->tabArrayPtr != NULL) {
-		Tcl_Free(tagPtr->tabArrayPtr);
+		ckfree(tagPtr->tabArrayPtr);
 		tagPtr->tabArrayPtr = NULL;
 	    }
 	    if (tagPtr->tabStringPtr != NULL) {
@@ -468,7 +468,7 @@ TkTextTagCmd(
 	    Tcl_WrongNumArgs(interp, 3, objv, "tagName ?tagName ...?");
 	    return TCL_ERROR;
 	}
-	for (i = 3; i < objc; i++) {
+	for (i = 3; i < (Tcl_Size)objc; i++) {
 	    hPtr = Tcl_FindHashEntry(&textPtr->sharedTextPtr->tagTable,
 		    Tcl_GetString(objv[i]));
 	    if (hPtr == NULL) {
@@ -541,7 +541,7 @@ TkTextTagCmd(
 	    Tcl_HashSearch search;
 	    Tcl_HashEntry *hPtr;
 
-	    arrayPtr = (TkTextTag **)Tcl_Alloc(textPtr->sharedTextPtr->numTags
+	    arrayPtr = (TkTextTag **)ckalloc(textPtr->sharedTextPtr->numTags
 		    * sizeof(TkTextTag *));
 	    for (i=0, hPtr = Tcl_FirstHashEntry(
 		    &textPtr->sharedTextPtr->tagTable, &search);
@@ -575,7 +575,7 @@ TkTextTagCmd(
 		    Tcl_NewStringObj(tagPtr->name,-1));
 	}
 	Tcl_SetObjResult(interp, listObj);
-	Tcl_Free(arrayPtr);
+	ckfree(arrayPtr);
 	break;
     }
     case TAG_NEXTRANGE: {
@@ -915,7 +915,7 @@ TkTextCreateTag(
      * to it to the hash table entry.
      */
 
-    tagPtr = (TkTextTag *)Tcl_Alloc(sizeof(TkTextTag));
+    tagPtr = (TkTextTag *)ckalloc(sizeof(TkTextTag));
     tagPtr->name = name;
     tagPtr->textPtr = NULL;
     tagPtr->toggleCount = 0;
@@ -1119,7 +1119,7 @@ TkTextFreeTag(
      */
 
     if (tagPtr->tabArrayPtr != NULL) {
-	Tcl_Free(tagPtr->tabArrayPtr);
+	ckfree(tagPtr->tabArrayPtr);
     }
 
     /*
@@ -1147,7 +1147,7 @@ TkTextFreeTag(
 	    Tcl_Panic("Tag being deleted from wrong widget");
 	}
 	if (textPtr->refCount-- <= 1) {
-	    Tcl_Free(textPtr);
+	    ckfree(textPtr);
 	}
 	tagPtr->textPtr = NULL;
     }
@@ -1156,7 +1156,7 @@ TkTextFreeTag(
      * Finally free the tag's memory.
      */
 
-    Tcl_Free(tagPtr);
+    ckfree(tagPtr);
 }
 
 /*
@@ -1407,7 +1407,7 @@ TkTextBindProc(
 
   done:
     if (textPtr->refCount-- <= 1) {
-	Tcl_Free(textPtr);
+	ckfree(textPtr);
     }
 }
 
@@ -1541,7 +1541,7 @@ TkTextPickCurrent(
     SortTags(textPtr->numCurTags, textPtr->curTagArrayPtr);
     if (numNewTags > 0) {
 	size = numNewTags * sizeof(TkTextTag *);
-	copyArrayPtr = (TkTextTag **)Tcl_Alloc(size);
+	copyArrayPtr = (TkTextTag **)ckalloc(size);
 	memcpy(copyArrayPtr, newArrayPtr, size);
 	for (i = 0; i < textPtr->numCurTags; i++) {
 	    for (j = 0; j < numNewTags; j++) {
@@ -1591,7 +1591,7 @@ TkTextPickCurrent(
 	    event.xcrossing.detail = NotifyAncestor;
 	    TagBindEvent(textPtr, &event, numOldTags, oldArrayPtr);
 	}
-	Tcl_Free(oldArrayPtr);
+	ckfree(oldArrayPtr);
     }
 
     /*
@@ -1613,7 +1613,7 @@ TkTextPickCurrent(
 	    event.xcrossing.detail = NotifyAncestor;
 	    TagBindEvent(textPtr, &event, numNewTags, copyArrayPtr);
 	}
-	Tcl_Free(copyArrayPtr);
+	ckfree(copyArrayPtr);
     }
 }
 
@@ -1653,7 +1653,7 @@ TagBindEvent(
      */
 
     if (numTags > NUM_BIND_TAGS) {
-	nameArrPtr = (const char **)Tcl_Alloc(numTags * sizeof(const char *));
+	nameArrPtr = (const char **)ckalloc(numTags * sizeof(const char *));
     } else {
 	nameArrPtr = nameArray;
     }
@@ -1683,7 +1683,7 @@ TagBindEvent(
 	    textPtr->tkwin, numTags, (void **) nameArrPtr);
 
     if (numTags > NUM_BIND_TAGS) {
-	Tcl_Free(nameArrPtr);
+	ckfree(nameArrPtr);
     }
 }
 

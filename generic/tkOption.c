@@ -535,12 +535,12 @@ Tk_GetOption(
 	 */
 
 	classNameLength	= masqName - name;
-	masqClass = (char *)Tcl_Alloc(classNameLength + 1);
+	masqClass = (char *)ckalloc(classNameLength + 1);
 	strncpy(masqClass, name, classNameLength);
 	masqClass[classNameLength] = '\0';
 
 	winClassId = Tk_GetUid(masqClass);
-	Tcl_Free(masqClass);
+	ckfree(masqClass);
 	winNameId = ((TkWindow *) tkwin)->nameUid;
 
 	levelPtr = &tsdPtr->levels[tsdPtr->curLevel];
@@ -612,7 +612,7 @@ int
 Tk_OptionObjCmd(
     void *clientData,	/* Main window associated with interpreter. */
     Tcl_Interp *interp,		/* Current interpreter. */
-    Tcl_Size objc,			/* Number of Tcl_Obj arguments. */
+    int objc,			/* Number of Tcl_Obj arguments. */
     Tcl_Obj *const objv[])	/* Tcl_Obj arguments. */
 {
     Tk_Window tkwin = (Tk_Window)clientData;
@@ -1150,7 +1150,7 @@ static ElArray *
 NewArray(
     int numEls)			/* How many elements of space to allocate. */
 {
-    ElArray *arrayPtr = (ElArray *)Tcl_Alloc(EL_ARRAY_SIZE(numEls));
+    ElArray *arrayPtr = (ElArray *)ckalloc(EL_ARRAY_SIZE(numEls));
 
     arrayPtr->arraySize = numEls;
     arrayPtr->numUsed = 0;
@@ -1187,7 +1187,7 @@ ExtendArray(
     if (arrayPtr->numUsed >= arrayPtr->arraySize) {
 	int newSize = 2*arrayPtr->arraySize;
 
-	arrayPtr = (ElArray *)Tcl_Realloc(arrayPtr, EL_ARRAY_SIZE(newSize));
+	arrayPtr = (ElArray *)ckrealloc(arrayPtr, EL_ARRAY_SIZE(newSize));
 	arrayPtr->arraySize = newSize;
 	arrayPtr->nextToUse = &arrayPtr->els[arrayPtr->numUsed];
     }
@@ -1306,11 +1306,11 @@ SetupStacks(
 
     if (tsdPtr->curLevel >= tsdPtr->numLevels) {
 	StackLevel *newLevels = (StackLevel *)
-		Tcl_Alloc(tsdPtr->numLevels * 2 * sizeof(StackLevel));
+		ckalloc(tsdPtr->numLevels * 2 * sizeof(StackLevel));
 
 	memcpy(newLevels, tsdPtr->levels,
 		tsdPtr->numLevels * sizeof(StackLevel));
-	Tcl_Free(tsdPtr->levels);
+	ckfree(tsdPtr->levels);
 	tsdPtr->numLevels *= 2;
 	tsdPtr->levels = newLevels;
     }
@@ -1429,9 +1429,9 @@ OptionThreadExitProc(
 	int i;
 
 	for (i = 0; i < NUM_STACKS; i++) {
-	    Tcl_Free(tsdPtr->stacks[i]);
+	    ckfree(tsdPtr->stacks[i]);
 	}
-	Tcl_Free(tsdPtr->levels);
+	ckfree(tsdPtr->levels);
 	tsdPtr->initialized = false;
     }
 }
@@ -1475,7 +1475,7 @@ OptionInit(
 	tsdPtr->curLevel = -1;
 	tsdPtr->serial = 0;
 
-	tsdPtr->levels = (StackLevel *)Tcl_Alloc(5 * sizeof(StackLevel));
+	tsdPtr->levels = (StackLevel *)ckalloc(5 * sizeof(StackLevel));
 	for (i = 0; i < NUM_STACKS; i++) {
 	    tsdPtr->stacks[i] = NewArray(10);
 	    tsdPtr->levels[0].bases[i] = 0;
@@ -1531,7 +1531,7 @@ ClearOptionTree(
 	    ClearOptionTree(elPtr->child.arrayPtr);
 	}
     }
-    Tcl_Free(arrayPtr);
+    ckfree(arrayPtr);
 }
 
 /*

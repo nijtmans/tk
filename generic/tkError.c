@@ -107,7 +107,7 @@ Tk_CreateErrorHandler(
      * Create the handler record.
      */
 
-    errorPtr = (TkErrorHandler *)Tcl_Alloc(sizeof(TkErrorHandler));
+    errorPtr = (TkErrorHandler *)ckalloc(sizeof(TkErrorHandler));
     errorPtr->dispPtr = dispPtr;
     errorPtr->firstRequest = NextRequest(display);
     errorPtr->lastRequest = (unsigned long) -1;
@@ -194,7 +194,7 @@ Tk_DeleteErrorHandler(
 		} else {
 		    prevPtr->nextPtr = nextPtr;
 		}
-		Tcl_Free(errorPtr);
+		ckfree(errorPtr);
 		continue;
 	    }
 	    prevPtr = errorPtr;

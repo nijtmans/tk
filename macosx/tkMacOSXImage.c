@@ -121,7 +121,7 @@ static void ReleaseData(
     TCL_UNUSED(const void *), /* data */
     TCL_UNUSED(size_t))        /* size */
 {
-    Tcl_Free(info);
+    ckfree(info);
 }
 
 static CGImageRef
@@ -148,7 +148,7 @@ TkMacOSXCreateCGImageWithXImage(
 
 	bitsPerComponent = 1;
 	bitsPerPixel = 1;
-	data = (char *)Tcl_Alloc(len);
+	data = (char *)ckalloc(len);
 	if (data) {
 	    if (image->bitmap_bit_order != MSBFirst) {
 		char *srcPtr = image->data + image->xoffset;
@@ -164,7 +164,7 @@ TkMacOSXCreateCGImageWithXImage(
 	    provider = CGDataProviderCreateWithData(data, data, len,
 		    releaseData);
 	    if (!provider) {
-		Tcl_Free(data);
+		ckfree(data);
 	    }
 	    img = CGImageMaskCreate(image->width, image->height,
 		    bitsPerComponent, bitsPerPixel, image->bytes_per_line,
@@ -188,13 +188,13 @@ TkMacOSXCreateCGImageWithXImage(
 	CGColorSpaceRef colorspace = CGColorSpaceCreateDeviceRGB();
 	bitsPerComponent = 8;
 	bitsPerPixel = 32;
-	data = (char *)Tcl_Alloc(len);
+	data = (char *)ckalloc(len);
 	if (data) {
 	    memcpy(data, image->data + image->xoffset, len);
 	    provider = CGDataProviderCreateWithData(data, data, len,
 		    releaseData);
 	    if (!provider) {
-		Tcl_Free(data);
+		ckfree(data);
 	    }
 	    img = CGImageCreate(image->width, image->height, bitsPerComponent,
 		    bitsPerPixel, image->bytes_per_line, colorspace, bitmapInfo,
@@ -232,9 +232,9 @@ DestroyImage(
 {
     if (image) {
 	if (image->data) {
-	    Tcl_Free(image->data);
+	    ckfree(image->data);
 	}
-	Tcl_Free(image);
+	ckfree(image);
     }
     return 0;
 }
@@ -404,7 +404,7 @@ XCreateImage(
     XImage *ximage;
 
     LastKnownRequestProcessed(display)++;
-    ximage = (XImage *)Tcl_Alloc(sizeof(XImage));
+    ximage = (XImage *)ckalloc(sizeof(XImage));
 
     ximage->height = height;
     ximage->width = width;
@@ -739,15 +739,13 @@ CreatePDFFromDrawableRect(
 			  unsigned int width,
 			  unsigned int height)
 {
-    MacDrawable *mac_drawable = (MacDrawable *) drawable;
+    MacDrawable *mac_drawable = (MacDrawable *)drawable;
     NSView *view = TkMacOSXGetNSViewForDrawable(mac_drawable);
     if (view == nil) {
 	TkMacOSXDbgMsg("Invalid source drawable");
 	return NULL;
     }
-
-    NSRect bounds;
-    CGRect viewSrcRect;
+    NSRect bounds, viewSrcRect;
 
     /*
      * Get the child window area in NSView coordinates
@@ -755,50 +753,13 @@ CreatePDFFromDrawableRect(
      */
 
     bounds = [view bounds];
-    viewSrcRect = CGRectMake(mac_drawable->xOff + x,
+    viewSrcRect = NSMakeRect(mac_drawable->xOff + x,
 			     bounds.size.height - height - (mac_drawable->yOff + y),
 			     width, height);
-
-    NSMutableData *pdfData = [NSMutableData data];
-
-    CGDataConsumerRef consumer = CGDataConsumerCreateWithCFData((__bridge CFMutableDataRef) pdfData);
-
-    CGRect pdfBounds = CGRectMake(0, 0, width, height);
-
-    CGContextRef ctx = CGPDFContextCreate(consumer, &pdfBounds, NULL);
-
-    CGPDFContextBeginPage(ctx, NULL);
-
-    CGContextSaveGState(ctx);
-
-    /*
-     * Translate so the requested rect maps to (0,0).
-     */
-
-    CGContextTranslateCTM(ctx, -viewSrcRect.origin.x,
-			  -viewSrcRect.origin.y);
-
-    /*
-     * Render CALayer tree.
-     */
-
-    [view.layer renderInContext:ctx];
-
-    CGContextRestoreGState(ctx);
-
-    CGPDFContextEndPage(ctx);
-
-    CGContextRelease(ctx);
-    CGDataConsumerRelease(consumer);
-
-    /*
-     * Caller owns returned CFDataRef.
-     */
-
-    return CFBridgingRetain(pdfData);
+    NSData *viewData = [view dataWithPDFInsideRect:viewSrcRect];
+    CFDataRef result = (CFDataRef)viewData;
+    return result;
 }
-
-
 
 
 /*
@@ -917,7 +878,7 @@ XGetImage(
 	    [bitmapRep release];
 	    return NULL;
 	}
-	bitmap = (char *)Tcl_Alloc(size);
+	bitmap = (char *)ckalloc(size);
 	memcpy(bitmap, (char *)[bitmapRep bitmapData], size);
 	[bitmapRep release];
 
@@ -1231,8 +1192,7 @@ XCopyPlane(
 		     */
 
 		    CGContextClipToMask(context, rect, submask);
-		    TkMacOSXSetColorInContext(gc, gc->background, dc.context,
-			    TkMacOSXInDarkMode((Tk_Window)dstDraw->winPtr));
+		    TkMacOSXSetColorInContext(gc, gc->background, dc.context);
 		    CGContextFillRect(context, rect);
 
 		    /*
@@ -1243,8 +1203,7 @@ XCopyPlane(
 		    CGImageRef subimage = CGImageCreateWithImageInRect(
 			    img, srcRect);
 		    CGContextClipToMask(context, rect, subimage);
-		    TkMacOSXSetColorInContext(gc, gc->foreground, context,
-			    TkMacOSXInDarkMode((Tk_Window)dstDraw->winPtr));
+		    TkMacOSXSetColorInContext(gc, gc->foreground, context);
 		    CGContextFillRect(context, rect);
 		    CGContextRestoreGState(context);
 		    CGImageRelease(img);
@@ -1756,10 +1715,10 @@ TkMacOSXNSImageCreate(
     TkMacOSXNSImageModel *modelPtr;
     Tk_OptionTable optionTable = Tk_CreateOptionTable(interp, systemImageOptions);
 
-    modelPtr = (TkMacOSXNSImageModel *)Tcl_Alloc(sizeof(TkMacOSXNSImageModel));
+    modelPtr = (TkMacOSXNSImageModel *)ckalloc(sizeof(TkMacOSXNSImageModel));
     modelPtr->tkModel = model;
     modelPtr->interp = interp;
-    modelPtr->imageName = (char *)Tcl_Alloc(strlen(name) + 1);
+    modelPtr->imageName = (char *)ckalloc(strlen(name) + 1);
     strcpy(modelPtr->imageName, name);
     modelPtr->flags = 0;
     modelPtr->instancePtr = NULL;
@@ -1807,7 +1766,7 @@ TkMacOSXNSImageGet(
     TkMacOSXNSImageModel *modelPtr = (TkMacOSXNSImageModel *) clientData;
     TkMacOSXNSImageInstance *instPtr;
 
-    instPtr = (TkMacOSXNSImageInstance *)Tcl_Alloc(sizeof(TkMacOSXNSImageInstance));
+    instPtr = (TkMacOSXNSImageInstance *)ckalloc(sizeof(TkMacOSXNSImageInstance));
     instPtr->modelPtr = modelPtr;
     return instPtr;
 }
@@ -1922,7 +1881,7 @@ TkMacOSXNSImageFree(
     TCL_UNUSED(Display *))	/* display */
 {
     TkMacOSXNSImageInstance *instPtr = (TkMacOSXNSImageInstance *) clientData;
-    Tcl_Free(instPtr);
+    ckfree(instPtr);
 }
 
 /*
@@ -1950,12 +1909,12 @@ TkMacOSXNSImageDelete(
     TkMacOSXNSImageModel *modelPtr = (TkMacOSXNSImageModel *) clientData;
 
     Tcl_DeleteCommand(modelPtr->interp, modelPtr->imageName);
-    Tcl_Free(modelPtr->imageName);
+    ckfree(modelPtr->imageName);
     Tcl_DecrRefCount(modelPtr->sourceObj);
     Tcl_DecrRefCount(modelPtr->asObj);
     [modelPtr->image release];
     [modelPtr->darkModeImage release];
-    Tcl_Free(modelPtr);
+    ckfree(modelPtr);
 }
 
 /*

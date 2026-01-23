@@ -403,7 +403,7 @@ XFree(
     void *data)
 {
 	if (data != NULL) {
-		Tcl_Free(data);
+		ckfree(data);
 	}
     return 0;
 }

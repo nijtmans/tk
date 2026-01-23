@@ -539,12 +539,12 @@ static void TroughClientDataDeleteProc(void *clientData)
     TroughClientData *cd = (TroughClientData *)clientData;
     DeleteObject(cd->PatternBrush);
     DeleteObject(cd->PatternBitmap);
-    Tcl_Free(clientData);
+    ckfree(clientData);
 }
 
 static TroughClientData *TroughClientDataInit(Tcl_Interp *interp)
 {
-    TroughClientData *cd = (TroughClientData *)Tcl_Alloc(sizeof(*cd));
+    TroughClientData *cd = (TroughClientData *)ckalloc(sizeof(*cd));
     cd->PatternBitmap = CreateBitmap(8, 8, 1, 1, Pattern);
     cd->PatternBrush  = CreatePatternBrush(cd->PatternBitmap);
     Ttk_RegisterCleanup(interp, cd, TroughClientDataDeleteProc);

@@ -490,16 +490,16 @@ GetEntryText(
     char *itemText;
 
     if (mePtr->type == TEAROFF_ENTRY) {
-	itemText = (char *)Tcl_Alloc(sizeof("(Tear-off)"));
+	itemText = (char *)ckalloc(sizeof("(Tear-off)"));
 	strcpy(itemText, "(Tear-off)");
     } else if (mePtr->imagePtr != NULL) {
-	itemText = (char *)Tcl_Alloc(sizeof("(Image)"));
+	itemText = (char *)ckalloc(sizeof("(Image)"));
 	strcpy(itemText, "(Image)");
     } else if (mePtr->bitmapPtr != NULL) {
-	itemText = (char *)Tcl_Alloc(sizeof("(Pixmap)"));
+	itemText = (char *)ckalloc(sizeof("(Pixmap)"));
 	strcpy(itemText, "(Pixmap)");
     } else if (mePtr->labelPtr == NULL || mePtr->labelLength == 0) {
-	itemText = (char *)Tcl_Alloc(sizeof("( )"));
+	itemText = (char *)ckalloc(sizeof("( )"));
 	strcpy(itemText, "( )");
     } else {
 	int i;
@@ -541,7 +541,7 @@ GetEntryText(
 	    }
 	}
 
-	itemText = (char *)Tcl_Alloc(Tcl_DStringLength(&itemString) + 1);
+	itemText = (char *)ckalloc(Tcl_DStringLength(&itemString) + 1);
 	strcpy(itemText, Tcl_DStringValue(&itemString));
 	Tcl_DStringFree(&itemString);
     }
@@ -746,7 +746,7 @@ ReconfigureWindowsMenu(
 	}
 	Tcl_DStringFree(&translatedText);
 	if (itemText != NULL) {
-	    Tcl_Free(itemText);
+	    ckfree(itemText);
 	    itemText = NULL;
 	}
     }
@@ -1359,7 +1359,7 @@ TkWinHandleMenuEvent(
 	    }
 	    mePtr = (TkMenuEntry *) itemPtr->itemData;
 	    menuPtr = mePtr->menuPtr;
-	    twdPtr = (TkWinDrawable *)Tcl_Alloc(sizeof(TkWinDrawable));
+	    twdPtr = (TkWinDrawable *)ckalloc(sizeof(TkWinDrawable));
 	    twdPtr->type = TWD_WINDC;
 	    twdPtr->winDC.hdc = itemPtr->hDC;
 
@@ -1402,7 +1402,7 @@ TkWinHandleMenuEvent(
 		    itemPtr->rcItem.bottom - itemPtr->rcItem.top,
 		    0, drawingParameters);
 
-	    Tcl_Free(twdPtr);
+	    ckfree(twdPtr);
 	}
 	*plResult = 1;
 	returnResult = 1;

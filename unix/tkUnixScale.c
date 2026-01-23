@@ -52,7 +52,7 @@ TkScale *
 TkpCreateScale(
     TCL_UNUSED(Tk_Window))
 {
-    return (TkScale *)Tcl_Alloc(sizeof(TkScale));
+    return (TkScale *)ckalloc(sizeof(TkScale));
 }
 
 /*

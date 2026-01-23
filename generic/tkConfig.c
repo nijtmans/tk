@@ -151,13 +151,14 @@ static void		DupOptionInternalRep(Tcl_Obj *, Tcl_Obj *);
  * the internalPtr2 field points to the entry that matched.
  */
 
-static const Tcl_ObjType optionObjType = {
-    "option",			/* name */
+static const TkObjType optionObjType = {
+    {"option",			/* name */
     FreeOptionInternalRep,	/* freeIntRepProc */
     DupOptionInternalRep,	/* dupIntRepProc */
     NULL,			/* updateStringProc */
     NULL,			/* setFromAnyProc */
-    TCL_OBJTYPE_V0
+    TCL_OBJTYPE_V0},
+    0
 };
 
 /*
@@ -230,7 +231,7 @@ Tk_CreateOptionTable(
     for (specPtr = templatePtr; specPtr->type != TK_OPTION_END; specPtr++) {
 	numOptions++;
     }
-    tablePtr = (OptionTable *)Tcl_Alloc(sizeof(OptionTable) + (numOptions * sizeof(Option)));
+    tablePtr = (OptionTable *)ckalloc(sizeof(OptionTable) + (numOptions * sizeof(Option)));
     tablePtr->refCount = 1;
     tablePtr->hashEntryPtr = hashEntryPtr;
     tablePtr->nextPtr = NULL;
@@ -366,7 +367,7 @@ Tk_DeleteOptionTable(
 	}
     }
     Tcl_DeleteHashEntry(tablePtr->hashEntryPtr);
-    Tcl_Free(tablePtr);
+    ckfree(tablePtr);
 }
 
 /*
@@ -760,7 +761,7 @@ DoObjConfig(
 	if (internalPtr != NULL) {
 	    if (valuePtr != NULL) {
 		value = Tcl_GetStringFromObj(valuePtr, &length);
-		newStr = (char *)Tcl_Alloc(length + 1);
+		newStr = (char *)ckalloc(length + 1);
 		strcpy(newStr, value);
 	    } else {
 		newStr = NULL;
@@ -1254,7 +1255,7 @@ GetOptionFromObj(
      * First, check to see if the object already has the answer cached.
      */
 
-    if (objPtr->typePtr == &optionObjType) {
+    if (objPtr->typePtr == &optionObjType.objType) {
 	if (objPtr->internalRep.twoPtrValue.ptr1 == (void *) tablePtr) {
 	    return (Option *) objPtr->internalRep.twoPtrValue.ptr2;
 	}
@@ -1276,7 +1277,7 @@ GetOptionFromObj(
     }
     objPtr->internalRep.twoPtrValue.ptr1 = (void *) tablePtr;
     objPtr->internalRep.twoPtrValue.ptr2 = (void *) bestPtr;
-    objPtr->typePtr = &optionObjType;
+    objPtr->typePtr = &optionObjType.objType;
     tablePtr->refCount++;
     return bestPtr;
 
@@ -1471,7 +1472,7 @@ Tk_SetOptions(
 	     * more space.
 	     */
 
-	    newSavePtr = (Tk_SavedOptions *)Tcl_Alloc(sizeof(Tk_SavedOptions));
+	    newSavePtr = (Tk_SavedOptions *)ckalloc(sizeof(Tk_SavedOptions));
 	    newSavePtr->recordPtr = recordPtr;
 	    newSavePtr->tkwin = tkwin;
 	    newSavePtr->numItems = 0;
@@ -1545,7 +1546,7 @@ Tk_RestoreSavedOptions(
 
     if (savePtr->nextPtr != NULL) {
 	Tk_RestoreSavedOptions(savePtr->nextPtr);
-	Tcl_Free(savePtr->nextPtr);
+	ckfree(savePtr->nextPtr);
 	savePtr->nextPtr = NULL;
     }
     for (i = savePtr->numItems - 1; i >= 0; i--) {
@@ -1745,7 +1746,7 @@ Tk_FreeSavedOptions(
 
     if (savePtr->nextPtr != NULL) {
 	Tk_FreeSavedOptions(savePtr->nextPtr);
-	Tcl_Free(savePtr->nextPtr);
+	ckfree(savePtr->nextPtr);
     }
     for (count = savePtr->numItems; count > 0; count--) {
 	savedOptionPtr = &savePtr->items[count-1];
@@ -1863,7 +1864,7 @@ FreeResources(
     case TK_OPTION_STRING:
 	if (internalFormExists) {
 	    if (*((char **)internalPtr) != NULL) {
-		Tcl_Free(*((char **)internalPtr));
+		ckfree(*((char **)internalPtr));
 		*((char **)internalPtr) = NULL;
 	    }
 	}

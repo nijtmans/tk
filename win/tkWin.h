@@ -14,17 +14,24 @@
 #define _TKWIN
 
 /*
- * We must specify the lowest version we intend to support.
+ * We must specify the lower version we intend to support. In particular
+ * the SystemParametersInfo API doesn't like to receive structures that
+ * are larger than it expects which affects the font assignments.
  *
- * 0x0A00 means Windows 10 and above
+ * WINVER = 0x0600 means Windows Vista and above. Even though we still
+ * support Windows XP, but the Vista-specifics are tested at runtime.
  */
 
-#ifndef _WIN32_WINNT
-#   define _WIN32_WINNT 0x0A00
-#endif
 #ifndef WINVER
-#   define WINVER _WIN32_WINNT		/* Should match _WIN32_WINNT */
+#   define WINVER 0x0601
 #endif
+#ifndef _WIN32_WINNT
+#   define _WIN32_WINNT 0x0601
+#endif
+#ifndef _WIN32_IE
+#   define _WIN32_IE 0x0800
+#endif
+
 #ifndef _TK
 #include <tk.h>
 #endif

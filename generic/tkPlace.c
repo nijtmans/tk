@@ -155,7 +155,7 @@ static const Tk_GeomMgr placerType = {
 static void		ContentStructureProc(void *clientData,
 			    XEvent *eventPtr);
 static int		ConfigureContent(Tcl_Interp *interp, Tk_Window tkwin,
-			    Tk_OptionTable table, Tcl_Size objc,
+			    Tk_OptionTable table, int objc,
 			    Tcl_Obj *const objv[]);
 static int		PlaceInfoCommand(Tcl_Interp *interp, Tk_Window tkwin);
 static Content *		CreateContent(Tk_Window tkwin, Tk_OptionTable table);
@@ -189,7 +189,7 @@ int
 Tk_PlaceObjCmd(
     void *clientData,	/* Interpreter main window. */
     Tcl_Interp *interp,		/* Current interpreter. */
-    Tcl_Size objc,			/* Number of arguments. */
+    int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
     Tk_Window main_win = (Tk_Window)clientData;
@@ -388,7 +388,7 @@ CreateContent(
      * populate it with some default values.
      */
 
-    contentPtr = (Content *)Tcl_Alloc(sizeof(Content));
+    contentPtr = (Content *)ckalloc(sizeof(Content));
     memset(contentPtr, 0, sizeof(Content));
     contentPtr->tkwin = tkwin;
     contentPtr->inTkwin = NULL;
@@ -430,7 +430,7 @@ FreeContent(
     }
     Tk_FreeConfigOptions(contentPtr, contentPtr->optionTable,
 	    contentPtr->tkwin);
-    Tcl_Free(contentPtr);
+    ckfree(contentPtr);
 }
 
 /*
@@ -541,7 +541,7 @@ CreateContainer(
 
     hPtr = Tcl_CreateHashEntry(&dispPtr->containerTable, (char *)tkwin, &isNew);
     if (isNew) {
-	containerPtr = (Container *)Tcl_Alloc(sizeof(Container));
+	containerPtr = (Container *)ckalloc(sizeof(Container));
 	containerPtr->tkwin = tkwin;
 	containerPtr->contentPtr = NULL;
 	containerPtr->abortPtr = NULL;
@@ -612,7 +612,7 @@ ConfigureContent(
     Tcl_Interp *interp,		/* Used for error reporting. */
     Tk_Window tkwin,		/* Token for the window to manipulate. */
     Tk_OptionTable table,	/* Token for option table. */
-    Tcl_Size objc,			/* Number of config arguments. */
+    int objc,			/* Number of config arguments. */
     Tcl_Obj *const objv[])	/* Object values for arguments. */
 {
     Container *containerPtr;

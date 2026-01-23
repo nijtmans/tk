@@ -341,7 +341,7 @@ TkSetGeometryContainer(
 	return TCL_ERROR;
     }
 
-    winPtr->geomMgrName = (char *)Tcl_Alloc(strlen(name) + 1);
+    winPtr->geomMgrName = (char *)ckalloc(strlen(name) + 1);
     strcpy(winPtr->geomMgrName, name);
     return TCL_OK;
 }
@@ -377,7 +377,7 @@ TkFreeGeometryContainer(
 		winPtr->geomMgrName, name);
     }
     if (winPtr->geomMgrName != NULL) {
-	Tcl_Free(winPtr->geomMgrName);
+	ckfree(winPtr->geomMgrName);
 	winPtr->geomMgrName = NULL;
     }
 }
@@ -464,7 +464,7 @@ Tk_MaintainGeometry(
     if (!isNew) {
 	containerPtr = (MaintainContainer *)Tcl_GetHashValue(hPtr);
     } else {
-	containerPtr = (MaintainContainer *)Tcl_Alloc(sizeof(MaintainContainer));
+	containerPtr = (MaintainContainer *)ckalloc(sizeof(MaintainContainer));
 	containerPtr->ancestor = container;
 	containerPtr->checkScheduled = 0;
 	containerPtr->contentPtr = NULL;
@@ -482,7 +482,7 @@ Tk_MaintainGeometry(
 	    goto gotContent;
 	}
     }
-    contentPtr = (MaintainContent *)Tcl_Alloc(sizeof(MaintainContent));
+    contentPtr = (MaintainContent *)ckalloc(sizeof(MaintainContent));
     contentPtr->content = window;
     contentPtr->container = container;
     contentPtr->nextPtr = containerPtr->contentPtr;
@@ -612,7 +612,7 @@ Tk_UnmaintainGeometry(
     }
     Tk_DeleteEventHandler(contentPtr->content, StructureNotifyMask,
 	    MaintainContentProc, contentPtr);
-    Tcl_Free(contentPtr);
+    ckfree(contentPtr);
     if (containerPtr->contentPtr == NULL) {
 	if (containerPtr->ancestor != NULL) {
 	    for (ancestor = container; ; ancestor = Tk_Parent(ancestor)) {
@@ -627,7 +627,7 @@ Tk_UnmaintainGeometry(
 	    Tcl_CancelIdleCall(MaintainCheckProc, containerPtr);
 	}
 	Tcl_DeleteHashEntry(hPtr);
-	Tcl_Free(containerPtr);
+	ckfree(containerPtr);
     }
 }
 

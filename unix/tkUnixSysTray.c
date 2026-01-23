@@ -5,8 +5,8 @@
  *	change the system tray/taskbar icon of a Tk toplevel window and
  *	to post system notifications.
  *
- * Copyright © 2005 Anton Kovalenko
- * Copyright © 2020 Kevin Walzer
+ * Copyright © 2005 Anton Kovalenko.
+ * Copyright © 2020 Kevin Walzer.
  *
  * See the file "license.terms" for information on usage and redistribution of
  * this file, and for a DISCLAIMER OF ALL WARRANTIES.
@@ -1603,7 +1603,7 @@ TrayIconCreateCmd(
     Tk_Window mainWindow = (Tk_Window)cd;
     DockIcon *icon;
 
-    icon = (DockIcon*)Tcl_AttemptAlloc(sizeof(DockIcon));
+    icon = (DockIcon*)attemptckalloc(sizeof(DockIcon));
     if (!icon) {
 	Tcl_SetObjResult(interp, Tcl_NewStringObj("running out of memory", TCL_INDEX_NONE));
 	goto handleErrors;
@@ -1691,7 +1691,7 @@ handleErrors:
 	    /* Resources will be freed by DestroyNotify handler */
 	    Tk_DestroyWindow(icon->tkwin);
 	}
-	Tcl_Free(icon);
+	ckfree(icon);
     }
     return TCL_ERROR;
 }

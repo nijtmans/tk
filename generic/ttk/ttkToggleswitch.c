@@ -178,7 +178,7 @@ static int TglswitchConfigure(Tcl_Interp *interp, void *recordPtr, int mask)
 		|| !strcmp(nameTail, "Toggleswitch2")
 		|| !strcmp(nameTail, "Toggleswitch3")) {
 	    size_t length = strlen(styleName);
-	    char *styleName2 = (char *)Tcl_Alloc(length + 1);
+	    char *styleName2 = (char *)ckalloc(length + 1);
 	    const char *sizeStr = Tcl_GetString(tglswPtr->tglsw.sizeObj);
 
 	    memcpy(styleName2, styleName, length + 1);
@@ -188,7 +188,7 @@ static int TglswitchConfigure(Tcl_Interp *interp, void *recordPtr, int mask)
 	    tglswPtr->core.styleObj = Tcl_NewStringObj(styleName2, -1);
 	    Tcl_IncrRefCount(tglswPtr->core.styleObj);
 
-	    Tcl_Free(styleName2);
+	    ckfree(styleName2);
 
 	    /*
 	     * Update the layout according to the new style
@@ -221,7 +221,7 @@ static int TglswitchConfigure(Tcl_Interp *interp, void *recordPtr, int mask)
 	}
     }
 
-    if (!TkObjIsEmpty(variableObj)) {
+    if (variableObj != NULL && *Tcl_GetString(variableObj) != '\0') {
 	varTrace = Ttk_TraceVariable(interp, variableObj,
 		TglswitchVariableChanged, recordPtr);
 	if (!varTrace) {
@@ -514,7 +514,7 @@ static int TglswitchSwitchstateCommand(
 	}
 	Tcl_IncrRefCount(tglswPtr->tglsw.curValObj);
 
-	if (!TkObjIsEmpty(variableObj)) {
+	if (variableObj != NULL && *Tcl_GetString(variableObj) != '\0') {
 	    /*
 	     * Update the associated variable
 	     */

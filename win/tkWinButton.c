@@ -208,7 +208,7 @@ TkpCreateButton(
 {
     WinButton *butPtr;
 
-    butPtr = (WinButton *)Tcl_Alloc(sizeof(WinButton));
+    butPtr = (WinButton *)ckalloc(sizeof(WinButton));
     butPtr->hwnd = NULL;
     return (TkButton *) butPtr;
 }
@@ -448,7 +448,7 @@ TkpDrawIndicator(
 	 */
 
 	svgDataLen = strlen(svgDataPtr);
-	svgDataCopy = (char *)Tcl_AttemptAlloc(svgDataLen + 1);
+	svgDataCopy = (char *)attemptckalloc(svgDataLen + 1);
 	if (svgDataCopy == NULL) {
 	    return;
 	}
@@ -487,15 +487,15 @@ TkpDrawIndicator(
 
 	cmdFmt = "image create photo %s -format $::tk::svgFmt -data {%s}";
 	scriptSize = strlen(cmdFmt) + strlen(imgName) + svgDataLen;
-	script = (char *)Tcl_AttemptAlloc(scriptSize);
+	script = (char *)attemptckalloc(scriptSize);
 	if (script == NULL) {
-	    Tcl_Free(svgDataCopy);
+	    ckfree(svgDataCopy);
 	    return;
 	}
 	snprintf(script, scriptSize, cmdFmt, imgName, svgDataCopy);
-	Tcl_Free(svgDataCopy);
+	ckfree(svgDataCopy);
 	code = Tcl_EvalEx(interp, script, TCL_INDEX_NONE, TCL_EVAL_GLOBAL);
-	Tcl_Free(script);
+	ckfree(script);
 	if (code != TCL_OK) {
 	    Tcl_BackgroundException(interp, code);
 	    return;

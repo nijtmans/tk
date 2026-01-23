@@ -18,6 +18,7 @@
 #include <oleacc.h>
 #include <oaidl.h>
 #include <oleauto.h>
+#include <UIAutomation.h>
 
 #include <initguid.h>
 #include <tlhelp32.h>
@@ -248,14 +249,14 @@ static int GetChildIdForTkWindow(Tk_Window win, Tcl_HashTable *childIdTable);
 Tk_Window GetToplevelOfWidget(Tk_Window tkwin);
 static Tcl_HashTable *GetChildIdTableForToplevel(Tk_Window toplevel);
 Tk_Window GetTkWindowForChildId(int id, Tk_Window toplevel);
-int IsScreenReaderRunning(void *clientData, Tcl_Interp *interp, Tcl_Size objc, Tcl_Obj *const *objv);
-static int EmitSelectionChanged(void *clientData,Tcl_Interp *ip, Tcl_Size objc, Tcl_Obj *const *objv);
-static int EmitFocusChanged(void *cd, Tcl_Interp *interp, Tcl_Size objc, Tcl_Obj *const *objv);
+int IsScreenReaderRunning(void *clientData, Tcl_Interp *interp, int argc, Tcl_Obj *const argv[]);
+static int EmitSelectionChanged(void *clientData,Tcl_Interp *ip, int objc, Tcl_Obj *const objv[]);
+static int EmitFocusChanged(void *cd, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[]);
 void TkRootAccessible_RegisterForCleanup(Tk_Window tkwin, void *tkAccessible);
 static void TkRootAccessible_DestroyHandler(void *clientData, XEvent *eventPtr);
 static void AssignChildIdsRecursive(Tk_Window win, int *nextId, Tcl_Interp *interp, Tk_Window toplevel);
 void InitAccessibilityMainThread(void);
-int TkRootAccessibleObjCmd(void *clientData, Tcl_Interp *interp, Tcl_Size objc, Tcl_Obj *const *objv);
+int TkRootAccessibleObjCmd(void *clientData, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[]);
 int TkWinAccessiblity_Init(Tcl_Interp *interp);
 
 /*
@@ -267,8 +268,7 @@ int TkWinAccessiblity_Init(Tcl_Interp *interp);
  */
 
 /* Empty stub functions required by MSAA. */
-HRESULT STDMETHODCALLTYPE
-TkRootAccessible_get_accHelpTopic(
+HRESULT STDMETHODCALLTYPE TkRootAccessible_get_accHelpTopic(
     TCL_UNUSED(IAccessible *), /* this */
     TCL_UNUSED(BSTR *), /* pszHelpFile */
     TCL_UNUSED(VARIANT), /* varChild */
@@ -277,8 +277,7 @@ TkRootAccessible_get_accHelpTopic(
     return E_NOTIMPL;
 }
 
-HRESULT STDMETHODCALLTYPE
-TkRootAccessible_get_accKeyboardShortcut(
+HRESULT STDMETHODCALLTYPE TkRootAccessible_get_accKeyboardShortcut(
     TCL_UNUSED(IAccessible *), /* this */
     TCL_UNUSED(VARIANT), /* varChild */
     TCL_UNUSED(BSTR *)) /* pszKeyboardShortcut */
@@ -286,16 +285,14 @@ TkRootAccessible_get_accKeyboardShortcut(
     return E_NOTIMPL;
 }
 
-HRESULT STDMETHODCALLTYPE
-TkRootAccessible_get_accSelection(
+HRESULT STDMETHODCALLTYPE TkRootAccessible_get_accSelection(
     TCL_UNUSED(IAccessible *), /* this */
     TCL_UNUSED(VARIANT *)) /*pvarChildren */
 {
     return E_NOTIMPL;
 }
 
-HRESULT STDMETHODCALLTYPE
-TkRootAccessible_accNavigate(
+HRESULT STDMETHODCALLTYPE TkRootAccessible_accNavigate(
     TCL_UNUSED(IAccessible *), /* this */
     TCL_UNUSED(long), /* navDir */
     TCL_UNUSED(VARIANT), /* varStart */
@@ -304,8 +301,7 @@ TkRootAccessible_accNavigate(
     return E_NOTIMPL;
 }
 
-HRESULT STDMETHODCALLTYPE
-TkRootAccessible_accHitTest(
+HRESULT STDMETHODCALLTYPE TkRootAccessible_accHitTest(
     TCL_UNUSED(IAccessible *), /* this */
     TCL_UNUSED(long), /* xLeft */
     TCL_UNUSED(long), /* yTop */
@@ -314,8 +310,7 @@ TkRootAccessible_accHitTest(
     return E_NOTIMPL;
 }
 
-HRESULT STDMETHODCALLTYPE
-TkRootAccessible_put_accName(
+HRESULT STDMETHODCALLTYPE TkRootAccessible_put_accName(
     TCL_UNUSED(IAccessible *), /* this */
     TCL_UNUSED(VARIANT), /* varChild */
     TCL_UNUSED(BSTR)) /* szName */
@@ -323,8 +318,7 @@ TkRootAccessible_put_accName(
     return E_NOTIMPL;
 }
 
-HRESULT STDMETHODCALLTYPE
-TkRootAccessible_put_accValue(
+HRESULT STDMETHODCALLTYPE TkRootAccessible_put_accValue(
     TCL_UNUSED(IAccessible *), /* this */
     TCL_UNUSED(VARIANT), /* varChild */
     TCL_UNUSED(BSTR)) /* szValue */
@@ -340,8 +334,7 @@ TkRootAccessible_put_accValue(
  *----------------------------------------------------------------------
  */
 
-static HRESULT STDMETHODCALLTYPE
-TkRootAccessible_QueryInterface(
+static HRESULT STDMETHODCALLTYPE TkRootAccessible_QueryInterface(
     IAccessible *this,
     REFIID riid,
     void **ppvObject)
@@ -357,8 +350,7 @@ TkRootAccessible_QueryInterface(
 }
 
 /* Function to add memory reference to the MSAA object. */
-static ULONG STDMETHODCALLTYPE
-TkRootAccessible_AddRef(
+static ULONG STDMETHODCALLTYPE TkRootAccessible_AddRef(
     IAccessible *this)
 {
     if (!this) return E_INVALIDARG;
@@ -367,8 +359,7 @@ TkRootAccessible_AddRef(
 }
 
 /* Function to free the MSAA object. */
-static ULONG STDMETHODCALLTYPE
-TkRootAccessible_Release(
+static ULONG STDMETHODCALLTYPE TkRootAccessible_Release(
     IAccessible *this)
 {
     if (!this) return E_INVALIDARG;
@@ -383,18 +374,17 @@ TkRootAccessible_Release(
 	    }
 	}
 	if (tkAccessible->pathName) {
-	    Tcl_Free(tkAccessible->pathName);
+	    ckfree(tkAccessible->pathName);
 	    tkAccessible->pathName = NULL;
 	}
-	Tcl_Free(tkAccessible);
+	ckfree(tkAccessible);
 	TkGlobalUnlock();
     }
     return count;
 }
 
 /* The number of type information interfaces provided by the object. */
-static HRESULT STDMETHODCALLTYPE
-TkRootAccessible_GetTypeInfoCount(
+static HRESULT STDMETHODCALLTYPE TkRootAccessible_GetTypeInfoCount(
     TCL_UNUSED(IAccessible *), /* this */
     UINT *pctinfo)
 {
@@ -407,8 +397,7 @@ TkRootAccessible_GetTypeInfoCount(
  * Retrieves the type information for an object, which can then be used
  * to get the type information for an interface.
  */
-static HRESULT STDMETHODCALLTYPE
-TkRootAccessible_GetTypeInfo(
+static HRESULT STDMETHODCALLTYPE TkRootAccessible_GetTypeInfo(
     TCL_UNUSED(IAccessible *), /* this */
     UINT iTInfo,
     LCID lcid,
@@ -436,8 +425,7 @@ TkRootAccessible_GetTypeInfo(
  * corresponding set of integer DISPIDs, which can be used on subsequent calls
  * to Invoke.
  */
-static HRESULT STDMETHODCALLTYPE
-TkRootAccessible_GetIDsOfNames(
+static HRESULT STDMETHODCALLTYPE TkRootAccessible_GetIDsOfNames(
     IAccessible *this,
     TCL_UNUSED(REFIID), /* riid */
     LPOLESTR *rgszNames,
@@ -456,8 +444,7 @@ TkRootAccessible_GetIDsOfNames(
 }
 
 /* Provides access to properties and methods exposed by an MSAA object. */
-static HRESULT STDMETHODCALLTYPE
-TkRootAccessible_Invoke(
+static HRESULT STDMETHODCALLTYPE TkRootAccessible_Invoke(
     IAccessible *this,
     DISPID dispIdMember,
     TCL_UNUSED(REFIID), /* riid */
@@ -504,8 +491,7 @@ TkRootAccessible_Invoke(
  * and Narrator.
  */
 
-static HRESULT STDMETHODCALLTYPE
-TkRootAccessible_get_accName(
+static HRESULT STDMETHODCALLTYPE TkRootAccessible_get_accName(
     IAccessible *this,
     VARIANT varChild,
     BSTR *pszName)
@@ -524,17 +510,17 @@ TkRootAccessible_get_accName(
     if (varChild.vt == VT_I4 && varChild.lVal == CHILDID_SELF) {
 	HWND hwnd = Tk_GetHWND(Tk_WindowId(tkAccessible->toplevel));
 	int wlen = GetWindowTextLengthW(hwnd);
-	WCHAR *wbuf = (WCHAR *)Tcl_Alloc((wlen + 1) * sizeof(WCHAR));
+	WCHAR *wbuf = (WCHAR *)ckalloc((wlen + 1) * sizeof(WCHAR));
 
 	/* Read the actual UTF-16 title. */
 	if (!GetWindowTextW(hwnd, wbuf, wlen + 1)) {
-	    Tcl_Free(wbuf);
+	    ckfree((char *)wbuf);
 	    *pszName = SysAllocString(L"");
 	    TkGlobalUnlock();
 	    return S_OK;
 	}
 	*pszName = SysAllocString(wbuf);
-	Tcl_Free(wbuf);
+	ckfree((char *)wbuf);
 	TkGlobalUnlock();
 	return S_OK;
     }
@@ -543,7 +529,7 @@ TkRootAccessible_get_accName(
     /* Child widgets - return description. */
     if (varChild.vt == VT_I4 && varChild.lVal > 0) {
 	Tk_Window child = GetTkWindowForChildId(varChild.lVal, tkAccessible->toplevel);
-	if (child) {
+	if (child) {            
 	    HRESULT hr = TkAccDescription(child, pszName);
 	    TkGlobalUnlock();
 	    return hr;
@@ -555,8 +541,7 @@ TkRootAccessible_get_accName(
 }
 
 /* Function to map accessible role to MSAA. For toplevels, return ROLE_SYSTEM_WINDOW. */
-static HRESULT STDMETHODCALLTYPE
-TkRootAccessible_get_accRole(
+static HRESULT STDMETHODCALLTYPE TkRootAccessible_get_accRole(
     IAccessible *this,
     VARIANT varChild,
     VARIANT *pvarRole)
@@ -585,8 +570,7 @@ TkRootAccessible_get_accRole(
 }
 
 /* Function to map accessible state to MSAA. For toplevel, return STATE_SYSTEM_FOCUSABLE. */
-static HRESULT STDMETHODCALLTYPE
-TkRootAccessible_get_accState(
+static HRESULT STDMETHODCALLTYPE TkRootAccessible_get_accState(
     IAccessible *this,
     VARIANT varChild,
     VARIANT *pvarState)
@@ -615,8 +599,7 @@ TkRootAccessible_get_accState(
 }
 
 /* Function to map accessible value to MSAA. For toplevel, return NULL. */
-static HRESULT STDMETHODCALLTYPE
-TkRootAccessible_get_accValue(
+static HRESULT STDMETHODCALLTYPE TkRootAccessible_get_accValue(
     IAccessible *this,
     VARIANT varChild,
     BSTR *pszValue)
@@ -644,8 +627,7 @@ TkRootAccessible_get_accValue(
 }
 
 /* Function to get accessible parent. For toplevel, return NULL. */
-static HRESULT STDMETHODCALLTYPE
-TkRootAccessible_get_accParent(
+static HRESULT STDMETHODCALLTYPE TkRootAccessible_get_accParent(
     TCL_UNUSED(IAccessible *), /* this */
     IDispatch **ppdispParent)
 {
@@ -655,8 +637,7 @@ TkRootAccessible_get_accParent(
 }
 
 /* Function to get number of accessible children to MSAA. */
-static HRESULT STDMETHODCALLTYPE
-TkRootAccessible_get_accChildCount(
+static HRESULT STDMETHODCALLTYPE TkRootAccessible_get_accChildCount(
     IAccessible *this,
     LONG *pcChildren)
 {
@@ -676,8 +657,7 @@ TkRootAccessible_get_accChildCount(
 }
 
 /* Function to get accessible children to MSAA. */
-static HRESULT STDMETHODCALLTYPE
-TkRootAccessible_get_accChild(
+static HRESULT STDMETHODCALLTYPE TkRootAccessible_get_accChild(
     IAccessible *this,
     VARIANT varChild,
     IDispatch **ppdispChild)
@@ -705,8 +685,7 @@ TkRootAccessible_get_accChild(
 }
 
 /* Function to get accessible frame to MSAA. */
-static HRESULT STDMETHODCALLTYPE
-TkRootAccessible_accLocation(
+static HRESULT STDMETHODCALLTYPE TkRootAccessible_accLocation(
     IAccessible *this,
     LONG *pxLeft,
     LONG *pyTop,
@@ -755,8 +734,7 @@ TkRootAccessible_accLocation(
 }
 
 /* Function to set accessible selection on Tk widget. */
-static HRESULT STDMETHODCALLTYPE
-TkRootAccessible_accSelect(
+static HRESULT STDMETHODCALLTYPE TkRootAccessible_accSelect(
     TCL_UNUSED(IAccessible *), /* this */
     TCL_UNUSED(long), /* flags */
     TCL_UNUSED(VARIANT)) /* varChild */
@@ -765,8 +743,7 @@ TkRootAccessible_accSelect(
 }
 
 /* Function to return default action for role. */
-static HRESULT STDMETHODCALLTYPE
-TkRootAccessible_get_accDefaultAction(
+static HRESULT STDMETHODCALLTYPE TkRootAccessible_get_accDefaultAction(
     IAccessible *this,
     VARIANT varChild,
     BSTR *pszDefaultAction)
@@ -814,8 +791,7 @@ TkRootAccessible_get_accDefaultAction(
 
 
 /* Function to get button press to MSAA. */
-static HRESULT STDMETHODCALLTYPE
-TkRootAccessible_accDoDefaultAction(
+static HRESULT STDMETHODCALLTYPE TkRootAccessible_accDoDefaultAction(
     TCL_UNUSED(IAccessible *), /* this */
     VARIANT varChild)
 {
@@ -831,8 +807,7 @@ TkRootAccessible_accDoDefaultAction(
 }
 
 /* Function to get accessible help to MSAA. */
-static HRESULT STDMETHODCALLTYPE
-TkRootAccessible_get_accHelp(
+static HRESULT STDMETHODCALLTYPE TkRootAccessible_get_accHelp(
     IAccessible *this,
     VARIANT varChild,
     BSTR* pszHelp)
@@ -859,8 +834,7 @@ TkRootAccessible_get_accHelp(
 }
 
 /* Function to get accessible focus to MSAA. */
-static HRESULT STDMETHODCALLTYPE
-TkRootAccessible_get_accFocus(
+static HRESULT STDMETHODCALLTYPE TkRootAccessible_get_accFocus(
     IAccessible *this,
     VARIANT *pvarChild)
 {
@@ -882,8 +856,7 @@ TkRootAccessible_get_accFocus(
 /*
  * Function to get accessible description to MSAA.
  */
-static HRESULT STDMETHODCALLTYPE
-TkRootAccessible_get_accDescription(
+static HRESULT STDMETHODCALLTYPE TkRootAccessible_get_accDescription(
 	IAccessible *this,
 	VARIANT varChild,
 	BSTR *pszDescription)
@@ -923,8 +896,7 @@ TkRootAccessible_get_accDescription(
  */
 
 /* Function to map accessible role to MSAA. */
-static HRESULT
-TkAccRole(
+static HRESULT TkAccRole(
     Tk_Window win,
     VARIANT *pvarRole)
 {
@@ -1131,8 +1103,7 @@ cache_and_notify:
 }
 
 /* Function to map accessible state to MSAA. */
-static HRESULT
-TkAccState(
+static HRESULT TkAccState(
     Tk_Window win,
     VARIANT *pvarState)
 {
@@ -1184,8 +1155,7 @@ TkAccState(
 }
 
 /* Function to map accessible value to MSAA. */
-static HRESULT
-TkAccValue(
+static HRESULT TkAccValue(
     Tk_Window win,
     BSTR *pValue)
 {
@@ -1204,8 +1174,7 @@ TkAccValue(
 }
 
 /* Event proc which calls the ActionEventProc procedure. */
-static int
-ActionEventProc(
+static int ActionEventProc(
     Tcl_Event *ev,
     TCL_UNUSED(int)) /* flags */
 {
@@ -1215,13 +1184,12 @@ ActionEventProc(
     if (!interp) return 1;
     int code = Tcl_EvalEx(interp, event->command, -1, TCL_EVAL_GLOBAL);
     if (code != TCL_OK) return TCL_ERROR;
-    Tcl_Free(event->command);
+    ckfree(event->command);
     return 1;
 }
 
 /* Function to get button press to MSAA. */
-static void
-TkDoDefaultAction(
+static void TkDoDefaultAction(
     TCL_UNUSED(int), /* num_args */
     void **args)
 {
@@ -1278,14 +1246,14 @@ TkDoDefaultAction(
 	mainThreadResult = E_INVALIDARG;
 	return;
     }
-    event = (ActionEvent *)Tcl_Alloc(sizeof(ActionEvent));
+    event = (ActionEvent *)ckalloc(sizeof(ActionEvent));
     if (event == NULL) {
 	TkGlobalUnlock();
 	mainThreadResult = E_OUTOFMEMORY;
 	return;
     }
     event->header.proc = ActionEventProc;
-    event->command = (char *)Tcl_Alloc(strlen(action) + 1);
+    event->command = ckalloc(strlen(action) + 1);
     strcpy(event->command, action);
     event->win = win;
 
@@ -1299,8 +1267,7 @@ TkDoDefaultAction(
 }
 
 /* Function to get MSAA focus. */
-static void
-TkAccFocus(
+static void TkAccFocus(
     TCL_UNUSED(int), /* num_args */
     void **args)
 {
@@ -1336,8 +1303,7 @@ TkAccFocus(
 }
 
 /* Function to get MSAA description. */
-static HRESULT
-TkAccDescription(
+static HRESULT TkAccDescription(
     Tk_Window win,
     BSTR *pDesc)
 {
@@ -1356,8 +1322,7 @@ TkAccDescription(
 }
 
 /* Function to get MSAA help. */
-static HRESULT
-TkAccHelp(
+static HRESULT TkAccHelp(
     Tk_Window win,
     BSTR *pszHelp)
 {
@@ -1376,9 +1341,7 @@ TkAccHelp(
 }
 
 /* Function to get number of child window objects. */
-static int
-TkAccChildCount(
-    Tk_Window win)
+static int TkAccChildCount(Tk_Window win)
 {
     if (!win) return -1;
     int count = 0;
@@ -1447,14 +1410,14 @@ static TkRootAccessible *CreateRootAccessible(
 	return NULL;
     }
     Tk_MakeWindowExist(win);
-    TkRootAccessible *tkAccessible = (TkRootAccessible *)Tcl_Alloc(sizeof(TkRootAccessible));
+    TkRootAccessible *tkAccessible = (TkRootAccessible *)ckalloc(sizeof(TkRootAccessible));
     if (!tkAccessible) {
 	Tcl_SetResult(interp, "Memory allocation failed for TkRootAccessible", TCL_STATIC);
 	return NULL;
     }
-    tkAccessible->pathName = (char *)Tcl_Alloc(strlen(pathName) + 1);
+    tkAccessible->pathName = ckalloc(strlen(pathName) + 1);
     if (!tkAccessible->pathName) {
-	Tcl_Free(tkAccessible);
+	ckfree(tkAccessible);
 	Tcl_SetResult(interp, "Memory allocation failed for pathName", TCL_STATIC);
 	return NULL;
     }
@@ -1553,7 +1516,7 @@ static Tcl_HashTable *GetChildIdTableForToplevel(
     TkGlobalLock();
     entry = Tcl_CreateHashEntry(toplevelChildTables, toplevel, &newEntry);
     if (newEntry) {
-	childIdTable = (Tcl_HashTable *)Tcl_Alloc(sizeof(Tcl_HashTable));
+	childIdTable = (Tcl_HashTable *)ckalloc(sizeof(Tcl_HashTable));
 	if (!childIdTable) {
 	    TkGlobalUnlock();
 	    return NULL;
@@ -1586,7 +1549,7 @@ Tk_Window GetToplevelOfWidget(
 void InitTkAccessibleTable(void)
 {
     if (!tkAccessibleTableInitialized) {
-	tkAccessibleTable = (Tcl_HashTable *)Tcl_Alloc(sizeof(Tcl_HashTable));
+	tkAccessibleTable = (Tcl_HashTable *)ckalloc(sizeof(Tcl_HashTable));
 	if (tkAccessibleTable) {
 	    Tcl_InitHashTable(tkAccessibleTable, TCL_ONE_WORD_KEYS);
 	    tkAccessibleTableInitialized = true;
@@ -1598,7 +1561,7 @@ void InitTkAccessibleTable(void)
 void InitChildIdTable(void)
 {
     if (!toplevelChildTables) {
-	toplevelChildTables = (Tcl_HashTable *)Tcl_Alloc(sizeof(Tcl_HashTable));
+	toplevelChildTables = (Tcl_HashTable *)ckalloc(sizeof(Tcl_HashTable));
 	if (toplevelChildTables) {
 	    Tcl_InitHashTable(toplevelChildTables, TCL_ONE_WORD_KEYS);
 	}
@@ -1620,7 +1583,7 @@ void ClearChildIdTableForToplevel(
 	Tcl_DeleteHashEntry(childEntry);
     }
     Tcl_DeleteHashEntry(entry); /* Remove toplevel entry to prevent memory leaks. */
-    Tcl_Free(childIdTable);
+    ckfree(childIdTable);
     TkGlobalUnlock();
 }
 
@@ -1717,7 +1680,7 @@ int ExecuteOnMainThreadSync(
     case 5: event->func(5, event->args); break;
     }
     SetEvent(event->doneEvent);
-    Tcl_Free(event);
+    ckfree(event);
     return 1;
 }
 
@@ -1737,14 +1700,14 @@ void RunOnMainThreadSync(
 	func(num_args, args);
 	return;
     }
-    MainThreadSyncEvent *event = (MainThreadSyncEvent *)Tcl_Alloc(sizeof(MainThreadSyncEvent));
+    MainThreadSyncEvent *event = (MainThreadSyncEvent *)ckalloc(sizeof(MainThreadSyncEvent));
     if (!event) return;
     event->header.proc = ExecuteOnMainThreadSync;
     event->func = func;
     event->num_args = num_args;
     event->doneEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
     if (!event->doneEvent) {
-	Tcl_Free(event);
+	ckfree(event);
 	return;
     }
     va_list ap;
@@ -1758,7 +1721,7 @@ void RunOnMainThreadSync(
     DWORD result = WaitForSingleObject(event->doneEvent, 500);
     if (result == WAIT_TIMEOUT) {
 	CloseHandle(event->doneEvent);
-	Tcl_Free(event);
+	ckfree(event);
     }
     CloseHandle(event->doneEvent);
 }
@@ -1808,7 +1771,7 @@ void EnsureGlobalLockInitialized(void)
 int IsScreenReaderRunning(
     TCL_UNUSED(void *), /* clientData */
     Tcl_Interp *interp,
-    TCL_UNUSED(Tcl_Size), /* objc */
+    TCL_UNUSED(int), /* objc */
     TCL_UNUSED(Tcl_Obj *const *)) /* objv */
 {
     BOOL screenReader = FALSE;
@@ -1857,8 +1820,8 @@ int IsScreenReaderRunning(
 static int EmitSelectionChanged(
     TCL_UNUSED(void *), /* clientData */
     Tcl_Interp *ip,
-    Tcl_Size objc,
-    Tcl_Obj *const *objv)
+    int objc,
+    Tcl_Obj *const objv[])
 {
     if (objc < 2) {
 	Tcl_WrongNumArgs(ip, 1, objv, "window?");
@@ -1980,8 +1943,8 @@ static void TkRootAccessible_DestroyHandler(
 static int EmitFocusChanged(
     TCL_UNUSED(void *), /* cd */
     Tcl_Interp *interp,
-    Tcl_Size objc,
-    Tcl_Obj *const *objv)
+    int objc,
+    Tcl_Obj *const objv[])
 {
     if (objc < 2) {
 	Tcl_WrongNumArgs(interp, 1, objv, "window");
@@ -2039,8 +2002,8 @@ static int EmitFocusChanged(
 int TkRootAccessibleObjCmd(
     TCL_UNUSED(void *), /* clientData */
     Tcl_Interp *interp,
-    Tcl_Size objc,
-    Tcl_Obj *const *objv)
+    int objc,
+    Tcl_Obj *const objv[])
 {
     if (objc != 2) {
 	Tcl_WrongNumArgs(interp, 1, objv, "window");
@@ -2112,10 +2075,10 @@ int TkWinAccessiblity_Init(
     TkGlobalUnlock();
 
     /* Initialize Tcl commands. */
-    Tcl_CreateObjCommand2(interp, "::tk::accessible::add_acc_object", TkRootAccessibleObjCmd, NULL, NULL);
-    Tcl_CreateObjCommand2(interp, "::tk::accessible::emit_selection_change", EmitSelectionChanged, NULL, NULL);
-    Tcl_CreateObjCommand2(interp, "::tk::accessible::emit_focus_change", EmitFocusChanged, NULL, NULL);
-    Tcl_CreateObjCommand2(interp, "::tk::accessible::check_screenreader", IsScreenReaderRunning, NULL, NULL);
+    Tcl_CreateObjCommand(interp, "::tk::accessible::add_acc_object", TkRootAccessibleObjCmd, NULL, NULL);
+    Tcl_CreateObjCommand(interp, "::tk::accessible::emit_selection_change", EmitSelectionChanged, NULL, NULL);
+    Tcl_CreateObjCommand(interp, "::tk::accessible::emit_focus_change", EmitFocusChanged, NULL, NULL);
+    Tcl_CreateObjCommand(interp, "::tk::accessible::check_screenreader", IsScreenReaderRunning, NULL, NULL);
     return TCL_OK;
 }
 

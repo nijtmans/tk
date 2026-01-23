@@ -389,7 +389,7 @@ int
 Tk_FrameObjCmd(
     void *clientData,	/* Either NULL or pointer to option table. */
     Tcl_Interp *interp,		/* Current interpreter. */
-    Tcl_Size objc,			/* Number of arguments. */
+    int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
     return TkCreateFrame(clientData, interp, objc, objv, TYPE_FRAME, NULL);
@@ -399,7 +399,7 @@ int
 Tk_ToplevelObjCmd(
     void *clientData,	/* Either NULL or pointer to option table. */
     Tcl_Interp *interp,		/* Current interpreter. */
-    Tcl_Size objc,			/* Number of arguments. */
+    int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
     return TkCreateFrame(clientData, interp, objc, objv, TYPE_TOPLEVEL, NULL);
@@ -409,7 +409,7 @@ int
 Tk_LabelframeObjCmd(
     void *clientData,	/* Either NULL or pointer to option table. */
     Tcl_Interp *interp,		/* Current interpreter. */
-    Tcl_Size objc,			/* Number of arguments. */
+    int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
     return TkCreateFrame(clientData, interp, objc, objv, TYPE_LABELFRAME, NULL);
@@ -612,10 +612,10 @@ TkCreateFrame(
      */
 
     if (type == TYPE_LABELFRAME) {
-	framePtr = (Frame *)Tcl_Alloc(sizeof(Labelframe));
+	framePtr = (Frame *)ckalloc(sizeof(Labelframe));
 	memset(framePtr, 0, sizeof(Labelframe));
     } else {
-	framePtr = (Frame *)Tcl_Alloc(sizeof(Frame));
+	framePtr = (Frame *)ckalloc(sizeof(Frame));
 	memset(framePtr, 0, sizeof(Frame));
     }
     framePtr->tkwin = newWin;
@@ -845,7 +845,7 @@ DestroyFrame(
     if (framePtr->bgimg) {
 	Tk_FreeImage(framePtr->bgimg);
     }
-    Tcl_Free(framePtr);
+    ckfree(framePtr);
 }
 
 /*

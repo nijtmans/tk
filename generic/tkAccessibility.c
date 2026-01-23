@@ -6,8 +6,8 @@
  *      in hash tables that can be accessed on any platform. This core Tk API
  *      is backed by platform-specific implementations.
  *
- * Copyright (c) 2024-2025 Kevin Walzer
- * Copyright (c) 2024 Emiliano Gavilan
+ * Copyright (c) 2024-2025 Kevin Walzer.
+ * Copyright (c) 2024 Emiliano Gavilan.
  *
  * See the file "license.terms" for information on usage and redistribution of
  * this file, and for a DISCLAIMER OF ALL WARRANTIES.
@@ -21,33 +21,33 @@
 Tcl_HashTable *TkAccessibilityObject = NULL;
 
 int     Tk_SetAccessibleRole(TCL_UNUSED(void *),Tcl_Interp *ip,
-			     Tcl_Size objc, Tcl_Obj *const objv[]);
+			     int objc, Tcl_Obj *const objv[]);
 int     Tk_SetAccessibleName(TCL_UNUSED(void *),Tcl_Interp *ip,
-			     Tcl_Size objc, Tcl_Obj *const objv[]);
+			     int objc, Tcl_Obj *const objv[]);
 int     Tk_SetAccessibleDescription(TCL_UNUSED(void *),Tcl_Interp *ip,
-				    Tcl_Size objc, Tcl_Obj *const objv[]);
+				    int objc, Tcl_Obj *const objv[]);
 int     Tk_SetAccessibleState (TCL_UNUSED(void *),Tcl_Interp *ip,
-			       Tcl_Size objc, Tcl_Obj *const objv[]);
+			       int objc, Tcl_Obj *const objv[]);
 int     Tk_SetAccessibleValue(TCL_UNUSED(void *),Tcl_Interp *ip,
-			      Tcl_Size objc, Tcl_Obj *const objv[]);
+			      int objc, Tcl_Obj *const objv[]);
 int     Tk_SetAccessibleAction(TCL_UNUSED(void *),Tcl_Interp *ip,
-			       Tcl_Size objc, Tcl_Obj *const objv[]);
+			       int objc, Tcl_Obj *const objv[]);
 int     Tk_SetAccessibleHelp(TCL_UNUSED(void *),Tcl_Interp *ip,
-			     Tcl_Size objc, Tcl_Obj *const objv[]);
+			     int objc, Tcl_Obj *const objv[]);
 int     Tk_GetAccessibleRole(TCL_UNUSED(void *),Tcl_Interp *ip,
-			     Tcl_Size objc, Tcl_Obj *const objv[]);
+			     int objc, Tcl_Obj *const objv[]);
 int     Tk_GetAccessibleName(TCL_UNUSED(void *),Tcl_Interp *ip,
-			     Tcl_Size objc, Tcl_Obj *const objv[]);
+			     int objc, Tcl_Obj *const objv[]);
 int     Tk_GetAccessibleDescription(TCL_UNUSED(void *),Tcl_Interp *ip,
-				    Tcl_Size objc, Tcl_Obj *const objv[]);
+				    int objc, Tcl_Obj *const objv[]);
 int     Tk_GetAccessibleState(TCL_UNUSED(void *),Tcl_Interp *ip,
-			      Tcl_Size objc, Tcl_Obj *const objv[]);
+			      int objc, Tcl_Obj *const objv[]);
 int     Tk_GetAccessibleValue(TCL_UNUSED(void *),Tcl_Interp *ip,
-			      Tcl_Size objc, Tcl_Obj *const objv[]);
+			      int objc, Tcl_Obj *const objv[]);
 int     Tk_GetAccessibleAction(TCL_UNUSED(void *),Tcl_Interp *ip,
-			       Tcl_Size objc, Tcl_Obj *const objv[]);
+			       int objc, Tcl_Obj *const objv[]);
 int     Tk_GetAccessibleHelp(TCL_UNUSED(void *),Tcl_Interp *ip,
-			     Tcl_Size objc, Tcl_Obj *const objv[]);
+			     int objc, Tcl_Obj *const objv[]);
 void    TkAccessibility_Cleanup(ClientData clientData);
 /* Cleanup proc when the window is destroyed. */
 static  Tk_EventProc WindowDestroyHandler;
@@ -74,7 +74,7 @@ int
 Tk_SetAccessibleRole(
 		     TCL_UNUSED(void *),
 		     Tcl_Interp *ip,		/* Current interpreter. */
-		     Tcl_Size objc,			/* Number of arguments. */
+		     int objc,			/* Number of arguments. */
 		     Tcl_Obj *const objv[])	/* Argument objects. */
 {
   if (objc < 3) {
@@ -99,7 +99,7 @@ Tk_SetAccessibleRole(
    */
   hPtr=Tcl_CreateHashEntry(TkAccessibilityObject, win, &isNew);
   if (isNew) {
-    AccessibleAttributes = (Tcl_HashTable *)Tcl_Alloc(sizeof(Tcl_HashTable));
+    AccessibleAttributes = (Tcl_HashTable *)ckalloc(sizeof(Tcl_HashTable));
     Tcl_InitHashTable(AccessibleAttributes,TCL_STRING_KEYS);
     Tcl_SetHashValue(hPtr, AccessibleAttributes);
     Tk_CreateEventHandler(win, StructureNotifyMask, WindowDestroyHandler, win);
@@ -110,12 +110,12 @@ Tk_SetAccessibleRole(
   /* Set accessible role for window.  */
   hPtr2 =  Tcl_CreateHashEntry(AccessibleAttributes, "role", &isNew);
   if (!isNew) {
-    Tcl_DecrRefCount((Tcl_Obj *)Tcl_GetHashValue(hPtr2));
+    Tcl_DecrRefCount(Tcl_GetHashValue(hPtr2));
   }
   Tcl_IncrRefCount(objv[2]);
   Tcl_SetHashValue(hPtr2, objv[2]);
 
-  Tcl_SetObjResult(ip, (Tcl_Obj *)Tcl_GetHashValue(hPtr2));
+  Tcl_SetObjResult(ip, Tcl_GetHashValue(hPtr2));
   return TCL_OK;
 }
 
@@ -143,7 +143,7 @@ int
 Tk_SetAccessibleName(
 		     TCL_UNUSED(void *),
 		     Tcl_Interp *ip,		/* Current interpreter. */
-		     Tcl_Size objc,			/* Number of arguments. */
+		     int objc,			/* Number of arguments. */
 		     Tcl_Obj *const objv[])	/* Argument objects. */
 {
   if (objc < 3) {
@@ -169,15 +169,15 @@ Tk_SetAccessibleName(
     return TCL_ERROR;
   }
 
-  AccessibleAttributes = (Tcl_HashTable *)Tcl_GetHashValue(hPtr);
+  AccessibleAttributes = Tcl_GetHashValue(hPtr);
   hPtr2 =  Tcl_CreateHashEntry(AccessibleAttributes, "name", &isNew);
   if (!isNew) {
-    Tcl_DecrRefCount((Tcl_Obj *)Tcl_GetHashValue(hPtr2));
+    Tcl_DecrRefCount(Tcl_GetHashValue(hPtr2));
   }
   Tcl_IncrRefCount(objv[2]);
   Tcl_SetHashValue(hPtr2, objv[2]);
 
-  Tcl_SetObjResult(ip, (Tcl_Obj *)Tcl_GetHashValue(hPtr2));
+  Tcl_SetObjResult(ip, Tcl_GetHashValue(hPtr2));
   return TCL_OK;
 }
 
@@ -204,7 +204,7 @@ int
 Tk_SetAccessibleDescription(
 			    TCL_UNUSED(void *),
 			    Tcl_Interp *ip,		/* Current interpreter. */
-			    Tcl_Size objc,			/* Number of arguments. */
+			    int objc,			/* Number of arguments. */
 			    Tcl_Obj *const objv[])	/* Argument objects. */
 {
   if (objc < 3) {
@@ -229,15 +229,15 @@ Tk_SetAccessibleDescription(
     Tcl_AppendResult(ip, "No table found. You must set the accessibility role first.", (char *) NULL);
     return TCL_ERROR;
   }
-  AccessibleAttributes = (Tcl_HashTable *)Tcl_GetHashValue(hPtr);
+  AccessibleAttributes = Tcl_GetHashValue(hPtr);
   hPtr2 =  Tcl_CreateHashEntry(AccessibleAttributes, "description", &isNew);
   if (!isNew) {
-    Tcl_DecrRefCount((Tcl_Obj *)Tcl_GetHashValue(hPtr2));
+    Tcl_DecrRefCount(Tcl_GetHashValue(hPtr2));
   }
   Tcl_IncrRefCount(objv[2]);
   Tcl_SetHashValue(hPtr2, objv[2]);
 
-  Tcl_SetObjResult(ip, (Tcl_Obj *)Tcl_GetHashValue(hPtr2));
+  Tcl_SetObjResult(ip, Tcl_GetHashValue(hPtr2));
   return TCL_OK;
 }
 
@@ -265,7 +265,7 @@ int
 Tk_SetAccessibleValue(
 		      TCL_UNUSED(void *),
 		      Tcl_Interp *ip,		/* Current interpreter. */
-		      Tcl_Size objc,			/* Number of arguments. */
+		      int objc,			/* Number of arguments. */
 		      Tcl_Obj *const objv[])	/* Argument objects. */
 {
   if (objc < 3) {
@@ -290,15 +290,15 @@ Tk_SetAccessibleValue(
     Tcl_AppendResult(ip, "No table found. You must set the accessibility role first.", (char *) NULL);
     return TCL_ERROR;
   }
-  AccessibleAttributes = (Tcl_HashTable *)Tcl_GetHashValue(hPtr);
+  AccessibleAttributes = Tcl_GetHashValue(hPtr);
   hPtr2 =  Tcl_CreateHashEntry(AccessibleAttributes, "value", &isNew);
   if (!isNew) {
-    Tcl_DecrRefCount((Tcl_Obj *)Tcl_GetHashValue(hPtr2));
+    Tcl_DecrRefCount(Tcl_GetHashValue(hPtr2));
   }
   Tcl_IncrRefCount(objv[2]);
   Tcl_SetHashValue(hPtr2, objv[2]);
 
-  Tcl_SetObjResult(ip, (Tcl_Obj *)Tcl_GetHashValue(hPtr2));
+  Tcl_SetObjResult(ip, Tcl_GetHashValue(hPtr2));
   return TCL_OK;
 }
 
@@ -324,7 +324,7 @@ int
 Tk_SetAccessibleState(
 		      TCL_UNUSED(void *),
 		      Tcl_Interp *ip,		/* Current interpreter. */
-		      Tcl_Size objc,			/* Number of arguments. */
+		      int objc,			/* Number of arguments. */
 		      Tcl_Obj *const objv[])	/* Argument objects. */
 {
   if (objc < 3) {
@@ -349,15 +349,15 @@ Tk_SetAccessibleState(
     Tcl_AppendResult(ip, "No table found. You must set the accessibility role first.", (char *) NULL);
     return TCL_ERROR;
   }
-  AccessibleAttributes = (Tcl_HashTable *)Tcl_GetHashValue(hPtr);
+  AccessibleAttributes = Tcl_GetHashValue(hPtr);
   hPtr2 =  Tcl_CreateHashEntry(AccessibleAttributes, "state", &isNew);
   if (!isNew) {
-    Tcl_DecrRefCount((Tcl_Obj *)Tcl_GetHashValue(hPtr2));
+    Tcl_DecrRefCount(Tcl_GetHashValue(hPtr2));
   }
   Tcl_IncrRefCount(objv[2]);
   Tcl_SetHashValue(hPtr2, objv[2]);
 
-  Tcl_SetObjResult(ip, (Tcl_Obj *)Tcl_GetHashValue(hPtr2));
+  Tcl_SetObjResult(ip, Tcl_GetHashValue(hPtr2));
   return TCL_OK;
 }
 
@@ -383,7 +383,7 @@ int
 Tk_SetAccessibleAction(
 		       TCL_UNUSED(void *),
 		       Tcl_Interp *ip,		/* Current interpreter. */
-		       Tcl_Size objc,			/* Number of arguments. */
+		       int objc,			/* Number of arguments. */
 		       Tcl_Obj *const objv[])	/* Argument objects. */
 
 {
@@ -409,15 +409,15 @@ Tk_SetAccessibleAction(
     Tcl_AppendResult(ip, "No table found. You must set the accessibility role first.", (char *) NULL);
     return TCL_ERROR;
   }
-  AccessibleAttributes = (Tcl_HashTable *)Tcl_GetHashValue(hPtr);
+  AccessibleAttributes = Tcl_GetHashValue(hPtr);
   hPtr2 =  Tcl_CreateHashEntry(AccessibleAttributes, "action", &isNew);
   if (!isNew) {
-    Tcl_DecrRefCount((Tcl_Obj *)Tcl_GetHashValue(hPtr2));
+    Tcl_DecrRefCount(Tcl_GetHashValue(hPtr2));
   }
   Tcl_IncrRefCount(objv[2]);
   Tcl_SetHashValue(hPtr2, objv[2]);
 
-  Tcl_SetObjResult(ip, (Tcl_Obj *)Tcl_GetHashValue(hPtr2));
+  Tcl_SetObjResult(ip, Tcl_GetHashValue(hPtr2));
   return TCL_OK;
 }
 
@@ -442,7 +442,7 @@ int
 Tk_SetAccessibleHelp(
 		     TCL_UNUSED(void *),
 		     Tcl_Interp *ip,		/* Current interpreter. */
-		     Tcl_Size objc,			/* Number of arguments. */
+		     int objc,			/* Number of arguments. */
 		     Tcl_Obj *const objv[])	/* Argument objects. */
 
 {
@@ -468,15 +468,15 @@ Tk_SetAccessibleHelp(
     Tcl_AppendResult(ip, "No table found. You must set the accessibility role first.", (char *) NULL);
     return TCL_ERROR;
   }
-  AccessibleAttributes = (Tcl_HashTable *)Tcl_GetHashValue(hPtr);
+  AccessibleAttributes = Tcl_GetHashValue(hPtr);
   hPtr2 =  Tcl_CreateHashEntry(AccessibleAttributes, "help", &isNew);
   if (!isNew) {
-    Tcl_DecrRefCount((Tcl_Obj *)Tcl_GetHashValue(hPtr2));
+    Tcl_DecrRefCount(Tcl_GetHashValue(hPtr2));
   }
   Tcl_IncrRefCount(objv[2]);
   Tcl_SetHashValue(hPtr2, objv[2]);
 
-  Tcl_SetObjResult(ip, (Tcl_Obj *)Tcl_GetHashValue(hPtr2));
+  Tcl_SetObjResult(ip, Tcl_GetHashValue(hPtr2));
   return TCL_OK;
 }
 
@@ -504,7 +504,7 @@ int
 Tk_GetAccessibleRole(
 		     TCL_UNUSED(void *),
 		     Tcl_Interp *ip,		/* Current interpreter. */
-		     Tcl_Size objc,			/* Number of arguments. */
+		     int objc,			/* Number of arguments. */
 		     Tcl_Obj *const objv[])	/* Argument objects. */
 {
   if (objc < 2) {
@@ -528,14 +528,14 @@ Tk_GetAccessibleRole(
     Tcl_AppendResult(ip, "No table found. You must set the accessibility role first.", (char *) NULL);
     return TCL_ERROR;
   }
-  AccessibleAttributes = (Tcl_HashTable *)Tcl_GetHashValue(hPtr);
+  AccessibleAttributes = Tcl_GetHashValue(hPtr);
   hPtr2=Tcl_FindHashEntry(AccessibleAttributes, "role");
   if (!hPtr2) {
     Tcl_AppendResult(ip, "No role found", (char *) NULL);
     return TCL_ERROR;
   }
 
-  Tcl_SetObjResult(ip, (Tcl_Obj *)Tcl_GetHashValue(hPtr2));
+  Tcl_SetObjResult(ip, Tcl_GetHashValue(hPtr2));
   return TCL_OK;
 }
 
@@ -561,7 +561,7 @@ int
 Tk_GetAccessibleName(
 		     TCL_UNUSED(void *),
 		     Tcl_Interp *ip,		/* Current interpreter. */
-		     Tcl_Size objc,			/* Number of arguments. */
+		     int objc,			/* Number of arguments. */
 		     Tcl_Obj *const objv[])	/* Argument objects. */
 {
   if (objc < 2) {
@@ -585,14 +585,14 @@ Tk_GetAccessibleName(
     Tcl_AppendResult(ip, "No table found. You must set the accessibility role first.", (char *) NULL);
     return TCL_ERROR;
   }
-  AccessibleAttributes = (Tcl_HashTable *)Tcl_GetHashValue(hPtr);
+  AccessibleAttributes = Tcl_GetHashValue(hPtr);
   hPtr2=Tcl_FindHashEntry(AccessibleAttributes, "name");
   if (!hPtr2) {
     Tcl_AppendResult(ip, "No name found", (char *) NULL);
     return TCL_ERROR;
   }
 
-  Tcl_SetObjResult(ip, (Tcl_Obj *)Tcl_GetHashValue(hPtr2));
+  Tcl_SetObjResult(ip, Tcl_GetHashValue(hPtr2));
   return TCL_OK;
 }
 
@@ -620,7 +620,7 @@ int
 Tk_GetAccessibleDescription(
 			    TCL_UNUSED(void *),
 			    Tcl_Interp *ip,		/* Current interpreter. */
-			    Tcl_Size objc,			/* Number of arguments. */
+			    int objc,			/* Number of arguments. */
 			    Tcl_Obj *const objv[])	/* Argument objects. */
 {
   if (objc < 2) {
@@ -644,14 +644,14 @@ Tk_GetAccessibleDescription(
     Tcl_AppendResult(ip, "No table found. You must set the accessibility role first.", (char *) NULL);
     return TCL_ERROR;
   }
-  AccessibleAttributes = (Tcl_HashTable *)Tcl_GetHashValue(hPtr);
+  AccessibleAttributes = Tcl_GetHashValue(hPtr);
   hPtr2=Tcl_FindHashEntry(AccessibleAttributes, "description");
   if (!hPtr2) {
     Tcl_AppendResult(ip, "No description found", (char *) NULL);
     return TCL_ERROR;
   }
 
-  Tcl_SetObjResult(ip, (Tcl_Obj *)Tcl_GetHashValue(hPtr2));
+  Tcl_SetObjResult(ip, Tcl_GetHashValue(hPtr2));
   return TCL_OK;
 }
 
@@ -679,7 +679,7 @@ int
 Tk_GetAccessibleValue(
 		      TCL_UNUSED(void *),
 		      Tcl_Interp *ip,		/* Current interpreter. */
-		      Tcl_Size objc,			/* Number of arguments. */
+		      int objc,			/* Number of arguments. */
 		      Tcl_Obj *const objv[])	/* Argument objects. */
 
 {
@@ -704,14 +704,14 @@ Tk_GetAccessibleValue(
     Tcl_AppendResult(ip, "No table found. You must set the accessibility role first.", (char *) NULL);
     return TCL_ERROR;
   }
-  AccessibleAttributes = (Tcl_HashTable *)Tcl_GetHashValue(hPtr);
+  AccessibleAttributes = Tcl_GetHashValue(hPtr);
   hPtr2=Tcl_FindHashEntry(AccessibleAttributes, "value");
   if (!hPtr2) {
     Tcl_AppendResult(ip, "No value found", (char *) NULL);
     return TCL_ERROR;
   }
 
-  Tcl_SetObjResult(ip, (Tcl_Obj *)Tcl_GetHashValue(hPtr2));
+  Tcl_SetObjResult(ip, Tcl_GetHashValue(hPtr2));
   return TCL_OK;
 }
 
@@ -737,7 +737,7 @@ int
 Tk_GetAccessibleState(
 		      TCL_UNUSED(void *),
 		      Tcl_Interp *ip,		/* Current interpreter. */
-		      Tcl_Size objc,			/* Number of arguments. */
+		      int objc,			/* Number of arguments. */
 		      Tcl_Obj *const objv[])	/* Argument objects. */
 
 {
@@ -762,14 +762,14 @@ Tk_GetAccessibleState(
     Tcl_AppendResult(ip, "No table found. You must set the accessibility role first.", (char *) NULL);
     return TCL_ERROR;
   }
-  AccessibleAttributes = (Tcl_HashTable *)Tcl_GetHashValue(hPtr);
+  AccessibleAttributes = Tcl_GetHashValue(hPtr);
   hPtr2=Tcl_FindHashEntry(AccessibleAttributes, "state");
   if (!hPtr2) {
     Tcl_AppendResult(ip, "No state found", (char *) NULL);
     return TCL_ERROR;
   }
 
-  Tcl_SetObjResult(ip, (Tcl_Obj *)Tcl_GetHashValue(hPtr2));
+  Tcl_SetObjResult(ip, Tcl_GetHashValue(hPtr2));
   return TCL_OK;
 }
 
@@ -796,7 +796,7 @@ int
 Tk_GetAccessibleAction(
 		       TCL_UNUSED(void *),
 		       Tcl_Interp *ip,		/* Current interpreter. */
-		       Tcl_Size objc,			/* Number of arguments. */
+		       int objc,			/* Number of arguments. */
 		       Tcl_Obj *const objv[])	/* Argument objects. */
 
 {
@@ -821,14 +821,14 @@ Tk_GetAccessibleAction(
     Tcl_AppendResult(ip, "No table found. You must set the accessibility role first.", (char *) NULL);
     return TCL_ERROR;
   }
-  AccessibleAttributes = (Tcl_HashTable *)Tcl_GetHashValue(hPtr);
+  AccessibleAttributes = Tcl_GetHashValue(hPtr);
   hPtr2=Tcl_FindHashEntry(AccessibleAttributes, "action");
   if (!hPtr2) {
     Tcl_AppendResult(ip, "No action found", (char *) NULL);
     return TCL_ERROR;
   }
 
-  Tcl_SetObjResult(ip, (Tcl_Obj *)Tcl_GetHashValue(hPtr2));
+  Tcl_SetObjResult(ip, Tcl_GetHashValue(hPtr2));
   return TCL_OK;
 }
 
@@ -853,7 +853,7 @@ int
 Tk_GetAccessibleHelp(
 		     TCL_UNUSED(void *),
 		     Tcl_Interp *ip,		/* Current interpreter. */
-		     Tcl_Size objc,			/* Number of arguments. */
+		     int objc,			/* Number of arguments. */
 		     Tcl_Obj *const objv[])	/* Argument objects. */
 
 {
@@ -878,14 +878,14 @@ Tk_GetAccessibleHelp(
     Tcl_AppendResult(ip, "No table found. You must set the accessibility role first.", (char *) NULL);
     return TCL_ERROR;
   }
-  AccessibleAttributes = (Tcl_HashTable *)Tcl_GetHashValue(hPtr);
+  AccessibleAttributes = Tcl_GetHashValue(hPtr);
   hPtr2=Tcl_FindHashEntry(AccessibleAttributes, "help");
   if (!hPtr2) {
     Tcl_AppendResult(ip, "No help found", (char *) NULL);
     return TCL_ERROR;
   }
 
-  Tcl_SetObjResult(ip, (Tcl_Obj *)Tcl_GetHashValue(hPtr2));
+  Tcl_SetObjResult(ip, Tcl_GetHashValue(hPtr2));
   return TCL_OK;
 }
 
@@ -924,15 +924,15 @@ static void WindowDestroyHandler(
 	/* shouldn't happen*/
 	return;
     }
-    AccessibleAttributes = (Tcl_HashTable *)Tcl_GetHashValue(hPtr);
+    AccessibleAttributes = Tcl_GetHashValue(hPtr);
     for (hPtr2 = Tcl_FirstHashEntry(AccessibleAttributes, &search);
 	    hPtr2 != NULL; hPtr2 = Tcl_NextHashEntry(&search)) {
-	Tcl_Obj *objPtr = (Tcl_Obj *)Tcl_GetHashValue(hPtr2);
+	Tcl_Obj *objPtr = Tcl_GetHashValue(hPtr2);
 	Tcl_DecrRefCount(objPtr);
 	Tcl_DeleteHashEntry(hPtr2);
     }
     Tcl_DeleteHashTable(AccessibleAttributes);
-    Tcl_Free(AccessibleAttributes);
+    ckfree(AccessibleAttributes);
     Tcl_DeleteHashEntry(hPtr);
     return;
 }
@@ -977,7 +977,7 @@ TkAccessibility_Cleanup(
     while (hPtr != NULL) {
 	/* GET THE KEY FROM 'table' (not the global). */
 	Tk_Window tkwin = (Tk_Window) Tcl_GetHashKey(table, hPtr);
-	Tcl_HashTable *perWin = (Tcl_HashTable *)Tcl_GetHashValue(hPtr);
+	Tcl_HashTable *perWin = (Tcl_HashTable *) Tcl_GetHashValue(hPtr);
 
 	if (tkwin) {
 	    /* Unregister the destroy handler so it cannot run later and touch freed data. */
@@ -991,7 +991,7 @@ TkAccessibility_Cleanup(
 	    Tcl_HashSearch s2;
 	    h2 = Tcl_FirstHashEntry(perWin, &s2);
 	    while (h2) {
-		Tcl_Obj *obj = (Tcl_Obj *)Tcl_GetHashValue(h2);
+		Tcl_Obj *obj = (Tcl_Obj *) Tcl_GetHashValue(h2);
 		if (obj) {
 		    Tcl_DecrRefCount(obj);
 		}
@@ -1000,7 +1000,7 @@ TkAccessibility_Cleanup(
 
 	    /* Delete the per-window hash table and free its memory. */
 	    Tcl_DeleteHashTable(perWin);
-	    Tcl_Free(perWin);
+	    ckfree((char *) perWin);
 	}
 
 	hPtr = Tcl_NextHashEntry(&search);
@@ -1008,7 +1008,7 @@ TkAccessibility_Cleanup(
 
     /* Now free the main table safely. */
     Tcl_DeleteHashTable(table);
-    Tcl_Free(table);
+    ckfree((char *) table);
 }
 
 
@@ -1021,23 +1021,23 @@ int
 TkAccessibility_Init(
 		     Tcl_Interp *interp)
 {
-  Tcl_CreateObjCommand2(interp, "::tk::accessible::set_acc_role", Tk_SetAccessibleRole, NULL, NULL);
-  Tcl_CreateObjCommand2(interp, "::tk::accessible::set_acc_name", Tk_SetAccessibleName, NULL,NULL);
-  Tcl_CreateObjCommand2(interp, "::tk::accessible::set_acc_description", Tk_SetAccessibleDescription, NULL, NULL);
-  Tcl_CreateObjCommand2(interp, "::tk::accessible::set_acc_value", Tk_SetAccessibleValue, NULL, NULL);
-  Tcl_CreateObjCommand2(interp, "::tk::accessible::set_acc_state", Tk_SetAccessibleState, NULL, NULL);
-  Tcl_CreateObjCommand2(interp, "::tk::accessible::set_acc_action", Tk_SetAccessibleAction, NULL, NULL);
-  Tcl_CreateObjCommand2(interp, "::tk::accessible::set_acc_help", Tk_SetAccessibleHelp, NULL, NULL);
-  Tcl_CreateObjCommand2(interp, "::tk::accessible::get_acc_role", Tk_GetAccessibleRole, NULL, NULL);
-  Tcl_CreateObjCommand2(interp, "::tk::accessible::get_acc_name", Tk_GetAccessibleName, NULL, NULL);
-  Tcl_CreateObjCommand2(interp, "::tk::accessible::get_acc_description", Tk_GetAccessibleDescription, NULL, NULL);
-  Tcl_CreateObjCommand2(interp, "::tk::accessible::get_acc_value", Tk_GetAccessibleValue, NULL, NULL);
-  Tcl_CreateObjCommand2(interp, "::tk::accessible::get_acc_state", Tk_GetAccessibleState, NULL, NULL);
-  Tcl_CreateObjCommand2(interp, "::tk::accessible::get_acc_action", Tk_GetAccessibleAction, NULL, NULL);
-  Tcl_CreateObjCommand2(interp, "::tk::accessible::get_acc_help", Tk_GetAccessibleHelp, NULL, NULL);
+  Tcl_CreateObjCommand(interp, "::tk::accessible::set_acc_role", Tk_SetAccessibleRole, NULL, NULL);
+  Tcl_CreateObjCommand(interp, "::tk::accessible::set_acc_name", Tk_SetAccessibleName, NULL,NULL);
+  Tcl_CreateObjCommand(interp, "::tk::accessible::set_acc_description", Tk_SetAccessibleDescription, NULL, NULL);
+  Tcl_CreateObjCommand(interp, "::tk::accessible::set_acc_value", Tk_SetAccessibleValue, NULL, NULL);
+  Tcl_CreateObjCommand(interp, "::tk::accessible::set_acc_state", Tk_SetAccessibleState, NULL, NULL);
+  Tcl_CreateObjCommand(interp, "::tk::accessible::set_acc_action", Tk_SetAccessibleAction, NULL, NULL);
+  Tcl_CreateObjCommand(interp, "::tk::accessible::set_acc_help", Tk_SetAccessibleHelp, NULL, NULL);
+  Tcl_CreateObjCommand(interp, "::tk::accessible::get_acc_role", Tk_GetAccessibleRole, NULL, NULL);
+  Tcl_CreateObjCommand(interp, "::tk::accessible::get_acc_name", Tk_GetAccessibleName, NULL, NULL);
+  Tcl_CreateObjCommand(interp, "::tk::accessible::get_acc_description", Tk_GetAccessibleDescription, NULL, NULL);
+  Tcl_CreateObjCommand(interp, "::tk::accessible::get_acc_value", Tk_GetAccessibleValue, NULL, NULL);
+  Tcl_CreateObjCommand(interp, "::tk::accessible::get_acc_state", Tk_GetAccessibleState, NULL, NULL);
+  Tcl_CreateObjCommand(interp, "::tk::accessible::get_acc_action", Tk_GetAccessibleAction, NULL, NULL);
+  Tcl_CreateObjCommand(interp, "::tk::accessible::get_acc_help", Tk_GetAccessibleHelp, NULL, NULL);
 
   if (!TkAccessibilityObject) {
-      TkAccessibilityObject = (Tcl_HashTable *)Tcl_Alloc(sizeof(Tcl_HashTable));
+      TkAccessibilityObject = (Tcl_HashTable *)ckalloc(sizeof(Tcl_HashTable));
       Tcl_InitHashTable(TkAccessibilityObject, TCL_ONE_WORD_KEYS);
   }
 

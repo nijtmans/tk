@@ -23,6 +23,7 @@ if {[tcltest::configure -singleproc] == 0} {
 }
 tk appname tktest
 wm title . tktest
+wm geometry . +0+0
 
 #
 # IMPORT TCLTEST COMMANDS

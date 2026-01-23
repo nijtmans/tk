@@ -284,7 +284,7 @@ TkTextWindowCmd(
 	 * Create the new window segment and initialize it.
 	 */
 
-	ewPtr = (TkTextSegment *)Tcl_Alloc(EW_SEG_SIZE);
+	ewPtr = (TkTextSegment *)ckalloc(EW_SEG_SIZE);
 	ewPtr->typePtr = &tkTextEmbWindowType;
 	ewPtr->size = 1;
 	ewPtr->body.ew.sharedTextPtr = textPtr->sharedTextPtr;
@@ -296,7 +296,7 @@ TkTextWindowCmd(
 	ewPtr->body.ew.stretch = 0;
 	ewPtr->body.ew.optionTable = Tk_CreateOptionTable(interp, optionSpecs);
 
-	client = (TkTextEmbWindowClient *)Tcl_Alloc(sizeof(TkTextEmbWindowClient));
+	client = (TkTextEmbWindowClient *)ckalloc(sizeof(TkTextEmbWindowClient));
 	client->next = NULL;
 	client->textPtr = textPtr;
 	client->tkwin = NULL;
@@ -461,7 +461,7 @@ EmbWinConfigure(
 		 * Have to make the new client.
 		 */
 
-		client = (TkTextEmbWindowClient *)Tcl_Alloc(sizeof(TkTextEmbWindowClient));
+		client = (TkTextEmbWindowClient *)ckalloc(sizeof(TkTextEmbWindowClient));
 		client->next = ewPtr->body.ew.clients;
 		client->textPtr = textPtr;
 		client->tkwin = NULL;
@@ -644,7 +644,7 @@ EmbWinLostContentProc(
 	}
 	loop->next = client->next;
     }
-    Tcl_Free(client);
+    ckfree(client);
 
     index.tree = ewPtr->body.ew.sharedTextPtr->tree;
     index.linePtr = ewPtr->body.ew.linePtr;
@@ -710,7 +710,7 @@ TkTextWinFreeClient(
      * Free up this client.
      */
 
-    Tcl_Free(client);
+    ckfree(client);
 }
 
 /*
@@ -763,7 +763,7 @@ EmbWinDeleteProc(
      * Free up all memory allocated.
      */
 
-    Tcl_Free(ewPtr);
+    ckfree(ewPtr);
     return 0;
 }
 
@@ -953,7 +953,7 @@ EmbWinLayoutProc(
 	     * now need to add to our client list.
 	     */
 
-	    client = (TkTextEmbWindowClient *)Tcl_Alloc(sizeof(TkTextEmbWindowClient));
+	    client = (TkTextEmbWindowClient *)ckalloc(sizeof(TkTextEmbWindowClient));
 	    client->next = ewPtr->body.ew.clients;
 	    client->textPtr = textPtr;
 	    client->tkwin = NULL;

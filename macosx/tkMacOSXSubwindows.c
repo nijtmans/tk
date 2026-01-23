@@ -90,10 +90,10 @@ XDestroyWindow(
 	}
 
 	if (macWin->toplevel->referenceCount == 0) {
-	    Tcl_Free(macWin->toplevel);
+	    ckfree(macWin->toplevel);
 	}
 	macWin->winPtr->privatePtr = NULL;
-	Tcl_Free(macWin);
+	ckfree(macWin);
 	return Success;
     }
     if (macWin->visRgn) {
@@ -117,7 +117,7 @@ XDestroyWindow(
      */
 
     if (macWin->toplevel->referenceCount == 0) {
-	Tcl_Free(macWin->toplevel);
+	ckfree(macWin->toplevel);
     }
     return Success;
 }
@@ -337,7 +337,6 @@ XUnmapWindow(
 	    winPtr->wmInfoPtr->hints.initial_state!=IconicState) {
 	    [win setExcludedFromWindowsMenu:YES];
 	    [win orderOut:NSApp];
-	    [[win contentView] setOnScreen:NO];
 	    if ([win isKeyWindow]) {
 
 		/*
@@ -1369,7 +1368,7 @@ Tk_GetPixmap(
     if (display != NULL) {
 	LastKnownRequestProcessed(display)++;
     }
-    macPix = (MacDrawable *)Tcl_Alloc(sizeof(MacDrawable));
+    macPix = (MacDrawable *)ckalloc(sizeof(MacDrawable));
     macPix->winPtr = NULL;
     macPix->xOff = 0;
     macPix->yOff = 0;
@@ -1413,7 +1412,7 @@ Tk_FreePixmap(
     if (macPix->context) {
 	CFRelease(macPix->context);
     }
-    Tcl_Free(macPix);
+    ckfree(macPix);
 }
 
 /*

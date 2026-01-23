@@ -477,7 +477,7 @@ static void IndicatorElementDraw(
 	 * a newly allocated memory area svgDataCopy
 	 */
 	svgDataLen = strlen(svgDataPtr);
-	svgDataCopy = (char *)Tcl_AttemptAlloc(svgDataLen + 1);
+	svgDataCopy = (char *)attemptckalloc(svgDataLen + 1);
 	if (svgDataCopy == NULL) {
 	    return;
 	}
@@ -509,15 +509,15 @@ static void IndicatorElementDraw(
 	 */
 	cmdFmt = "image create photo %s -format $::tk::svgFmt -data {%s}";
 	scriptSize = strlen(cmdFmt) + strlen(imgName) + svgDataLen;
-	script = (char *)Tcl_AttemptAlloc(scriptSize);
+	script = (char *)attemptckalloc(scriptSize);
 	if (script == NULL) {
-	    Tcl_Free(svgDataCopy);
+	    ckfree(svgDataCopy);
 	    return;
 	}
 	snprintf(script, scriptSize, cmdFmt, imgName, svgDataCopy);
-	Tcl_Free(svgDataCopy);
+	ckfree(svgDataCopy);
 	code = Tcl_EvalEx(interp, script, -1, TCL_EVAL_GLOBAL);
-	Tcl_Free(script);
+	ckfree(script);
 	if (code != TCL_OK) {
 	    Tcl_BackgroundException(interp, code);
 	    return;

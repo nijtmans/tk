@@ -163,7 +163,7 @@ TkpOpenDisplay(
     if (display == NULL) {
 	return NULL;
     }
-    dispPtr = (TkDisplay *)Tcl_Alloc(sizeof(TkDisplay));
+    dispPtr = (TkDisplay *)ckalloc(sizeof(TkDisplay));
     memset(dispPtr, 0, sizeof(TkDisplay));
     dispPtr->display = display;
 #ifdef TK_USE_INPUT_METHODS

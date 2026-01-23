@@ -436,7 +436,7 @@ int
 Tk_TextObjCmd(
     void *clientData,	/* Main window associated with interpreter. */
     Tcl_Interp *interp,		/* Current interpreter. */
-    Tcl_Size objc,			/* Number of arguments. */
+    int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
     Tk_Window tkwin = (Tk_Window)clientData;
@@ -501,7 +501,7 @@ CreateWidget(
      * and 'insert', 'current' mark pointers are all NULL to start.
      */
 
-    textPtr = (TkText *)Tcl_Alloc(sizeof(TkText));
+    textPtr = (TkText *)ckalloc(sizeof(TkText));
     memset(textPtr, 0, sizeof(TkText));
 
     textPtr->tkwin = newWin;
@@ -512,7 +512,7 @@ CreateWidget(
 	    textPtr, TextCmdDeletedProc);
 
     if (sharedPtr == NULL) {
-	sharedPtr = (TkSharedText *)Tcl_Alloc(sizeof(TkSharedText));
+	sharedPtr = (TkSharedText *)ckalloc(sizeof(TkSharedText));
 	memset(sharedPtr, 0, sizeof(TkSharedText));
 
 	sharedPtr->refCount = 0;
@@ -1101,7 +1101,7 @@ TextWidgetObjCmd(
 
 		objc -= 2;
 		objv += 2;
-		indices = (TkTextIndex *)Tcl_Alloc((objc + 1) * sizeof(TkTextIndex));
+		indices = (TkTextIndex *)ckalloc((objc + 1) * sizeof(TkTextIndex));
 
 		/*
 		 * First pass verifies that all indices are valid.
@@ -1113,7 +1113,7 @@ TextWidgetObjCmd(
 
 		    if (indexPtr == NULL) {
 			result = TCL_ERROR;
-			Tcl_Free(indices);
+			ckfree(indices);
 			goto done;
 		    }
 		    indices[i] = *indexPtr;
@@ -1129,7 +1129,7 @@ TextWidgetObjCmd(
 			    COUNT_INDICES);
 		    objc++;
 		}
-		useIdx = (char *)Tcl_Alloc(objc);
+		useIdx = (char *)ckalloc(objc);
 		memset(useIdx, 0, objc);
 
 		/*
@@ -1193,7 +1193,7 @@ TextWidgetObjCmd(
 				&indices[i+1], 1);
 		    }
 		}
-		Tcl_Free(indices);
+		ckfree(indices);
 	    }
 	}
 	break;
@@ -1531,7 +1531,6 @@ TextWidgetObjCmd(
 	    goto done;
 	}
 	if (textPtr->afterSyncCmd) {
-	    Tcl_CancelIdleCall(TkTextRunAfterSyncCmd, textPtr);
 	    Tcl_DecrRefCount(textPtr->afterSyncCmd);
 	}
 	textPtr->afterSyncCmd = NULL;
@@ -1555,7 +1554,7 @@ TextWidgetObjCmd(
 
   done:
     if (textPtr->refCount-- <= 1) {
-	Tcl_Free(textPtr);
+	ckfree(textPtr);
     }
     return result;
 }
@@ -1934,10 +1933,10 @@ DestroyText(
     TkTextDeleteTag(textPtr, textPtr->selTagPtr);
     TkBTreeUnlinkSegment(textPtr->insertMarkPtr,
 	    textPtr->insertMarkPtr->body.mark.linePtr);
-    Tcl_Free(textPtr->insertMarkPtr);
+    ckfree(textPtr->insertMarkPtr);
     TkBTreeUnlinkSegment(textPtr->currentMarkPtr,
 	    textPtr->currentMarkPtr->body.mark.linePtr);
-    Tcl_Free(textPtr->currentMarkPtr);
+    ckfree(textPtr->currentMarkPtr);
 
     /*
      * Now we've cleaned up everything of relevance to us in the B-tree, so we
@@ -2001,7 +2000,7 @@ DestroyText(
 	Tcl_DeleteHashTable(&sharedTextPtr->tagTable);
 	for (hPtr = Tcl_FirstHashEntry(&sharedTextPtr->markTable, &search);
 	     hPtr != NULL; hPtr = Tcl_NextHashEntry(&search)) {
-	    Tcl_Free(Tcl_GetHashValue(hPtr));
+	    ckfree(Tcl_GetHashValue(hPtr));
 	}
 	Tcl_DeleteHashTable(&sharedTextPtr->markTable);
 	TkUndoFreeStack(sharedTextPtr->undoStack);
@@ -2012,11 +2011,11 @@ DestroyText(
 	if (sharedTextPtr->bindingTable != NULL) {
 	    Tk_DeleteBindingTable(sharedTextPtr->bindingTable);
 	}
-	Tcl_Free(sharedTextPtr);
+	ckfree(sharedTextPtr);
     }
 
     if (textPtr->tabArrayPtr != NULL) {
-	Tcl_Free(textPtr->tabArrayPtr);
+	ckfree(textPtr->tabArrayPtr);
     }
     if (textPtr->insertBlinkHandler != NULL) {
 	Tcl_DeleteTimerHandler(textPtr->insertBlinkHandler);
@@ -2029,7 +2028,7 @@ DestroyText(
 	textPtr->afterSyncCmd = NULL;
     }
     if (textPtr->refCount-- <= 1) {
-	Tcl_Free(textPtr);
+	ckfree(textPtr);
     }
 }
 
@@ -2203,7 +2202,7 @@ ConfigureText(
      */
 
     if (textPtr->tabArrayPtr != NULL) {
-	Tcl_Free(textPtr->tabArrayPtr);
+	ckfree(textPtr->tabArrayPtr);
 	textPtr->tabArrayPtr = NULL;
     }
     if (textPtr->tabOptionObj != NULL) {
@@ -2641,7 +2640,7 @@ InsertChars(
 
     resetViewCount = 0;
     if (sharedTextPtr->refCount > PIXEL_CLIENTS) {
-	lineAndByteIndex = (int *)Tcl_Alloc(sizeof(int) * 2 * sharedTextPtr->refCount);
+	lineAndByteIndex = (int *)ckalloc(sizeof(int) * 2 * sharedTextPtr->refCount);
     } else {
 	lineAndByteIndex = pixels;
     }
@@ -2703,7 +2702,7 @@ InsertChars(
 	resetViewCount += 2;
     }
     if (sharedTextPtr->refCount > PIXEL_CLIENTS) {
-	Tcl_Free(lineAndByteIndex);
+	ckfree(lineAndByteIndex);
     }
 
     /*
@@ -3167,7 +3166,7 @@ DeleteIndexRange(
 	    for (i = 0; i < arraySize; i++) {
 		TkBTreeTag(&index2, &oldIndex2, arrayPtr[i], 0);
 	    }
-	    Tcl_Free(arrayPtr);
+	    ckfree(arrayPtr);
 	}
     }
 
@@ -3213,7 +3212,7 @@ DeleteIndexRange(
 
     resetViewCount = 0;
     if (sharedTextPtr->refCount > PIXEL_CLIENTS) {
-	lineAndByteIndex = (int *)Tcl_Alloc(sizeof(int) * 2 * sharedTextPtr->refCount);
+	lineAndByteIndex = (int *)ckalloc(sizeof(int) * 2 * sharedTextPtr->refCount);
     } else {
 	lineAndByteIndex = pixels;
     }
@@ -3346,7 +3345,7 @@ DeleteIndexRange(
 	resetViewCount += 2;
     }
     if (sharedTextPtr->refCount > PIXEL_CLIENTS) {
-	Tcl_Free(lineAndByteIndex);
+	ckfree(lineAndByteIndex);
     }
 
     if (line1 >= line2) {
@@ -3726,7 +3725,7 @@ TextInsertCmd(
 		for (i = 0; i < numTags; i++) {
 		    TkBTreeTag(&index1, &index2, oldTagArrayPtr[i], 0);
 		}
-		Tcl_Free(oldTagArrayPtr);
+		ckfree(oldTagArrayPtr);
 	    }
 	    if (Tcl_ListObjGetElements(interp, objv[j+1], &numTags,
 		    &tagNamePtrs) != TCL_OK) {
@@ -4513,7 +4512,7 @@ TkTextGetTabs(
      * Parse the elements of the list one at a time to fill in the array.
      */
 
-    tabArrayPtr = (TkTextTabArray *)Tcl_Alloc(offsetof(TkTextTabArray, tabs)
+    tabArrayPtr = (TkTextTabArray *)ckalloc(offsetof(TkTextTabArray, tabs)
 	    + count * sizeof(TkTextTab));
     tabArrayPtr->numTabs = 0;
     prevStop = 0.0;
@@ -4600,7 +4599,7 @@ TkTextGetTabs(
     return tabArrayPtr;
 
   error:
-    Tcl_Free(tabArrayPtr);
+    ckfree(tabArrayPtr);
     return NULL;
 }
 
@@ -4862,7 +4861,7 @@ DumpLine(
 		 */
 
 		int length = last - first;
-		char *range = (char *)Tcl_Alloc(length + 1);
+		char *range = (char *)ckalloc(length + 1);
 
 		memcpy(range, segPtr->body.chars + first, length);
 		range[length] = '\0';
@@ -4871,7 +4870,7 @@ DumpLine(
 			lineno, offset + first, &index);
 		lineChanged = DumpSegment(textPtr, interp, "text", range,
 			command, &index, what);
-		Tcl_Free(range);
+		ckfree(range);
 	    } else {
 		TkTextMakeByteIndex(textPtr->sharedTextPtr->tree, textPtr,
 			lineno, offset + first, &index);
@@ -5575,7 +5574,7 @@ TkTextRunAfterSyncCmd(
 	*/
 
 	if (textPtr->refCount-- <= 1) {
-	    Tcl_Free(textPtr);
+	    ckfree(textPtr);
 	}
 	return;
     }
@@ -6052,7 +6051,7 @@ SearchCore(
 			     * exact searches.
 			     */
 
-			    if (lastTotal - skipFirst >= matchLength) {
+			    if ((Tcl_Size)lastTotal - skipFirst >= matchLength) {
 				/*
 				 * We now have enough text to match, so we
 				 * make a final test and break whatever the
@@ -6134,7 +6133,7 @@ SearchCore(
 			}
 		    } else {
 			firstOffset = matchLength ? p - startOfLine + matchLength
-						  : p - startOfLine + 1;
+						  : p - startOfLine + (Tcl_Size)1;
 			if (firstOffset >= lastOffset) {
 			    /*
 			     * Now, we have to be careful not to find
@@ -6192,7 +6191,7 @@ SearchCore(
 
 		if (!match ||
 			((info.extendStart == info.matches[0].start)
-			&& (info.matches[0].end == (lastOffset - firstOffset)))) {
+			&& (info.matches[0].end == (Tcl_Size) (lastOffset - firstOffset)))) {
 		    int extraLines = 0;
 		    Tcl_Size prevFullLine;
 
@@ -6307,7 +6306,7 @@ SearchCore(
 			 */
 
 			if ((match &&
-				firstOffset + info.matches[0].end != lastTotal &&
+				firstOffset + info.matches[0].end != (Tcl_Size) lastTotal &&
 				firstOffset + info.matches[0].end < prevFullLine)
 				|| info.extendStart < 0) {
 			    break;
@@ -6369,7 +6368,7 @@ SearchCore(
 			     * Possible overlap or inclusion.
 			     */
 
-			    Tcl_Size thisOffset = firstOffset + info.matches[0].end
+			    int thisOffset = firstOffset + info.matches[0].end
 				    - info.matches[0].start;
 
 			    if (lastNonOverlap != -1) {
@@ -6377,8 +6376,8 @@ SearchCore(
 				 * Possible overlap or enclosure.
 				 */
 
-				if (thisOffset - lastNonOverlap >=
-					lastBackwardsMatchOffset + matchLength){
+				if ((Tcl_Size)thisOffset - lastNonOverlap >=
+					lastBackwardsMatchOffset + matchLength + 1){
 				    /*
 				     * Totally encloses previous match, so
 				     * forget the previous match.
@@ -6483,12 +6482,12 @@ SearchCore(
 			     */
 
 			    Tcl_Size *newArray = (Tcl_Size *)
-				    Tcl_Alloc(4 * matchNum * sizeof(Tcl_Size));
+				    ckalloc(4 * matchNum * sizeof(Tcl_Size));
 			    memcpy(newArray, storeMatch, matchNum*sizeof(Tcl_Size));
 			    memcpy(newArray + 2*matchNum, storeLength,
 				    matchNum * sizeof(Tcl_Size));
 			    if (storeMatch != smArray) {
-				Tcl_Free(storeMatch);
+				ckfree(storeMatch);
 			    }
 			    matchNum *= 2;
 			    storeMatch = newArray;
@@ -6718,7 +6717,7 @@ SearchCore(
      */
 
     if (storeMatch != smArray) {
-	Tcl_Free(storeMatch);
+	ckfree(storeMatch);
     }
 
     return code;

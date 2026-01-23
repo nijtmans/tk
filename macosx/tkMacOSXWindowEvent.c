@@ -6,8 +6,8 @@
  *
  * Copyright © 2001-2009 Apple Inc.
  * Copyright © 2005-2009 Daniel A. Steffen <das@users.sourceforge.net>
- * Copyright © 2015 Kevin Walzer
- * Copyright © 2015 Marc Culler
+ * Copyright © 2015 Kevin Walzer.
+ * Copyright © 2015 Marc Culler.
  *
  * See the file "license.terms" for information on usage and redistribution of
  * this file, and for a DISCLAIMER OF ALL WARRANTIES.
@@ -75,9 +75,6 @@ extern NSString *NSWindowDidOrderOffScreenNotification;
 
 		TkMacOSXAssignNewKeyWindow(NULL, NULL);
 	    }
-	}
-	if (winPtr && Tk_IsMapped(winPtr)) {
-	    GenerateActivateEvents(winPtr, false);
 	}
     }
     /*
@@ -304,24 +301,29 @@ extern NSString *NSWindowDidOrderOffScreenNotification;
     return (winPtr ? NO : YES);
 }
 
-// Not used by default - may be enabled for debugging.
 - (void) windowBecameVisible: (NSNotification *) notification
 {
     NSWindow *window = [notification object];
     TkWindow *winPtr = TkMacOSXGetTkWindow(window);
     if (winPtr) {
-	fprintf(stderr, "Window %s became visible.\n", Tk_PathName(winPtr));
+	TKContentView *view = [window contentView];
+	// fprintf(stderr, "Window %s became visible.\n", Tk_PathName(winPtr));
+
+#if MAC_OS_X_VERSION_MAX_ALLOWED >= 101400
+	if (@available(macOS 10.14, *)) {
+	    [view viewDidChangeEffectiveAppearance];
+	}
+#endif
     }
 }
 
-// Not used by default - may be enabled for debugging.
 - (void) windowMapped: (NSNotification *) notification
 {
     NSWindow *w = [notification object];
     TkWindow *winPtr = TkMacOSXGetTkWindow(w);
 
     if (winPtr) {
-	fprintf(stderr, "Window %s was ordered on screen.\n", Tk_PathName(winPtr));
+	// fprintf(stderr, "Window %s was ordered on screen.\n", Tk_PathName(winPtr));
     }
 }
 
@@ -367,11 +369,8 @@ extern NSString *NSWindowDidOrderOffScreenNotification;
     observe(NSWindowDidDeminiaturizeNotification, windowExpanded:);
     observe(NSWindowDidMiniaturizeNotification, windowCollapsed:);
     observe(NSWindowWillMiniaturizeNotification, windowCollapsed:);
-#if 0
-    // These can be useful for debugging.
     observe(NSWindowWillOrderOnScreenNotification, windowMapped:);
     observe(NSWindowDidOrderOnScreenNotification, windowBecameVisible:);
-#endif
     observe(NSWindowWillStartLiveResizeNotification, windowLiveResize:);
     observe(NSWindowDidEndLiveResizeNotification, windowLiveResize:);
     observe(NSWindowDidEnterFullScreenNotification, windowEnteredFullScreen:);
@@ -423,16 +422,12 @@ static void RefocusGrabWindow(void *data) {
      */
 
     for (NSWindow *win in [NSApp windows]) {
-	if (! [win isKindOfClass:[TKWindow class]]) {
-	    continue;
-	}
 	TkWindow *winPtr = TkMacOSXGetTkWindow(win);
 	if (!winPtr || !winPtr->wmInfoPtr) {
 	    continue;
 	}
 	if (winPtr->wmInfoPtr->hints.initial_state == WithdrawnState) {
 	    [win orderOut:NSApp];
-	    [[win contentView] setOnScreen:NO];
 	}
 	if (winPtr->dispPtr->grabWinPtr == winPtr) {
 	    Tcl_Preserve(winPtr);
@@ -1042,18 +1037,8 @@ ExposeRestrictProc(
 }
 - (void) updateLayer {
     CGContextRef context = self.tkLayerBitmapContext;
+    static bool initialized = false;
     if (context && ![NSApp tkWillExit]) {
-	/*
-	 * If this ContentView is off screen, Run any pending widget
-	 * display procs before updating the layer.
-	 */
-
-	if (! [self onScreen]) {
-	    //printf("Running event loop.\n");
-	    while(Tcl_DoOneEvent(TCL_IDLE_EVENTS)){}
-	    [self setOnScreen:YES];
-	}
-
 	/*
 	 * Create a CGImage by copying (probably using copy-on-write) the
 	 * bitmap data of the CGBitmapContext that we have been using for
@@ -1066,6 +1051,16 @@ ExposeRestrictProc(
 	CGImageRef newImg = CGBitmapContextCreateImage(context);
 	self.layer.contents = (__bridge id) newImg;
 	CGImageRelease(newImg); // will quickly leak memory if this is missing
+
+	/*
+	 * Run any pending widget display procs as part of the update.
+	 * Without this there are black flashes when a window opens.
+	 */
+
+	if (!initialized) {
+	    while(Tcl_DoOneEvent(TCL_IDLE_EVENTS)){}
+	    initialized = true;
+	}
     }
 }
 
@@ -1269,10 +1264,11 @@ static const char *const accentNames[] = {
     [self setFrameSize:self.frame.size];
 
     /*
-     * Update some style elements
+     * Create the *Tglswitch*.trough and *Tglswitch*.slider
+     * elements for the Toggleswitch* styles if necessary
      */
     Tcl_Interp *interp = Tk_Interp(tkwin);
-    int code = Tcl_EvalEx(interp, "after 0 ttk::AppearanceChanged",
+    int code = Tcl_EvalEx(interp, "after 0 ttk::toggleswitch::CondUpdateElements",
 	    TCL_INDEX_NONE, TCL_EVAL_GLOBAL);
     if (code != TCL_OK) {
 	Tcl_BackgroundException(interp, code);

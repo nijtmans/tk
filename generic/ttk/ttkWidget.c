@@ -376,7 +376,7 @@ int TtkWidgetConstructorObjCmd(
     /*
      * Allocate and initialize the widget record.
      */
-    recordPtr = Tcl_Alloc(widgetSpec->recordSize);
+    recordPtr = ckalloc(widgetSpec->recordSize);
     memset(recordPtr, 0, widgetSpec->recordSize);
     corePtr = (WidgetCore *)recordPtr;
 
