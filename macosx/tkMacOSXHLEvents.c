@@ -461,14 +461,12 @@ static void ProcessAppleEvent(
 						  &reslen);
 	if (code == TCL_OK) {
 	    AEPutParamPtr((AppleEvent*)[AEInfo->replyEvent aeDesc],
-			  keyErrorNumber, typeSInt32, &code, 4);
-	    AEPutParamPtr((AppleEvent*)[AEInfo->replyEvent aeDesc],
 			  keyDirectObject, typeChar, result, reslen);
 	} else {
 	    AEPutParamPtr((AppleEvent*)[AEInfo->replyEvent aeDesc],
-			  keyErrorNumber, typeSInt32, &code, 4);
+			  keyErrorString, typeChar, result, reslen);
 	    AEPutParamPtr((AppleEvent*)[AEInfo->replyEvent aeDesc],
-	    			  keyErrorString, typeUTF8Text, result, reslen);
+			  keyErrorNumber, typeSInt32, (Ptr) &code, sizeof(int));
 	}
     } else if (code != TCL_OK) {
 	Tcl_BackgroundException(AEInfo->interp, code);

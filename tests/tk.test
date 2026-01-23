@@ -1,6 +1,5 @@
-# This file is a Tcl script to test the "tk" command, except for:
-# - "tk attribtable", which has its tests in the test file attribtable.test
-# - "tk busy", which has its tests in the test file busy.test
+# This file is a Tcl script to test the "tk" command, except those for
+# "tk busy", which are in the test file busy.test.
 #
 # Copyright © 1997 Sun Microsystems, Inc.
 # Copyright © 1998-1999 Scriptics Corporation.
@@ -38,7 +37,7 @@ test tk-1.1 {tk command: general} -body {
 } -returnCodes error -result {wrong # args: should be "tk subcommand ?arg ...?"}
 test tk-1.2 {tk command: general} -constraints {aquaOrWin32 failsOnXQuartz} -body {
     tk xyz
-} -returnCodes error -result {unknown or ambiguous subcommand "xyz": must be accessible, appname, attribtable, busy, caret, fileicon, fontchooser, inactive, print, scaling, sysnotify, systray, useinputmethods, or windowingsystem}
+} -returnCodes error -result {unknown or ambiguous subcommand "xyz": must be accessible, appname, attribtable, busy, caret, fontchooser, fileicon, inactive, print, scaling, sysnotify, systray, useinputmethods, or windowingsystem}
 
 #
 # COMMON TEST SETUP
