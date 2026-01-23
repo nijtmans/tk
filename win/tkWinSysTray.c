@@ -364,7 +364,7 @@ GetIcoPtr(
     Tcl_Obj *obj)
 {
     IcoInfo *icoPtr;
-    int id;
+    unsigned id;
     const char *string = Tcl_GetString(obj);
     const char *start;
     char *end;
@@ -744,7 +744,7 @@ TaskbarHandlerProc(
 	for (icoInterpPtr = firstIcoInterpPtr; icoInterpPtr != NULL; icoInterpPtr = icoInterpPtr->nextPtr) {
 	    if (icoInterpPtr->hwnd == hwnd) {
 		for (icoPtr = icoInterpPtr->firstIcoPtr; icoPtr != NULL; icoPtr = icoPtr->nextPtr) {
-		    if (icoPtr->id == (int)wParam) {
+		    if (icoPtr->id == wParam) {
 			if (icoPtr->taskbar_command != NULL) {
 			    TaskbarEval(icoPtr, wParam, lParam);
 			}
