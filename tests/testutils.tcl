@@ -157,7 +157,6 @@ namespace eval ::tk::test::generic {
 	# - make it adapt its size to its children
 	. configure -width 200 -height 200
 	wm geometry . +100+100
-	update
 	wm geometry . {}
 	update
     }
@@ -405,7 +404,7 @@ namespace eval ::tk::test::child {
 		    set interpCount 1
 		}
 		set fd [open "|[list [::tcltest::interpreter] \
-			-name tktest[incr interpCount]] $args" r+]
+			-geometry +100+100 -name tktest[incr interpCount]] $args" r+]
 		puts $fd "puts foo; flush stdout"
 		flush $fd
 		if {[gets $fd data] < 0} {
