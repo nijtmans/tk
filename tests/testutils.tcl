@@ -156,6 +156,8 @@ namespace eval ::tk::test::generic {
 	#   (dock, hotspots, ...), i.e. away from screen borders and corners.
 	# - make it adapt its size to its children
 	. configure -width 200 -height 200
+	wm geometry . +100+100
+	update
 	wm geometry . {}
 	update
     }
@@ -403,7 +405,7 @@ namespace eval ::tk::test::child {
 		    set interpCount 1
 		}
 		set fd [open "|[list [::tcltest::interpreter] \
-			-geometry +100+100 -name tktest[incr interpCount]] $args" r+]
+			-name tktest[incr interpCount]] $args" r+]
 		puts $fd "puts foo; flush stdout"
 		flush $fd
 		if {[gets $fd data] < 0} {
