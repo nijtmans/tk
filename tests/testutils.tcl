@@ -148,6 +148,7 @@ namespace eval ::tk::test::generic {
     #
     proc resetWindows {} {
 	deleteWindows
+	. configure -width 200 -height 200
 	wm geometry . {}
 	update
     }
