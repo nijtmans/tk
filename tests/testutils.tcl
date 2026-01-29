@@ -157,7 +157,6 @@ namespace eval ::tk::test::generic {
 	# - make it adapt its size to its children
 	. configure -width 200 -height 200
 	wm geometry . +100+100
-	wm geometry . {}
 	update
     }
 
