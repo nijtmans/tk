@@ -17,7 +17,6 @@
 
 #include "tkInt.h"
 #include <windows.h>
-#include <shellapi.h>
 #include <shobjidl.h>
 #include <propvarutil.h>
 #include <propkey.h>
@@ -25,6 +24,9 @@
 #include "tkWinInt.h"
 #include "tkWinIco.h"
 
+#ifndef NOTIFYICON_VERSION_4
+#   define NOTIFYICON_VERSION_4 4
+#endif
 
 /*
  * Based extensively on the winico extension and sample code from Microsoft.
@@ -364,7 +366,7 @@ GetIcoPtr(
     Tcl_Obj *obj)
 {
     IcoInfo *icoPtr;
-    unsigned id;
+    int id;
     const char *string = Tcl_GetString(obj);
     const char *start;
     char *end;
@@ -744,7 +746,7 @@ TaskbarHandlerProc(
 	for (icoInterpPtr = firstIcoInterpPtr; icoInterpPtr != NULL; icoInterpPtr = icoInterpPtr->nextPtr) {
 	    if (icoInterpPtr->hwnd == hwnd) {
 		for (icoPtr = icoInterpPtr->firstIcoPtr; icoPtr != NULL; icoPtr = icoPtr->nextPtr) {
-		    if (icoPtr->id == wParam) {
+		    if (icoPtr->id == (int)wParam) {
 			if (icoPtr->taskbar_command != NULL) {
 			    TaskbarEval(icoPtr, wParam, lParam);
 			}
@@ -1219,9 +1221,9 @@ WinIcoInit(
 	    icoInterpPtr, NULL);
     Tcl_CreateObjCommand2(interp, "::tk::sysnotify::_sysnotify", WinSysNotifyCmd,
 	    icoInterpPtr, NULL);
-	/* 
-	* This command is defined in tkWinIco.c, but that file does not have 
-	* any hooks for script command creation. 
+	/*
+	* This command is defined in tkWinIco.c, but that file does not have
+	* any hooks for script command creation.
 	*/
 	Tcl_CreateObjCommand(interp, "::tk:::fileicon::_getwinicon", GetFileIcon,
 	    NULL, NULL);

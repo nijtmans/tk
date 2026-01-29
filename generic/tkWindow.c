@@ -966,7 +966,7 @@ TkCreateMainWindow(
 		mainPtr->tclUpdateObjProc2 = cmdInfo.objProc2;
 #ifndef TCL_NO_DEPRECATED
 	    } else if (!cmdInfo.objClientData) {
-		mainPtr->tclUpdateObjProc = cmdInfo.objProc;
+		mainPtr->tclUpdateObjProc = (void *)cmdInfo.objProc;
 #endif /* TCL_NO_DEPRECATED */
 	    }
 	}
@@ -1016,6 +1016,9 @@ TkCreateMainWindow(
 #endif
 #ifdef USE_NMAKE
 		".nmake"
+#endif
+#if !defined(_WIN32) && !defined(MAC_OSX_TK) && !defined(USE_ATK)
+		".no-atk"
 #endif
 #ifdef TK_NO_DEPRECATED
 		".no-deprecate"
