@@ -918,21 +918,24 @@ declare 43 aqua {
 declare 44 aqua {
     MacDrawable *TkMacOSXGetHostToplevel(TkWindow *winPtr)
 }
-declare 46 aqua {
-    int TkpIsWindowFloating(void *window)
-}
+# removed in Tk 9.1
+#declare 46 aqua {
+#    int TkpIsWindowFloating(void *window)
+#}
 declare 47 aqua {
     Tk_Window TkpGetCapture(void)
 }
 declare 49 aqua {
     Tk_Window TkMacOSXGetContainer(TkWindow *winPtr)
 }
-declare 50 aqua {
-    int TkGenerateButtonEvent(int x, int y, Window window, unsigned int state)
-}
-declare 51 aqua {
-    void TkGenWMDestroyEvent(Tk_Window tkwin)
-}
+# removed in Tk 9.1
+#declare 50 aqua {
+#    int TkGenerateButtonEvent(int x, int y, Window window, unsigned int state)
+#}
+# removed in Tk 9.1
+#declare 51 aqua {
+#    void TkGenWMDestroyEvent(Tk_Window tkwin)
+#}
 #
 # Slot 52 unused (WAS: TkMacOSXSetDrawingEnabled)
 #

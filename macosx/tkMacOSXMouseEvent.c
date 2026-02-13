@@ -721,59 +721,6 @@ TkGenerateButtonEventForXPointer(
 /*
  *----------------------------------------------------------------------
  *
- * TkGenerateButtonEvent --
- *
- *	Given a global x & y position and the button key status this procedure
- *	generates the appropriate X button event. It also handles the state
- *	changes needed to implement implicit grabs.
- *
- * Results:
- *	True if event(s) are generated, false otherwise.
- *
- * Side effects:
- *	Additional events may be placed on the Tk event queue. Grab state may
- *	also change.
- *
- *----------------------------------------------------------------------
- */
-
-int
-TkGenerateButtonEvent(
-    int x,			/* X location of mouse, */
-    int y,			/* Y location of mouse. */
-    Window window,		/* X Window containing button event. */
-    unsigned int state)		/* Button Key state suitable for X event. */
-{
-    MacDrawable *macWin = (MacDrawable *)window;
-    NSWindow *win = TkMacOSXGetNSWindowForDrawable(window);
-    MouseEventData med;
-
-    bzero(&med, sizeof(MouseEventData));
-    med.state = state;
-    med.window = window;
-    med.global.h = x;
-    med.global.v = y;
-    med.local = med.global;
-
-    if (win) {
-	NSPoint local = NSMakePoint(x, TkMacOSXZeroScreenHeight() - y);
-
-	local = [win tkConvertPointFromScreen:local];
-	local.y = [win frame].size.height - local.y;
-	if (macWin->winPtr && macWin->winPtr->wmInfoPtr) {
-	    local.x -= macWin->winPtr->wmInfoPtr->xInParent;
-	    local.y -= macWin->winPtr->wmInfoPtr->yInParent;
-	}
-	med.local.h = local.x;
-	med.local.v = TkMacOSXZeroScreenHeight() - local.y;
-    }
-
-    return GenerateButtonEvent(&med);
-}
-
-/*
- *----------------------------------------------------------------------
- *
  * GenerateButtonEvent --
  *
  *	Generate an X button event from a MouseEventData structure. Handles
@@ -796,23 +743,6 @@ GenerateButtonEvent(
     Tk_Window tkwin;
     int dummy;
     TkDisplay *dispPtr;
-
-#ifdef UNUSED
-
-    /*
-     * ButtonDown events will always occur in the front window. ButtonUp
-     * events, however, may occur anywhere on the screen. ButtonUp events
-     * should only be sent to Tk if in the front window or during an implicit
-     * grab.
-     */
-
-    if ((medPtr->activeNonFloating == NULL)
-	    || ((!(TkpIsWindowFloating(medPtr->whichWin))
-	    && (medPtr->activeNonFloating != medPtr->whichWin))
-	    && TkpGetCapture() == NULL)) {
-	return false;
-    }
-#endif
 
     dispPtr = TkGetDisplayList();
     tkwin = Tk_IdToWindow(dispPtr->display, medPtr->window);

@@ -7069,29 +7069,6 @@ setStateEnd:
 }
 
 /*
- *----------------------------------------------------------------------
- *
- * TkpIsWindowFloating --
- *
- *	Returns 1 if a window is floating, 0 otherwise.
- *
- * Results:
- *	1 or 0 depending on window's floating attribute.
- *
- * Side effects:
- *	None.
- *
- *----------------------------------------------------------------------
- */
-
-int
-TkpIsWindowFloating(
-    void *wRef)
-{
-    return [(NSWindow *)wRef level] == kCGFloatingWindowLevel;
-}
-
-/*
  *--------------------------------------------------------------
  *
  * TkMacOSXWindowOffset --

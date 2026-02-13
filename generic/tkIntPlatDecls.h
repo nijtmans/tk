@@ -210,18 +210,12 @@ EXTERN MacDrawable *	TkMacOSXContainerId(TkWindow *winPtr);
 /* 44 */
 EXTERN MacDrawable *	TkMacOSXGetHostToplevel(TkWindow *winPtr);
 /* Slot 45 is reserved */
-/* 46 */
-EXTERN int		TkpIsWindowFloating(void *window);
+/* Slot 46 is reserved */
 /* 47 */
 EXTERN Tk_Window	TkpGetCapture(void);
 /* Slot 48 is reserved */
 /* 49 */
 EXTERN Tk_Window	TkMacOSXGetContainer(TkWindow *winPtr);
-/* 50 */
-EXTERN int		TkGenerateButtonEvent(int x, int y, Window window,
-				unsigned int state);
-/* 51 */
-EXTERN void		TkGenWMDestroyEvent(Tk_Window tkwin);
 #endif /* AQUA */
 #if !(defined(_WIN32) || defined(__CYGWIN__) || defined(MAC_OSX_TK)) /* X11 */
 /* 0 */
@@ -389,12 +383,10 @@ typedef struct TkIntPlatStubs {
     MacDrawable * (*tkMacOSXContainerId) (TkWindow *winPtr); /* 43 */
     MacDrawable * (*tkMacOSXGetHostToplevel) (TkWindow *winPtr); /* 44 */
     void (*reserved45)(void);
-    int (*tkpIsWindowFloating) (void *window); /* 46 */
+    void (*reserved46)(void);
     Tk_Window (*tkpGetCapture) (void); /* 47 */
     void (*reserved48)(void);
     Tk_Window (*tkMacOSXGetContainer) (TkWindow *winPtr); /* 49 */
-    int (*tkGenerateButtonEvent) (int x, int y, Window window, unsigned int state); /* 50 */
-    void (*tkGenWMDestroyEvent) (Tk_Window tkwin); /* 51 */
 #endif /* AQUA */
 #if !(defined(_WIN32) || defined(__CYGWIN__) || defined(MAC_OSX_TK)) /* X11 */
     void (*tkCreateXEventSource) (void); /* 0 */
@@ -617,17 +609,12 @@ extern const TkIntPlatStubs *tkIntPlatStubsPtr;
 #define TkMacOSXGetHostToplevel \
 	(tkIntPlatStubsPtr->tkMacOSXGetHostToplevel) /* 44 */
 /* Slot 45 is reserved */
-#define TkpIsWindowFloating \
-	(tkIntPlatStubsPtr->tkpIsWindowFloating) /* 46 */
+/* Slot 46 is reserved */
 #define TkpGetCapture \
 	(tkIntPlatStubsPtr->tkpGetCapture) /* 47 */
 /* Slot 48 is reserved */
 #define TkMacOSXGetContainer \
 	(tkIntPlatStubsPtr->tkMacOSXGetContainer) /* 49 */
-#define TkGenerateButtonEvent \
-	(tkIntPlatStubsPtr->tkGenerateButtonEvent) /* 50 */
-#define TkGenWMDestroyEvent \
-	(tkIntPlatStubsPtr->tkGenWMDestroyEvent) /* 51 */
 #endif /* AQUA */
 #if !(defined(_WIN32) || defined(__CYGWIN__) || defined(MAC_OSX_TK)) /* X11 */
 #define TkCreateXEventSource \
