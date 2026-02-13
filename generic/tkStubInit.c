@@ -166,14 +166,8 @@ TkPutImage(
 #	define TkWinFillRect 0
 #	define TkWinGetBorderPixels 0
 #	define TkWinGetDrawableDC 0
-#	define TkWinGetModifierState 0
-#	define TkWinGetSystemPalette 0
-#	define TkWinGetWrapperWindow 0
-#	define TkWinHandleMenuEvent 0
-#	define TkWinIndexOfColor 0
 #	define TkWinReleaseDrawableDC 0
 #	define TkWinResendEvent 0
-#	define TkWinSelectPalette 0
 #	define TkWinSetMenu 0
 #	define TkWinSetWindowPos 0
 #	define TkWinWmCleanup 0
@@ -181,7 +175,6 @@ TkPutImage(
 #	define TkWinXInit 0
 #	define TkWinSetForegroundWindow 0
 #	define TkWinDialogDebug 0
-#	define TkWinGetMenuSystemDefault 0
 #	define TkWinSetHINSTANCE 0
 #	define TkWinChildProc 0
 
@@ -442,22 +435,22 @@ static const TkIntPlatStubs tkIntPlatStubs = {
     TkWinFillRect, /* 14 */
     TkWinGetBorderPixels, /* 15 */
     TkWinGetDrawableDC, /* 16 */
-    TkWinGetModifierState, /* 17 */
-    TkWinGetSystemPalette, /* 18 */
-    TkWinGetWrapperWindow, /* 19 */
-    TkWinHandleMenuEvent, /* 20 */
-    TkWinIndexOfColor, /* 21 */
+    0, /* 17 */
+    0, /* 18 */
+    0, /* 19 */
+    0, /* 20 */
+    0, /* 21 */
     TkWinReleaseDrawableDC, /* 22 */
     TkWinResendEvent, /* 23 */
-    TkWinSelectPalette, /* 24 */
-    TkWinSetMenu, /* 25 */
+    0, /* 24 */
+    0, /* 25 */
     TkWinSetWindowPos, /* 26 */
     TkWinWmCleanup, /* 27 */
     TkWinXCleanup, /* 28 */
     TkWinXInit, /* 29 */
     TkWinSetForegroundWindow, /* 30 */
     TkWinDialogDebug, /* 31 */
-    TkWinGetMenuSystemDefault, /* 32 */
+    0, /* 32 */
     TkAlignImageData, /* 33 */
     TkWinSetHINSTANCE, /* 34 */
     0, /* 35 */

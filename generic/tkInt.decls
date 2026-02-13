@@ -696,14 +696,14 @@ declare 10 win {
 }
 # removed in Tk 9.1
 #declare 11 win {
-#    void TkWinCancelMouseTimer(void)
+#   void TkWinCancelMouseTimer(void)
 #}
 declare 12 win {
     void TkWinClipboardRender(TkDisplay *dispPtr, UINT format)
 }
 # removed in Tk 9.1
 #declare 13 win {
-#    LRESULT TkWinEmbeddedEventProc(HWND hwnd, UINT message,
+#   LRESULT TkWinEmbeddedEventProc(HWND hwnd, UINT message,
 #	    WPARAM wParam, LPARAM lParam)
 #}
 declare 14 win {
@@ -716,34 +716,41 @@ declare 15 win {
 declare 16 win {
     HDC TkWinGetDrawableDC(Display *display, Drawable d, TkWinDCState *state)
 }
-declare 17 win {
-    unsigned int TkWinGetModifierState(void)
-}
-declare 18 win {
-    HPALETTE TkWinGetSystemPalette(void)
-}
-declare 19 win {
-    HWND TkWinGetWrapperWindow(Tk_Window tkwin)
-}
-declare 20 win {
-    int TkWinHandleMenuEvent(HWND *phwnd, UINT *pMessage, WPARAM *pwParam,
-	    LPARAM *plParam, LRESULT *plResult)
-}
-declare 21 win {
-    int TkWinIndexOfColor(XColor *colorPtr)
-}
+# removed in Tk 9.1
+#declare 17 win {
+#   unsigned int TkWinGetModifierState(void)
+#}
+# removed in Tk 9.1
+#declare 18 win {
+#   HPALETTE TkWinGetSystemPalette(void)
+#}
+# removed in Tk 9.1
+#declare 19 win {
+#   HWND TkWinGetWrapperWindow(Tk_Window tkwin)
+#}
+# removed in Tk 9.1
+#declare 20 win {
+#   int TkWinHandleMenuEvent(HWND *phwnd, UINT *pMessage, WPARAM *pwParam,
+#	    LPARAM *plParam, LRESULT *plResult)
+#}
+# removed in Tk 9.1
+#declare 21 win {
+#   int TkWinIndexOfColor(XColor *colorPtr)
+#}
 declare 22 win {
     void TkWinReleaseDrawableDC(Drawable d, HDC hdc, TkWinDCState *state)
 }
 declare 23 win {
     LRESULT TkWinResendEvent(WNDPROC wndproc, HWND hwnd, XEvent *eventPtr)
 }
-declare 24 win {
-    HPALETTE TkWinSelectPalette(HDC dc, Colormap colormap)
-}
-declare 25 win {
-    void TkWinSetMenu(Tk_Window tkwin, HMENU hMenu)
-}
+# removed in Tk 9.1
+#declare 24 win {
+#   HPALETTE TkWinSelectPalette(HDC dc, Colormap colormap)
+#}
+# removed in Tk 9.1
+#declare 25 win {
+#   void TkWinSetMenu(Tk_Window tkwin, HMENU hMenu)
+#}
 declare 26 win {
     void TkWinSetWindowPos(HWND hwnd, HWND siblingHwnd, int pos)
 }
@@ -765,10 +772,11 @@ declare 30 win {
 declare 31 win {
     void TkWinDialogDebug(int debug)
 }
-declare 32 win {
-    Tcl_Obj *TkWinGetMenuSystemDefault(Tk_Window tkwin,
-	    const char *dbName, const char *className)
-}
+# removed in Tk 9.1
+#declare 32 win {
+#   Tcl_Obj *TkWinGetMenuSystemDefault(Tk_Window tkwin,
+#	    const char *dbName, const char *className)
+#}
 declare 33 win {
     char *TkAlignImageData(XImage *image, int alignment, int bitOrder)
 }

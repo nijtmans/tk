@@ -72,28 +72,19 @@ EXTERN COLORREF		TkWinGetBorderPixels(Tk_Window tkwin,
 /* 16 */
 EXTERN HDC		TkWinGetDrawableDC(Display *display, Drawable d,
 				TkWinDCState *state);
-/* 17 */
-EXTERN unsigned int	TkWinGetModifierState(void);
-/* 18 */
-EXTERN HPALETTE		TkWinGetSystemPalette(void);
-/* 19 */
-EXTERN HWND		TkWinGetWrapperWindow(Tk_Window tkwin);
-/* 20 */
-EXTERN int		TkWinHandleMenuEvent(HWND *phwnd, UINT *pMessage,
-				WPARAM *pwParam, LPARAM *plParam,
-				LRESULT *plResult);
-/* 21 */
-EXTERN int		TkWinIndexOfColor(XColor *colorPtr);
+/* Slot 17 is reserved */
+/* Slot 18 is reserved */
+/* Slot 19 is reserved */
+/* Slot 20 is reserved */
+/* Slot 21 is reserved */
 /* 22 */
 EXTERN void		TkWinReleaseDrawableDC(Drawable d, HDC hdc,
 				TkWinDCState *state);
 /* 23 */
 EXTERN LRESULT		TkWinResendEvent(WNDPROC wndproc, HWND hwnd,
 				XEvent *eventPtr);
-/* 24 */
-EXTERN HPALETTE		TkWinSelectPalette(HDC dc, Colormap colormap);
-/* 25 */
-EXTERN void		TkWinSetMenu(Tk_Window tkwin, HMENU hMenu);
+/* Slot 24 is reserved */
+/* Slot 25 is reserved */
 /* 26 */
 EXTERN void		TkWinSetWindowPos(HWND hwnd, HWND siblingHwnd,
 				int pos);
@@ -107,9 +98,7 @@ EXTERN void		TkWinXInit(HINSTANCE hInstance);
 EXTERN void		TkWinSetForegroundWindow(TkWindow *winPtr);
 /* 31 */
 EXTERN void		TkWinDialogDebug(int debug);
-/* 32 */
-EXTERN Tcl_Obj *	TkWinGetMenuSystemDefault(Tk_Window tkwin,
-				const char *dbName, const char *className);
+/* Slot 32 is reserved */
 /* 33 */
 EXTERN char *		TkAlignImageData(XImage *image, int alignment,
 				int bitOrder);
@@ -321,22 +310,22 @@ typedef struct TkIntPlatStubs {
     void (*tkWinFillRect) (HDC dc, int x, int y, int width, int height, int pixel); /* 14 */
     COLORREF (*tkWinGetBorderPixels) (Tk_Window tkwin, Tk_3DBorder border, int which); /* 15 */
     HDC (*tkWinGetDrawableDC) (Display *display, Drawable d, TkWinDCState *state); /* 16 */
-    unsigned int (*tkWinGetModifierState) (void); /* 17 */
-    HPALETTE (*tkWinGetSystemPalette) (void); /* 18 */
-    HWND (*tkWinGetWrapperWindow) (Tk_Window tkwin); /* 19 */
-    int (*tkWinHandleMenuEvent) (HWND *phwnd, UINT *pMessage, WPARAM *pwParam, LPARAM *plParam, LRESULT *plResult); /* 20 */
-    int (*tkWinIndexOfColor) (XColor *colorPtr); /* 21 */
+    void (*reserved17)(void);
+    void (*reserved18)(void);
+    void (*reserved19)(void);
+    void (*reserved20)(void);
+    void (*reserved21)(void);
     void (*tkWinReleaseDrawableDC) (Drawable d, HDC hdc, TkWinDCState *state); /* 22 */
     LRESULT (*tkWinResendEvent) (WNDPROC wndproc, HWND hwnd, XEvent *eventPtr); /* 23 */
-    HPALETTE (*tkWinSelectPalette) (HDC dc, Colormap colormap); /* 24 */
-    void (*tkWinSetMenu) (Tk_Window tkwin, HMENU hMenu); /* 25 */
+    void (*reserved24)(void);
+    void (*reserved25)(void);
     void (*tkWinSetWindowPos) (HWND hwnd, HWND siblingHwnd, int pos); /* 26 */
     void (*tkWinWmCleanup) (HINSTANCE hInstance); /* 27 */
     void (*tkWinXCleanup) (void *clientData); /* 28 */
     void (*tkWinXInit) (HINSTANCE hInstance); /* 29 */
     void (*tkWinSetForegroundWindow) (TkWindow *winPtr); /* 30 */
     void (*tkWinDialogDebug) (int debug); /* 31 */
-    Tcl_Obj * (*tkWinGetMenuSystemDefault) (Tk_Window tkwin, const char *dbName, const char *className); /* 32 */
+    void (*reserved32)(void);
     char * (*tkAlignImageData) (XImage *image, int alignment, int bitOrder); /* 33 */
     void (*tkWinSetHINSTANCE) (HINSTANCE hInstance); /* 34 */
     void (*reserved35)(void);
@@ -502,24 +491,17 @@ extern const TkIntPlatStubs *tkIntPlatStubsPtr;
 	(tkIntPlatStubsPtr->tkWinGetBorderPixels) /* 15 */
 #define TkWinGetDrawableDC \
 	(tkIntPlatStubsPtr->tkWinGetDrawableDC) /* 16 */
-#define TkWinGetModifierState \
-	(tkIntPlatStubsPtr->tkWinGetModifierState) /* 17 */
-#define TkWinGetSystemPalette \
-	(tkIntPlatStubsPtr->tkWinGetSystemPalette) /* 18 */
-#define TkWinGetWrapperWindow \
-	(tkIntPlatStubsPtr->tkWinGetWrapperWindow) /* 19 */
-#define TkWinHandleMenuEvent \
-	(tkIntPlatStubsPtr->tkWinHandleMenuEvent) /* 20 */
-#define TkWinIndexOfColor \
-	(tkIntPlatStubsPtr->tkWinIndexOfColor) /* 21 */
+/* Slot 17 is reserved */
+/* Slot 18 is reserved */
+/* Slot 19 is reserved */
+/* Slot 20 is reserved */
+/* Slot 21 is reserved */
 #define TkWinReleaseDrawableDC \
 	(tkIntPlatStubsPtr->tkWinReleaseDrawableDC) /* 22 */
 #define TkWinResendEvent \
 	(tkIntPlatStubsPtr->tkWinResendEvent) /* 23 */
-#define TkWinSelectPalette \
-	(tkIntPlatStubsPtr->tkWinSelectPalette) /* 24 */
-#define TkWinSetMenu \
-	(tkIntPlatStubsPtr->tkWinSetMenu) /* 25 */
+/* Slot 24 is reserved */
+/* Slot 25 is reserved */
 #define TkWinSetWindowPos \
 	(tkIntPlatStubsPtr->tkWinSetWindowPos) /* 26 */
 #define TkWinWmCleanup \
@@ -532,8 +514,7 @@ extern const TkIntPlatStubs *tkIntPlatStubsPtr;
 	(tkIntPlatStubsPtr->tkWinSetForegroundWindow) /* 30 */
 #define TkWinDialogDebug \
 	(tkIntPlatStubsPtr->tkWinDialogDebug) /* 31 */
-#define TkWinGetMenuSystemDefault \
-	(tkIntPlatStubsPtr->tkWinGetMenuSystemDefault) /* 32 */
+/* Slot 32 is reserved */
 #define TkAlignImageData \
 	(tkIntPlatStubsPtr->tkAlignImageData) /* 33 */
 #define TkWinSetHINSTANCE \
