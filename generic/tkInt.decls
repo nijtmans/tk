@@ -857,9 +857,10 @@ declare 8 aqua {
 declare 9 aqua {
     int TkpWmSetState(TkWindow *winPtr, int state)
 }
-declare 10 aqua {
-    void TkMacOSXClearMenubarActive(void)
-}
+# removed in Tk 9.1
+#declare 10 aqua {
+#   void TkMacOSXClearMenubarActive(void)
+#}
 declare 11 aqua {
     void TkpSetCapture(TkWindow *winPtr)
 }

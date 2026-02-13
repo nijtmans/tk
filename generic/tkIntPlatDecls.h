@@ -150,8 +150,7 @@ EXTERN int		TkpScanWindowId(Tcl_Interp *interp,
 EXTERN void		TkpSetCursor(Cursor cursor);
 /* 9 */
 EXTERN int		TkpWmSetState(TkWindow *winPtr, int state);
-/* 10 */
-EXTERN void		TkMacOSXClearMenubarActive(void);
+/* Slot 10 is reserved */
 /* 11 */
 EXTERN void		TkpSetCapture(TkWindow *winPtr);
 /* Slot 12 is reserved */
@@ -347,7 +346,7 @@ typedef struct TkIntPlatStubs {
     void (*reserved7)(void);
     void (*tkpSetCursor) (Cursor cursor); /* 8 */
     int (*tkpWmSetState) (TkWindow *winPtr, int state); /* 9 */
-    void (*tkMacOSXClearMenubarActive) (void); /* 10 */
+    void (*reserved10)(void);
     void (*tkpSetCapture) (TkWindow *winPtr); /* 11 */
     void (*reserved12)(void);
     void (*reserved13)(void);
@@ -553,8 +552,7 @@ extern const TkIntPlatStubs *tkIntPlatStubsPtr;
 	(tkIntPlatStubsPtr->tkpSetCursor) /* 8 */
 #define TkpWmSetState \
 	(tkIntPlatStubsPtr->tkpWmSetState) /* 9 */
-#define TkMacOSXClearMenubarActive \
-	(tkIntPlatStubsPtr->tkMacOSXClearMenubarActive) /* 10 */
+/* Slot 10 is reserved */
 #define TkpSetCapture \
 	(tkIntPlatStubsPtr->tkpSetCapture) /* 11 */
 /* Slot 12 is reserved */

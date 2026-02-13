@@ -478,7 +478,7 @@ static const TkIntPlatStubs tkIntPlatStubs = {
     0, /* 7 */
     TkpSetCursor, /* 8 */
     TkpWmSetState, /* 9 */
-    TkMacOSXClearMenubarActive, /* 10 */
+    0, /* 10 */
     TkpSetCapture, /* 11 */
     0, /* 12 */
     0, /* 13 */
