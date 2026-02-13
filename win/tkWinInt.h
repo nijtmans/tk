@@ -187,7 +187,6 @@ MODULE_SCOPE void TkWinSetMenu(Tk_Window, HMENU);
 MODULE_SCOPE Tcl_Obj *TkWinGetMenuSystemDefault(Tk_Window, const char *, const char *);
 
 
-
 /*
  * The following allows us to cache these encoding for multiple functions.
  */
