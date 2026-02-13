@@ -1,7 +1,7 @@
 /*
  * tkMacOSXDraw.c --
  *
- *	This file contains functions that draw to windows. Many of thees
+ *	This file contains functions that draw to windows. Many of these
  *	functions emulate Xlib functions.
  *
  * Copyright © 1995-1997 Sun Microsystems, Inc.
@@ -1067,30 +1067,6 @@ XFillArcs(
     }
     TkMacOSXRestoreDrawingContext(&dc);
     return Success;
-}
-
-/*
- *----------------------------------------------------------------------
- *
- * TkMacOSXSetUpGraphicsPort --
- *
- *	Set up the graphics port from the given GC.
- *
- * Results:
- *	None.
- *
- * Side effects:
- *	None.
- *
- *----------------------------------------------------------------------
- */
-
-void
-TkMacOSXSetUpGraphicsPort(
-    TCL_UNUSED(GC),			/* GC to apply to current port. */
-    TCL_UNUSED(void *))
-{
-    Tcl_Panic("TkMacOSXSetUpGraphicsPort: Obsolete, no more QD!");
 }
 
 

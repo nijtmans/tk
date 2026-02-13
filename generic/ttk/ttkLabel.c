@@ -131,7 +131,7 @@ static void TextDraw(TextElement *text, Tk_Window tkwin, Drawable d, Ttk_Box b)
     XGCValues gcValues;
     GC gc1, gc2;
     Tk_Anchor anchor = TK_ANCHOR_CENTER;
-    TkRegion clipRegion = NULL;
+    Region clipRegion = NULL;
 
     gcValues.font = Tk_FontId(text->tkfont);
     gcValues.foreground = color->pixel;
@@ -151,7 +151,7 @@ static void TextDraw(TextElement *text, Tk_Window tkwin, Drawable d, Ttk_Box b)
     if (b.width < text->width || b.height < text->height) {
 	XRectangle rect;
 
-	clipRegion = TkCreateRegion();
+	clipRegion = XCreateRegion();
 	rect.x = b.x;
 	rect.y = b.y;
 	rect.width = b.width + (text->embossed ? 1 : 0);

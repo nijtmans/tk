@@ -619,29 +619,6 @@ enum {
 /*
  *----------------------------------------------------------------------
  *
- * TkMacOSXButtonKeyState --
- *
- *	Returns the current state of the button & modifier keys.
- *
- * Results:
- *	A bitwise inclusive OR of a subset of the following: Button1Mask,
- *	ShiftMask, LockMask, ControlMask, Mod*Mask.
- *
- * Side effects:
- *	None.
- *
- *----------------------------------------------------------------------
- */
-
-unsigned int
-TkMacOSXButtonKeyState(void)
-{
-    return [NSApp tkButtonState];
-}
-
-/*
- *----------------------------------------------------------------------
- *
  * XQueryPointer --
  *
  *	Check the current state of the mouse. This is not a complete
@@ -699,7 +676,7 @@ XQueryPointer(
 	}
     }
     if (mask_return) {
-	*mask_return = TkMacOSXButtonKeyState();
+	*mask_return = [NSApp tkButtonState];
     }
     return True;
 }

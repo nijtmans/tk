@@ -15,7 +15,7 @@
 /*
  *----------------------------------------------------------------------
  *
- * TkCreateRegion --
+ * XCreateRegion --
  *
  *	Construct an empty region.
  *
@@ -28,12 +28,12 @@
  *----------------------------------------------------------------------
  */
 
-TkRegion
-TkCreateRegion(void)
+Region
+XCreateRegion(void)
 {
     RECT rect;
     memset(&rect, 0, sizeof(RECT));
-    return (TkRegion) CreateRectRgnIndirect(&rect);
+    return (Region)CreateRectRgnIndirect(&rect);
 }
 
 /*
@@ -54,7 +54,7 @@ TkCreateRegion(void)
 
 int
 TkDestroyRegion(
-    TkRegion r)
+    Region r)
 {
     DeleteObject((HRGN) r);
     return Success;
@@ -78,7 +78,7 @@ TkDestroyRegion(
 
 int
 TkClipBox(
-    TkRegion r,
+    Region r,
     XRectangle* rect_return)
 {
     RECT rect;
@@ -109,9 +109,9 @@ TkClipBox(
 
 int
 TkIntersectRegion(
-    TkRegion sra,
-    TkRegion srb,
-    TkRegion dr_return)
+    Region sra,
+    Region srb,
+    Region dr_return)
 {
     CombineRgn((HRGN) dr_return, (HRGN) sra, (HRGN) srb, RGN_AND);
     return Success;
@@ -136,8 +136,8 @@ TkIntersectRegion(
 int
 TkUnionRectWithRegion(
     XRectangle *rectangle,
-    TkRegion src_region,
-    TkRegion dest_region_return)
+    Region src_region,
+    Region dest_region_return)
 {
     HRGN rectRgn = CreateRectRgn(rectangle->x, rectangle->y,
 	    rectangle->x + rectangle->width, rectangle->y + rectangle->height);
@@ -167,7 +167,7 @@ TkUnionRectWithRegion(
 
 void
 TkpBuildRegionFromAlphaData(
-    TkRegion region,
+    Region region,
     unsigned int x, unsigned int y,
 				/* Where in region to update. */
     unsigned int width, unsigned int height,
@@ -238,7 +238,7 @@ TkpBuildRegionFromAlphaData(
 
 int
 TkRectInRegion(
-    TkRegion r,			/* Region to inspect */
+    Region r,			/* Region to inspect */
     int x, int y,		/* Top-left of rectangle */
     unsigned int width,		/* Width of rectangle */
     unsigned int height)	/* Height of rectangle */
@@ -269,9 +269,9 @@ TkRectInRegion(
 
 int
 TkSubtractRegion(
-    TkRegion sra,
-    TkRegion srb,
-    TkRegion dr_return)
+    Region sra,
+    Region srb,
+    Region dr_return)
 {
     CombineRgn((HRGN) dr_return, (HRGN) sra, (HRGN) srb, RGN_DIFF);
     return Success;
@@ -295,8 +295,8 @@ TkSubtractRegion(
 
 void
 TkpCopyRegion(
-    TkRegion dst,
-    TkRegion src)
+    Region dst,
+    Region src)
 {
     CombineRgn((HRGN)dst, (HRGN)src, NULL, RGN_COPY);
 }

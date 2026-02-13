@@ -423,7 +423,7 @@ int
 TkSetRegion(
     TCL_UNUSED(Display *),
     GC gc,
-    TkRegion r)
+    Region r)
 {
     if (r == NULL) {
 	Tcl_Panic("must not pass NULL to TkSetRegion for compatibility with X11; use XSetClipMask instead");
@@ -432,7 +432,7 @@ TkSetRegion(
 
 	clip_mask->type = TKP_CLIP_REGION;
 	clip_mask->value.region = r;
-	clip_mask->value.region = TkCreateRegion();
+	clip_mask->value.region = XCreateRegion();
 	TkpCopyRegion(clip_mask->value.region, r);
     }
     return Success;
@@ -465,7 +465,7 @@ XSetClipRectangles(
     int n,
     TCL_UNUSED(int))
 {
-    TkRegion clipRgn = TkCreateRegion();
+    Region clipRgn = XCreateRegion();
     TkpClipMask * clip_mask = AllocClipMask(gc);
     clip_mask->type = TKP_CLIP_REGION;
     clip_mask->value.region = clipRgn;

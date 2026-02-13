@@ -50,16 +50,13 @@ doNothing(void)
     /* dummy implementation, no need to do anything */
     return 0;
 }
-#   undef TkpWillDrawWidget
-#   undef TkpRedrawWidget
 #   undef TkpDefineNativeBitmaps
 #   undef TkpCreateNativeBitmap
 #   undef TkpGetNativeAppBitmap
-#   define TkpWillDrawWidget ((int (*)(Tk_Window))(void *)doNothing)
-#   define TkpRedrawWidget ((void (*)(Tk_Window))(void *)doNothing)
 #   define TkpDefineNativeBitmaps ((void (*)(void))(void *)doNothing)
 #   define TkpCreateNativeBitmap ((Pixmap (*)(Display *, const void *))(void *)doNothing)
 #   define TkpGetNativeAppBitmap ((Pixmap (*)(Display *, const char *, int *, int *))(void *)doNothing)
+#   define TkAboutDlg ((void (*)(void))(void *)doNothing)
 #endif
 
 #ifdef _WIN32
@@ -165,9 +162,7 @@ TkPutImage(
 #	define TkPointerDeadWindow 0
 #	define TkpSetCapture 0
 #	define TkpSetCursor 0
-#	define TkWinCancelMouseTimer 0
 #	define TkWinClipboardRender 0
-#	define TkWinEmbeddedEventProc 0
 #	define TkWinFillRect 0
 #	define TkWinGetBorderPixels 0
 #	define TkWinGetDrawableDC 0
@@ -421,8 +416,8 @@ static const TkIntStubs tkIntStubs = {
     TkUnderlineAngledTextLayout, /* 182 */
     TkIntersectAngledTextLayout, /* 183 */
     TkDrawAngledChars, /* 184 */
-    TkpRedrawWidget, /* 185 */
-    TkpWillDrawWidget, /* 186 */
+    0, /* 185 */
+    0, /* 186 */
     TkDebugPhotoStringMatchDef, /* 187 */
 };
 
@@ -431,7 +426,7 @@ static const TkIntPlatStubs tkIntPlatStubs = {
     0,
 #if defined(_WIN32) || defined(__CYGWIN__) /* WIN */
     TkCreateXEventSource, /* 0 */
-    0, /* 1 */
+    TkAboutDlg, /* 1 */
     TkGenerateActivateEvents, /* 2 */
     TkpGetMS, /* 3 */
     TkPointerDeadWindow, /* 4 */
@@ -441,9 +436,9 @@ static const TkIntPlatStubs tkIntPlatStubs = {
     TkpSetCursor, /* 8 */
     TkpWmSetState, /* 9 */
     TkSetPixmapColormap, /* 10 */
-    TkWinCancelMouseTimer, /* 11 */
+    0, /* 11 */
     TkWinClipboardRender, /* 12 */
-    TkWinEmbeddedEventProc, /* 13 */
+    0, /* 13 */
     TkWinFillRect, /* 14 */
     TkWinGetBorderPixels, /* 15 */
     TkWinGetDrawableDC, /* 16 */
@@ -485,36 +480,36 @@ static const TkIntPlatStubs tkIntPlatStubs = {
     TkGenerateActivateEvents, /* 2 */
     TkpGetMS, /* 3 */
     TkPointerDeadWindow, /* 4 */
-    TkpSetCursor, /* 5 */
+    0, /* 5 */
     TkpScanWindowId, /* 6 */
-    TkpWmSetState, /* 7 */
-    TkMacOSXButtonKeyState, /* 8 */
-    TkMacOSXClearMenubarActive, /* 9 */
-    TkMacOSXDispatchMenuEvent, /* 10 */
+    0, /* 7 */
+    TkpSetCursor, /* 8 */
+    TkpWmSetState, /* 9 */
+    TkMacOSXClearMenubarActive, /* 10 */
     TkpSetCapture, /* 11 */
-    TkMacOSXHandleTearoffMenu, /* 12 */
+    0, /* 12 */
     0, /* 13 */
     TkMacOSXDoHLEvent, /* 14 */
     0, /* 15 */
     TkMacOSXGetXWindow, /* 16 */
     TkMacOSXGrowToplevel, /* 17 */
-    TkMacOSXHandleMenuSelect, /* 18 */
+    0, /* 18 */
     0, /* 19 */
     0, /* 20 */
     TkMacOSXInvalidateWindow, /* 21 */
     0, /* 22 */
     TkMacOSXMakeRealWindowExist, /* 23 */
     TkMacOSXMakeStippleMap, /* 24 */
-    TkMacOSXMenuClick, /* 25 */
+    0, /* 25 */
     0, /* 26 */
     TkMacOSXResizable, /* 27 */
-    TkMacOSXSetHelpMenuItemCount, /* 28 */
+    0, /* 28 */
     TkMacOSXSetScrollbarGrow, /* 29 */
     0, /* 30 */
-    TkMacOSXSetUpGraphicsPort, /* 31 */
+    0, /* 31 */
     TkMacOSXUpdateClipRgn, /* 32 */
     0, /* 33 */
-    TkMacOSXUseMenuID, /* 34 */
+    0, /* 34 */
     TkMacOSXVisableClipRgn, /* 35 */
     TkMacOSXWinBounds, /* 36 */
     TkMacOSXWindowOffset, /* 37 */
@@ -525,7 +520,7 @@ static const TkIntPlatStubs tkIntPlatStubs = {
     Tk_TopCoordsToWindow, /* 42 */
     TkMacOSXContainerId, /* 43 */
     TkMacOSXGetHostToplevel, /* 44 */
-    TkMacOSXPreprocessMenu, /* 45 */
+    0, /* 45 */
     TkpIsWindowFloating, /* 46 */
     TkpGetCapture, /* 47 */
     0, /* 48 */
@@ -535,7 +530,7 @@ static const TkIntPlatStubs tkIntPlatStubs = {
 #endif /* AQUA */
 #if !(defined(_WIN32) || defined(__CYGWIN__) || defined(MAC_OSX_TK)) /* X11 */
     TkCreateXEventSource, /* 0 */
-    0, /* 1 */
+    TkAboutDlg, /* 1 */
     TkGenerateActivateEvents, /* 2 */
     0, /* 3 */
     0, /* 4 */

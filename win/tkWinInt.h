@@ -167,13 +167,17 @@ MODULE_SCOPE HICON TkWinGetIcon(Tk_Window tkw, DWORD iconsize);
 
 MODULE_SCOPE void TkWinDisplayChanged(Display *display);
 MODULE_SCOPE void TkWinCleanupContainerList(void);
+MODULE_SCOPE LRESULT TkWinEmbeddedEventProc(HWND, UINT, WPARAM, LPARAM);
+
 
 /*
- * Used by tkWinWm.c for embedded menu handling. May become public.
+ * Used by tkWinWm.c for embedded menu handling.
  */
 
-MODULE_SCOPE HWND Tk_GetMenuHWND(Tk_Window tkwin);
-MODULE_SCOPE HWND Tk_GetEmbeddedMenuHWND(Tk_Window tkwin);
+MODULE_SCOPE HWND TkGetMenuHWND(Tk_Window tkwin);
+MODULE_SCOPE HWND TkGetEmbeddedMenuHWND(Tk_Window tkwin);
+MODULE_SCOPE void TkWinCancelMouseTimer(void);
+
 
 /*
  * The following allows us to cache these encoding for multiple functions.

@@ -1186,7 +1186,7 @@ EntryDoLayout(void *recordPtr)
  *      Get a GC using the specified foreground color and the entry's font.
  *      Result must be freed with Tk_FreeGC().
  */
-static GC EntryGetGC(Entry *entryPtr, Tcl_Obj *colorObj, TkRegion clip)
+static GC EntryGetGC(Entry *entryPtr, Tcl_Obj *colorObj, Region clip)
 {
     Tk_Window tkwin = entryPtr->core.tkwin;
     Tk_Font font = Tk_GetFontFromObj(tkwin, entryPtr->entry.fontObj);
@@ -1223,7 +1223,7 @@ static void EntryDisplay(void *clientData, Drawable d)
     GC gc;
     int showSelection, showCursor;
     Ttk_Box textarea;
-    TkRegion clipRegion;
+    Region clipRegion;
     XRectangle rect;
     Tcl_Obj *foregroundObj;
 
@@ -1291,7 +1291,7 @@ static void EntryDisplay(void *clientData, Drawable d)
     rect.y = textarea.y;
     rect.width = textarea.width;
     rect.height = textarea.height;
-    clipRegion = TkCreateRegion();
+    clipRegion = XCreateRegion();
     TkUnionRectWithRegion(&rect, clipRegion, clipRegion);
 #ifdef HAVE_XFT
     TkUnixSetXftClipRegion(clipRegion);
