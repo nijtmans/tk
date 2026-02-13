@@ -39,7 +39,7 @@ XCreateRegion(void)
 /*
  *----------------------------------------------------------------------
  *
- * TkDestroyRegion --
+ * XDestroyRegion --
  *
  *	Destroy the specified region.
  *
@@ -53,7 +53,7 @@ XCreateRegion(void)
  */
 
 int
-TkDestroyRegion(
+XDestroyRegion(
     Region r)
 {
     DeleteObject((HRGN) r);
@@ -63,7 +63,7 @@ TkDestroyRegion(
 /*
  *----------------------------------------------------------------------
  *
- * TkClipBox --
+ * XClipBox --
  *
  *	Computes the bounding box of a region.
  *
@@ -77,7 +77,7 @@ TkDestroyRegion(
  */
 
 int
-TkClipBox(
+XClipBox(
     Region r,
     XRectangle* rect_return)
 {
@@ -94,7 +94,7 @@ TkClipBox(
 /*
  *----------------------------------------------------------------------
  *
- * TkIntersectRegion --
+ * XIntersectRegion --
  *
  *	Compute the intersection of two regions.
  *
@@ -108,7 +108,7 @@ TkClipBox(
  */
 
 int
-TkIntersectRegion(
+XIntersectRegion(
     Region sra,
     Region srb,
     Region dr_return)
@@ -120,7 +120,7 @@ TkIntersectRegion(
 /*
  *----------------------------------------------------------------------
  *
- * TkUnionRectWithRegion --
+ * XUnionRectWithRegion --
  *
  *	Create the union of a source region and a rectangle.
  *
@@ -134,7 +134,7 @@ TkIntersectRegion(
  */
 
 int
-TkUnionRectWithRegion(
+XUnionRectWithRegion(
     XRectangle *rectangle,
     Region src_region,
     Region dest_region_return)
@@ -222,7 +222,7 @@ TkpBuildRegionFromAlphaData(
 /*
  *----------------------------------------------------------------------
  *
- * TkRectInRegion --
+ * XRectInRegion --
  *
  *	Test whether a given rectangle overlaps with a region.
  *
@@ -237,7 +237,7 @@ TkpBuildRegionFromAlphaData(
  */
 
 int
-TkRectInRegion(
+XRectInRegion(
     Region r,			/* Region to inspect */
     int x, int y,		/* Top-left of rectangle */
     unsigned int width,		/* Width of rectangle */
@@ -254,7 +254,7 @@ TkRectInRegion(
 /*
  *----------------------------------------------------------------------
  *
- * TkSubtractRegion --
+ * XSubtractRegion --
  *
  *	Compute the set-difference of two regions.
  *
@@ -268,7 +268,7 @@ TkRectInRegion(
  */
 
 int
-TkSubtractRegion(
+XSubtractRegion(
     Region sra,
     Region srb,
     Region dr_return)

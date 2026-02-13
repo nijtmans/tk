@@ -205,7 +205,7 @@ TkpBuildRegionFromAlphaData(
 		rect.y = (short)(y + y1);
 		rect.width = (unsigned short)(end - x1);
 		rect.height = 1;
-		TkUnionRectWithRegion(&rect, region, region);
+		XUnionRectWithRegion(&rect, region, region);
 	    }
 	}
 	dataPtr += lineStride;

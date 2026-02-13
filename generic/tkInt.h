@@ -1275,16 +1275,16 @@ MODULE_SCOPE Status TkParseColor (Display * display,
 /*
  * These macros are just wrappers for the equivalent X Region calls.
  */
-#define TkClipBox XClipBox
 #ifndef TK_NO_DEPRECATED
+#   define TkClipBox XClipBox
 #   define TkCreateRegion XCreateRegion
+#   define TkDestroyRegion XDestroyRegion
+#   define TkIntersectRegion XIntersectRegion
+#   define TkRectInRegion XRectInRegion
+#   define TkSetRegion XSetRegion
+#   define TkSubtractRegion XSubtractRegion
+#   define TkUnionRectWithRegion XUnionRectWithRegion
 #endif
-#define TkDestroyRegion XDestroyRegion
-#define TkIntersectRegion XIntersectRegion
-#define TkRectInRegion XRectInRegion
-#define TkSetRegion XSetRegion
-#define TkSubtractRegion XSubtractRegion
-#define TkUnionRectWithRegion XUnionRectWithRegion
 
 #ifdef HAVE_XFT
 MODULE_SCOPE void	TkUnixSetXftClipRegion(Region clipRegion);

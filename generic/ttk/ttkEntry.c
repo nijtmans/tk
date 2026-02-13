@@ -1203,7 +1203,7 @@ static GC EntryGetGC(Entry *entryPtr, Tcl_Obj *colorObj, Region clip)
     }
     gc = Tk_GetGC(entryPtr->core.tkwin, mask, &gcValues);
     if (clip != NULL) {
-	TkSetRegion(Tk_Display(entryPtr->core.tkwin), gc, clip);
+	XSetRegion(Tk_Display(entryPtr->core.tkwin), gc, clip);
     }
     return gc;
 }
@@ -1292,7 +1292,7 @@ static void EntryDisplay(void *clientData, Drawable d)
     rect.width = textarea.width;
     rect.height = textarea.height;
     clipRegion = XCreateRegion();
-    TkUnionRectWithRegion(&rect, clipRegion, clipRegion);
+    XUnionRectWithRegion(&rect, clipRegion, clipRegion);
 #ifdef HAVE_XFT
     TkUnixSetXftClipRegion(clipRegion);
 #endif
@@ -1390,7 +1390,7 @@ static void EntryDisplay(void *clientData, Drawable d)
 #ifdef HAVE_XFT
     TkUnixSetXftClipRegion(NULL);
 #endif
-    TkDestroyRegion(clipRegion);
+    XDestroyRegion(clipRegion);
 }
 
 /*------------------------------------------------------------------------

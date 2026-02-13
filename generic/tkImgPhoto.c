@@ -1323,15 +1323,15 @@ readCleanup:
 	    setBox.width = 1;
 	    setBox.height = 1;
 	    modRegion = XCreateRegion();
-	    TkUnionRectWithRegion(&setBox, modRegion, modRegion);
+	    XUnionRectWithRegion(&setBox, modRegion, modRegion);
 	    if (pixelPtr[3]) {
-		TkUnionRectWithRegion(&setBox, modelPtr->validRegion,
+		XUnionRectWithRegion(&setBox, modelPtr->validRegion,
 			modelPtr->validRegion);
 	    } else {
-		TkSubtractRegion(modelPtr->validRegion, modRegion,
+		XSubtractRegion(modelPtr->validRegion, modRegion,
 			modelPtr->validRegion);
 	    }
-	    TkDestroyRegion(modRegion);
+	    XDestroyRegion(modRegion);
 
 	    /*
 	     * Inform the generic image code that the image
@@ -2367,7 +2367,7 @@ ImgPhotoDelete(
 	Tcl_Free(modelPtr->pix32);
     }
     if (modelPtr->validRegion != NULL) {
-	TkDestroyRegion(modelPtr->validRegion);
+	XDestroyRegion(modelPtr->validRegion);
     }
     if (modelPtr->dataObj != NULL) {
 	Tcl_DecrRefCount(modelPtr->dataObj);
@@ -2489,7 +2489,7 @@ ImgPhotoSetSize(
      * image size.
      */
 
-    TkClipBox(modelPtr->validRegion, &validBox);
+    XClipBox(modelPtr->validRegion, &validBox);
     if ((validBox.x + validBox.width > width)
 	    || (validBox.y + validBox.height > height)) {
 	clipBox.x = 0;
@@ -2497,11 +2497,11 @@ ImgPhotoSetSize(
 	clipBox.width = width;
 	clipBox.height = height;
 	clipRegion = XCreateRegion();
-	TkUnionRectWithRegion(&clipBox, clipRegion, clipRegion);
-	TkIntersectRegion(modelPtr->validRegion, clipRegion,
+	XUnionRectWithRegion(&clipBox, clipRegion, clipRegion);
+	XIntersectRegion(modelPtr->validRegion, clipRegion,
 		modelPtr->validRegion);
-	TkDestroyRegion(clipRegion);
-	TkClipBox(modelPtr->validRegion, &validBox);
+	XDestroyRegion(clipRegion);
+	XClipBox(modelPtr->validRegion, &validBox);
     }
 
     /*
@@ -3377,10 +3377,10 @@ Tk_PhotoPutBlock(
 	    rect.y = y;
 	    rect.width = width;
 	    rect.height = height;
-	    TkUnionRectWithRegion(&rect, workRgn, workRgn);
-	    TkSubtractRegion(modelPtr->validRegion, workRgn,
+	    XUnionRectWithRegion(&rect, workRgn, workRgn);
+	    XSubtractRegion(modelPtr->validRegion, workRgn,
 		    modelPtr->validRegion);
-	    TkDestroyRegion(workRgn);
+	    XDestroyRegion(workRgn);
 	}
 
 	/*
@@ -3397,7 +3397,7 @@ Tk_PhotoPutBlock(
 	rect.y = y;
 	rect.width = width;
 	rect.height = height;
-	TkUnionRectWithRegion(&rect, modelPtr->validRegion,
+	XUnionRectWithRegion(&rect, modelPtr->validRegion,
 		modelPtr->validRegion);
     }
 
@@ -3745,10 +3745,10 @@ Tk_PhotoPutZoomedBlock(
 	    rect.y = y;
 	    rect.width = width;
 	    rect.height = 1;
-	    TkUnionRectWithRegion(&rect, workRgn, workRgn);
-	    TkSubtractRegion(modelPtr->validRegion, workRgn,
+	    XUnionRectWithRegion(&rect, workRgn, workRgn);
+	    XSubtractRegion(modelPtr->validRegion, workRgn,
 		    modelPtr->validRegion);
-	    TkDestroyRegion(workRgn);
+	    XDestroyRegion(workRgn);
 	}
 
 	TkpBuildRegionFromAlphaData(modelPtr->validRegion,
@@ -3760,7 +3760,7 @@ Tk_PhotoPutZoomedBlock(
 	rect.y = y;
 	rect.width = width;
 	rect.height = height;
-	TkUnionRectWithRegion(&rect, modelPtr->validRegion,
+	XUnionRectWithRegion(&rect, modelPtr->validRegion,
 		modelPtr->validRegion);
     }
 
@@ -3928,7 +3928,7 @@ Tk_PhotoBlank(
      */
 
     if (modelPtr->validRegion != NULL) {
-	TkDestroyRegion(modelPtr->validRegion);
+	XDestroyRegion(modelPtr->validRegion);
     }
     modelPtr->validRegion = XCreateRegion();
 

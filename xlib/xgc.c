@@ -47,7 +47,7 @@ static TkpClipMask *AllocClipMask(GC gc) {
 	clip_mask = (TkpClipMask *)Tcl_Alloc(sizeof(TkpClipMask));
 	gc->clip_mask = (Pixmap) clip_mask;
     } else if (clip_mask->type == TKP_CLIP_REGION) {
-	TkDestroyRegion(clip_mask->value.region);
+	XDestroyRegion(clip_mask->value.region);
     }
     clip_mask->type = TKP_CLIP_PIXMAP;
     clip_mask->value.pixmap = None;
@@ -76,7 +76,7 @@ static void FreeClipMask(GC gc) {
 	return;
     }
     if (clip_mask->type == TKP_CLIP_REGION) {
-	TkDestroyRegion(clip_mask->value.region);
+	XDestroyRegion(clip_mask->value.region);
     }
     Tcl_Free(clip_mask);
     gc->clip_mask = None;
@@ -403,7 +403,7 @@ XSetClipOrigin(
 /*
  *----------------------------------------------------------------------
  *
- * TkSetRegion, XSetClipMask, XSetClipRectangles --
+ * XSetRegion, XSetClipMask, XSetClipRectangles --
  *
  *	Sets the clipping region/pixmap for a GC.
  *
@@ -420,13 +420,13 @@ XSetClipOrigin(
  */
 
 int
-TkSetRegion(
+XSetRegion(
     TCL_UNUSED(Display *),
     GC gc,
     Region r)
 {
     if (r == NULL) {
-	Tcl_Panic("must not pass NULL to TkSetRegion for compatibility with X11; use XSetClipMask instead");
+	Tcl_Panic("must not pass NULL to XSetRegion for compatibility with X11; use XSetClipMask instead");
     } else {
 	TkpClipMask *clip_mask = AllocClipMask(gc);
 
@@ -475,7 +475,7 @@ XSetClipRectangles(
 
 	rect.x += (short)clip_x_origin;
 	rect.y += (short)clip_y_origin;
-	TkUnionRectWithRegion(&rect, clipRgn, clipRgn);
+	XUnionRectWithRegion(&rect, clipRgn, clipRgn);
 	rectangles++;
     }
     return 1;
