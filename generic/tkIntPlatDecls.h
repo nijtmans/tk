@@ -160,26 +160,19 @@ EXTERN int		TkMacOSXDoHLEvent(void *theEvent);
 /* Slot 15 is reserved */
 /* 16 */
 EXTERN Window		TkMacOSXGetXWindow(void *macWinPtr);
-/* 17 */
-EXTERN int		TkMacOSXGrowToplevel(void *whichWindow, XPoint start);
+/* Slot 17 is reserved */
 /* Slot 18 is reserved */
 /* Slot 19 is reserved */
 /* Slot 20 is reserved */
-/* 21 */
-EXTERN void		TkMacOSXInvalidateWindow(MacDrawable *macWin,
-				int flag);
+/* Slot 21 is reserved */
 /* Slot 22 is reserved */
-/* 23 */
-EXTERN void		TkMacOSXMakeRealWindowExist(TkWindow *winPtr);
-/* 24 */
-EXTERN void *		TkMacOSXMakeStippleMap(Drawable d1, Drawable d2);
+/* Slot 23 is reserved */
+/* Slot 24 is reserved */
 /* Slot 25 is reserved */
 /* Slot 26 is reserved */
-/* 27 */
-EXTERN int		TkMacOSXResizable(TkWindow *winPtr);
+/* Slot 27 is reserved */
 /* Slot 28 is reserved */
-/* 29 */
-EXTERN void		TkMacOSXSetScrollbarGrow(TkWindow *winPtr, int flag);
+/* Slot 29 is reserved */
 /* Slot 30 is reserved */
 /* Slot 31 is reserved */
 /* 32 */
@@ -353,19 +346,19 @@ typedef struct TkIntPlatStubs {
     int (*tkMacOSXDoHLEvent) (void *theEvent); /* 14 */
     void (*reserved15)(void);
     Window (*tkMacOSXGetXWindow) (void *macWinPtr); /* 16 */
-    int (*tkMacOSXGrowToplevel) (void *whichWindow, XPoint start); /* 17 */
+    void (*reserved17)(void);
     void (*reserved18)(void);
     void (*reserved19)(void);
     void (*reserved20)(void);
-    void (*tkMacOSXInvalidateWindow) (MacDrawable *macWin, int flag); /* 21 */
+    void (*reserved21)(void);
     void (*reserved22)(void);
-    void (*tkMacOSXMakeRealWindowExist) (TkWindow *winPtr); /* 23 */
-    void * (*tkMacOSXMakeStippleMap) (Drawable d1, Drawable d2); /* 24 */
+    void (*reserved23)(void);
+    void (*reserved24)(void);
     void (*reserved25)(void);
     void (*reserved26)(void);
-    int (*tkMacOSXResizable) (TkWindow *winPtr); /* 27 */
+    void (*reserved27)(void);
     void (*reserved28)(void);
-    void (*tkMacOSXSetScrollbarGrow) (TkWindow *winPtr, int flag); /* 29 */
+    void (*reserved29)(void);
     void (*reserved30)(void);
     void (*reserved31)(void);
     void (*tkMacOSXUpdateClipRgn) (TkWindow *winPtr); /* 32 */
@@ -562,25 +555,19 @@ extern const TkIntPlatStubs *tkIntPlatStubsPtr;
 /* Slot 15 is reserved */
 #define TkMacOSXGetXWindow \
 	(tkIntPlatStubsPtr->tkMacOSXGetXWindow) /* 16 */
-#define TkMacOSXGrowToplevel \
-	(tkIntPlatStubsPtr->tkMacOSXGrowToplevel) /* 17 */
+/* Slot 17 is reserved */
 /* Slot 18 is reserved */
 /* Slot 19 is reserved */
 /* Slot 20 is reserved */
-#define TkMacOSXInvalidateWindow \
-	(tkIntPlatStubsPtr->tkMacOSXInvalidateWindow) /* 21 */
+/* Slot 21 is reserved */
 /* Slot 22 is reserved */
-#define TkMacOSXMakeRealWindowExist \
-	(tkIntPlatStubsPtr->tkMacOSXMakeRealWindowExist) /* 23 */
-#define TkMacOSXMakeStippleMap \
-	(tkIntPlatStubsPtr->tkMacOSXMakeStippleMap) /* 24 */
+/* Slot 23 is reserved */
+/* Slot 24 is reserved */
 /* Slot 25 is reserved */
 /* Slot 26 is reserved */
-#define TkMacOSXResizable \
-	(tkIntPlatStubsPtr->tkMacOSXResizable) /* 27 */
+/* Slot 27 is reserved */
 /* Slot 28 is reserved */
-#define TkMacOSXSetScrollbarGrow \
-	(tkIntPlatStubsPtr->tkMacOSXSetScrollbarGrow) /* 29 */
+/* Slot 29 is reserved */
 /* Slot 30 is reserved */
 /* Slot 31 is reserved */
 #define TkMacOSXUpdateClipRgn \

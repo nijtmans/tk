@@ -485,19 +485,19 @@ static const TkIntPlatStubs tkIntPlatStubs = {
     TkMacOSXDoHLEvent, /* 14 */
     0, /* 15 */
     TkMacOSXGetXWindow, /* 16 */
-    TkMacOSXGrowToplevel, /* 17 */
+    0, /* 17 */
     0, /* 18 */
     0, /* 19 */
     0, /* 20 */
-    TkMacOSXInvalidateWindow, /* 21 */
+    0, /* 21 */
     0, /* 22 */
-    TkMacOSXMakeRealWindowExist, /* 23 */
-    TkMacOSXMakeStippleMap, /* 24 */
+    0, /* 23 */
+    0, /* 24 */
     0, /* 25 */
     0, /* 26 */
-    TkMacOSXResizable, /* 27 */
+    0, /* 27 */
     0, /* 28 */
-    TkMacOSXSetScrollbarGrow, /* 29 */
+    0, /* 29 */
     0, /* 30 */
     0, /* 31 */
     TkMacOSXUpdateClipRgn, /* 32 */

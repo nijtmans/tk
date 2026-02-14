@@ -744,6 +744,23 @@ GenerateButtonEvent(
     int dummy;
     TkDisplay *dispPtr;
 
+#ifdef UNUSED
+
+    /*
+     * ButtonDown events will always occur in the front window. ButtonUp
+     * events, however, may occur anywhere on the screen. ButtonUp events
+     * should only be sent to Tk if in the front window or during an implicit
+     * grab.
+     */
+
+    if ((medPtr->activeNonFloating == NULL)
+	    || ((!(TkpIsWindowFloating(medPtr->whichWin))
+	    && (medPtr->activeNonFloating != medPtr->whichWin))
+	    && TkpGetCapture() == NULL)) {
+	return false;
+    }
+#endif
+
     dispPtr = TkGetDisplayList();
     tkwin = Tk_IdToWindow(dispPtr->display, medPtr->window);
 

@@ -789,7 +789,7 @@ declare 34 win {
 
 # removed in Tk 9.1
 #declare 35 win {
-#    int TkWinGetPlatformTheme(void)
+#   int TkWinGetPlatformTheme(void)
 #}
 
 # Exported through stub table since Tk 8.4.20/8.5.9
@@ -852,7 +852,7 @@ declare 8 aqua {
 }
 # removed in Tk 9.1
 #declare 8 aqua {
-#    unsigned int TkMacOSXButtonKeyState(void)
+#   unsigned int TkMacOSXButtonKeyState(void)
 #}
 declare 9 aqua {
     int TkpWmSetState(TkWindow *winPtr, int state)
@@ -870,24 +870,30 @@ declare 14 aqua {
 declare 16 aqua {
     Window TkMacOSXGetXWindow(void *macWinPtr)
 }
-declare 17 aqua {
-    int TkMacOSXGrowToplevel(void *whichWindow, XPoint start)
-}
-declare 21 aqua {
-    void TkMacOSXInvalidateWindow(MacDrawable *macWin, int flag)
-}
-declare 23 aqua {
-    void TkMacOSXMakeRealWindowExist(TkWindow *winPtr)
-}
-declare 24 aqua {
-    void *TkMacOSXMakeStippleMap(Drawable d1, Drawable d2)
-}
-declare 27 aqua {
-    int TkMacOSXResizable(TkWindow *winPtr)
-}
-declare 29 aqua {
-    void TkMacOSXSetScrollbarGrow(TkWindow *winPtr, int flag)
-}
+# removed in Tk 9.1
+#declare 17 aqua {
+#   int TkMacOSXGrowToplevel(void *whichWindow, XPoint start)
+#}
+# removed in Tk 9.1
+#declare 21 aqua {
+#   void TkMacOSXInvalidateWindow(MacDrawable *macWin, int flag)
+#}
+# removed in Tk 9.1
+#declare 23 aqua {
+#   void TkMacOSXMakeRealWindowExist(TkWindow *winPtr)
+#}
+# removed in Tk 9.1
+#declare 24 aqua {
+#   void *TkMacOSXMakeStippleMap(Drawable d1, Drawable d2)
+#}
+# removed in Tk 9.1
+#declare 27 aqua {
+#    int TkMacOSXResizable(TkWindow *winPtr)
+#}
+# removed in Tk 9.1
+#declare 29 aqua {
+#    void TkMacOSXSetScrollbarGrow(TkWindow *winPtr, int flag)
+#}
 declare 32 aqua {
     void TkMacOSXUpdateClipRgn(TkWindow *winPtr)
 }
@@ -921,7 +927,7 @@ declare 44 aqua {
 }
 # removed in Tk 9.1
 #declare 46 aqua {
-#    int TkpIsWindowFloating(void *window)
+#   int TkpIsWindowFloating(void *window)
 #}
 declare 47 aqua {
     Tk_Window TkpGetCapture(void)
@@ -931,18 +937,18 @@ declare 49 aqua {
 }
 # removed in Tk 9.1
 #declare 50 aqua {
-#    int TkGenerateButtonEvent(int x, int y, Window window, unsigned int state)
+#   int TkGenerateButtonEvent(int x, int y, Window window, unsigned int state)
 #}
 # removed in Tk 9.1
 #declare 51 aqua {
-#    void TkGenWMDestroyEvent(Tk_Window tkwin)
+#   void TkGenWMDestroyEvent(Tk_Window tkwin)
 #}
 #
 # Slot 52 unused (WAS: TkMacOSXSetDrawingEnabled)
 #
 # Made public as Tk_MacOSXGetNSWindowForDrawable
 #declare 54 aqua {
-#    void *TkMacOSXDrawable(Drawable drawable)
+#   void *TkMacOSXDrawable(Drawable drawable)
 #}
 
 ##############################################################################
