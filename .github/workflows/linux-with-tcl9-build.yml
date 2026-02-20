@@ -40,6 +40,7 @@ jobs:
           path: tcl
       - name: Setup Environment (compiler=${{ matrix.compiler }})
         run: |
+          sudo apt-get install libx11-dev
           mkdir "$HOME/install dir"
           touch tk/doc/man.macros tk/generic/tkStubInit.c
           echo "CFGOPT=$CFGOPT" >> $GITHUB_ENV
