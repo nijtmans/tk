@@ -31,6 +31,7 @@ jobs:
           path: tcl
       - name: Prepare
         run: |
+          sudo apt-get update
           sudo apt-get install libxss-dev libxft-dev libatk1.0-dev libatk-bridge2.0-dev
           touch tcl/generic/tclStubInit.c tcl/generic/tclOOStubInit.c
           touch tk/generic/tkStubInit.c

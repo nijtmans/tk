@@ -42,6 +42,7 @@ jobs:
           path: tcl
       - name: Setup Environment (compiler=${{ matrix.compiler }})
         run: |
+          sudo apt-get update
           sudo apt-get install libxss-dev libxft-dev libatk1.0-dev libatk-bridge2.0-dev
           mkdir "$HOME/install dir"
           touch tk/doc/man.macros tk/generic/tkStubInit.c
@@ -146,6 +147,7 @@ jobs:
           path: tcl
       - name: Setup Environment (compiler=${{ matrix.compiler }})
         run: |
+          sudo apt-get update
           sudo apt-get install libxss-dev libxft-dev libatk1.0-dev libatk-bridge2.0-dev libicu-dev xvfb xfonts-75dpi xfonts-100dpi xfonts-scalable libxfont2 unifont
           mkdir "$HOME/install dir"
           touch tk/doc/man.macros tk/generic/tkStubInit.c
