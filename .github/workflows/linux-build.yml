@@ -26,8 +26,6 @@ jobs:
           - ""
           - "CFLAGS=-DTK_NO_DEPRECATED=1"
           - "--disable-shared"
-          - "--disable-xft"
-          - "--disable-xss"
           - "--enable-symbols"
     steps:
       - name: Checkout Tk
@@ -43,7 +41,7 @@ jobs:
       - name: Setup Environment (compiler=${{ matrix.compiler }})
         run: |
           sudo apt-get update
-          sudo apt-get install libxss-dev libxft-dev libcups2-dev
+          sudo apt-get install libxss-dev libxft-dev libcups2-dev libatk1.0-dev libatk-bridge2.0-dev
           mkdir "$HOME/install dir"
           touch tk/doc/man.macros tk/generic/tkStubInit.c
           echo "CFGOPT=$CFGOPT" >> $GITHUB_ENV
@@ -132,7 +130,6 @@ jobs:
           - "gcc"
         config:
           - ""
-          - "--disable-xft"
           - "--enable-symbols"
     steps:
       - name: Checkout Tk

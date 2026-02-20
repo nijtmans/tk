@@ -26,8 +26,6 @@ jobs:
           - ""
           - "CFLAGS=-DTK_NO_DEPRECATED=1"
           - "--disable-shared"
-          - "--disable-xft"
-          - "--disable-xss"
           - "--enable-symbols"
     steps:
       - name: Checkout
@@ -42,8 +40,6 @@ jobs:
           path: tcl
       - name: Setup Environment (compiler=${{ matrix.compiler }})
         run: |
-          sudo apt-get update
-          sudo apt-get install libxss-dev libxft-dev
           mkdir "$HOME/install dir"
           touch tk/doc/man.macros tk/generic/tkStubInit.c
           echo "CFGOPT=$CFGOPT" >> $GITHUB_ENV
@@ -113,7 +109,6 @@ jobs:
           - "gcc"
         config:
           - ""
-          - "--disable-xft"
           - "--enable-symbols"
     steps:
       - name: Checkout
@@ -129,7 +124,7 @@ jobs:
       - name: Setup Environment (compiler=${{ matrix.compiler }})
         run: |
           sudo apt-get update
-          sudo apt-get install libxss-dev libxft-dev xvfb libicu-dev xfonts-75dpi xfonts-100dpi xfonts-scalable libxfont2 unifont
+          sudo apt-get install xvfb libicu-dev xfonts-75dpi xfonts-100dpi xfonts-scalable libxfont2 unifont
           mkdir "$HOME/install dir"
           touch tk/doc/man.macros tk/generic/tkStubInit.c
           echo "CFGOPT=$CFGOPT" >> $GITHUB_ENV
