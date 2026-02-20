@@ -835,7 +835,7 @@ XAllocColor(
 {
     LastKnownRequestProcessed(display)++;
     colorPtr->pixel = TkpGetPixel(colorPtr);
-    return 1;
+    return Success;
 }
 
 Colormap
