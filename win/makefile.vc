@@ -190,6 +190,7 @@ TKOBJS = \
 	$(TMP_DIR)\tkArgv.obj \
 	$(TMP_DIR)\tkAtom.obj \
 	$(TMP_DIR)\tkBind.obj \
+	$(TMP_DIR)\tkBitField.obj \
 	$(TMP_DIR)\tkBitmap.obj \
 	$(TMP_DIR)\tkBusy.obj \
 	$(TMP_DIR)\tkButton.obj \
@@ -231,6 +232,7 @@ TKOBJS = \
 	$(TMP_DIR)\tkImgPhoto.obj \
 	$(TMP_DIR)\tkImgPhInstance.obj \
 	$(TMP_DIR)\tkImgUtil.obj \
+	$(TMP_DIR)\tkIntSet.obj \
 	$(TMP_DIR)\tkListbox.obj \
 	$(TMP_DIR)\tkMacWinMenu.obj \
 	$(TMP_DIR)\tkMain.obj \
@@ -247,6 +249,7 @@ TKOBJS = \
 	$(TMP_DIR)\tkPkgConfig.obj \
 	$(TMP_DIR)\tkPlace.obj \
 	$(TMP_DIR)\tkPointer.obj \
+	$(TMP_DIR)\tkRangeList.obj \
 	$(TMP_DIR)\tkRectOval.obj \
 	$(TMP_DIR)\tkScale.obj \
 	$(TMP_DIR)\tkScrollbar.obj \
@@ -257,11 +260,13 @@ TKOBJS = \
 	$(TMP_DIR)\tkTextDisp.obj \
 	$(TMP_DIR)\tkTextImage.obj \
 	$(TMP_DIR)\tkTextIndex.obj \
+	$(TMP_DIR)\tkTextLineBreak.obj \
 	$(TMP_DIR)\tkTextMark.obj \
 	$(TMP_DIR)\tkTextTag.obj \
+	$(TMP_DIR)\tkTextTagSet.obj \
+	$(TMP_DIR)\tkTextUndo.obj \
 	$(TMP_DIR)\tkTextWind.obj \
 	$(TMP_DIR)\tkTrig.obj \
-	$(TMP_DIR)\tkUndo.obj \
 	$(TMP_DIR)\tkUtil.obj \
 	$(TMP_DIR)\tkVisual.obj \
 	$(TMP_DIR)\tkStubInit.obj \
@@ -610,13 +615,13 @@ $(TMP_DIR)\tkUuid.h:	$(ROOT)\manifest.uuid
 	copy $(WIN_DIR)\tkUuid.h.in+$(ROOT)\manifest.uuid $(TMP_DIR)\tkUuid.h
 
 $(TMP_DIR)\tkTest.obj: $(GENERICDIR)\tkTest.c
-	$(cc32) $(appcflags_nostubs) -Fo$@ $?
+	$(cc32) $(stubscflags) /DUSE_TK_STUBS -Fo$@ $?
 
 $(TMP_DIR)\tkWinTest.obj: $(WIN_DIR)\tkWinTest.c
-	$(cc32) $(appcflags_nostubs) -Fo$@ $?
+	$(cc32) $(stubscflags) /DUSE_TK_STUBS -Fo$@ $?
 
 $(TMP_DIR)\tkSquare.obj: $(GENERICDIR)\tkSquare.c
-	$(cc32) $(appcflags_nostubs) -Fo$@ $?
+	$(cc32) $(stubscflags) /DUSE_TK_STUBS -Fo$@ $?
 
 # Note: Static builds now always mandate statically linking Tcl registry etc.
 $(TMP_DIR)\winMain.obj: $(WIN_DIR)\winMain.c

@@ -369,20 +369,20 @@ CANV_OBJS = tkCanvas.o tkCanvArc.o tkCanvBmap.o tkCanvImg.o \
 IMAGE_OBJS = tkImage.o tkImgBmap.o tkImgGIF.o tkImgPNG.o tkImgPPM.o \
 	tkImgPhoto.o tkImgPhInstance.o tkImgListFormat.o tkImgSVGnano.o
 
-TEXT_OBJS = tkText.o tkTextBTree.o tkTextDisp.o tkTextImage.o tkTextIndex.o \
-	tkTextMark.o tkTextTag.o tkTextWind.o
+TEXT_OBJS = tkText.o tkTextBTree.o tkTextDisp.o tkTextImage.o \
+	tkTextIndex.o tkTextLineBreak.o tkTextMark.o tkTextTag.o \
+	tkTextTagSet.o tkTextUndo.o tkTextWind.o
 
 # either tkUnixFont.o (default) or tkUnixRFont.o (if --enable-xft)
 #
 FONT_OBJS = @UNIX_FONT_OBJS@
 
-GENERIC_OBJS = tk3d.o tkAccessibility.o tkArgv.o tkAtom.o tkBind.o tkBitmap.o tkBusy.o \
-	tkClipboard.o \
-	tkCmds.o tkColor.o tkConfig.o tkConsole.o tkCursor.o tkError.o \
-	tkEvent.o tkFocus.o tkFont.o tkGet.o tkGC.o tkGeometry.o tkGrab.o \
-	tkGrid.o tkMain.o tkObj.o tkOldConfig.o tkOption.o tkPack.o \
-	tkPkgConfig.o tkPlace.o	tkSelect.o tkStyle.o tkUndo.o tkUtil.o \
-	tkVisual.o tkWindow.o
+GENERIC_OBJS = tk3d.o tkAccessibility.o tkArgv.o tkAtom.o tkBind.o tkBitmap.o tkBitField.o \
+	tkBusy.o tkClipboard.o tkCmds.o tkColor.o tkConfig.o tkConsole.o \
+	tkCursor.o tkError.o tkEvent.o tkFocus.o tkFont.o tkGet.o tkGC.o \
+	tkGeometry.o tkGrab.o tkGrid.o tkIntSet.o tkMain.o tkObj.o tkOldConfig.o \
+	tkOption.o tkPack.o tkPkgConfig.o tkPlace.o tkRangeList.o tkSelect.o \
+	tkStyle.o tkUtil.o tkVisual.o tkWindow.o
 
 TTK_OBJS = \
 	ttkBlink.o ttkButton.o ttkCache.o ttkClamTheme.o ttkClassicTheme.o \
@@ -434,8 +434,8 @@ TTK_DECLS = \
 GENERIC_SRCS = \
 	$(GENERIC_DIR)/tk3d.c $(GENERIC_DIR)/tkAccessibility.c $(GENERIC_DIR)/tkArgv.c \
 	$(GENERIC_DIR)/tkAtom.c $(GENERIC_DIR)/tkBind.c	\
-	$(GENERIC_DIR)/tkBitmap.c $(GENERIC_DIR)/tkBusy.c \
-	$(GENERIC_DIR)/tkClipboard.c \
+	$(GENERIC_DIR)/tkBitField.c $(GENERIC_DIR)/tkBitmap.c \
+	$(GENERIC_DIR)/tkBusy.c $(GENERIC_DIR)/tkClipboard.c \
 	$(GENERIC_DIR)/tkCmds.c $(GENERIC_DIR)/tkColor.c \
 	$(GENERIC_DIR)/tkConfig.c $(GENERIC_DIR)/tkCursor.c \
 	$(GENERIC_DIR)/tkError.c $(GENERIC_DIR)/tkEvent.c \
@@ -443,11 +443,12 @@ GENERIC_SRCS = \
 	$(GENERIC_DIR)/tkGet.c $(GENERIC_DIR)/tkGC.c \
 	$(GENERIC_DIR)/tkGeometry.c $(GENERIC_DIR)/tkGrab.c \
 	$(GENERIC_DIR)/tkGrid.c $(GENERIC_DIR)/tkConsole.c \
+	$(GENERIC_DIR)/tkIntSet.c \
 	$(GENERIC_DIR)/tkMain.c $(GENERIC_DIR)/tkOption.c \
 	$(GENERIC_DIR)/tkPack.c $(GENERIC_DIR)/tkPlace.c \
 	$(GENERIC_DIR)/tkPkgConfig.c \
 	$(GENERIC_DIR)/tkSelect.c $(GENERIC_DIR)/tkStyle.c \
-	$(GENERIC_DIR)/tkUndo.c $(GENERIC_DIR)/tkUtil.c \
+	$(GENERIC_DIR)/tkUtil.c \
 	$(GENERIC_DIR)/tkVisual.c $(GENERIC_DIR)/tkWindow.c \
 	$(GENERIC_DIR)/tkButton.c $(GENERIC_DIR)/tkObj.c \
 	$(GENERIC_DIR)/tkEntry.c $(GENERIC_DIR)/tkFrame.c \
@@ -466,11 +467,13 @@ GENERIC_SRCS = \
 	$(GENERIC_DIR)/tkImgPNG.c $(GENERIC_DIR)/tkImgPPM.c \
 	$(GENERIC_DIR)/tkImgSVGnano.c $(GENERIC_DIR)/tkImgSVGnano.c \
 	$(GENERIC_DIR)/tkImgPhoto.c $(GENERIC_DIR)/tkImgPhInstance.c \
-	$(GENERIC_DIR)/tkImgListFormat.c $(GENERIC_DIR)/tkText.c \
-	$(GENERIC_DIR)/tkTextBTree.c $(GENERIC_DIR)/tkTextDisp.c \
-	$(GENERIC_DIR)/tkTextImage.c \
-	$(GENERIC_DIR)/tkTextIndex.c $(GENERIC_DIR)/tkTextMark.c \
-	$(GENERIC_DIR)/tkTextTag.c $(GENERIC_DIR)/tkTextWind.c \
+	$(GENERIC_DIR)/tkImgListFormat.c $(GENERIC_DIR)/tkRangeList.c \
+	$(GENERIC_DIR)/tkText.c $(GENERIC_DIR)/tkTextBTree.c \
+	$(GENERIC_DIR)/tkTextDisp.c $(GENERIC_DIR)/tkTextImage.c \
+	$(GENERIC_DIR)/tkTextIndex.c $(GENERIC_DIR)/tkTextLineBreak.c \
+	$(GENERIC_DIR)/tkTextMark.c $(GENERIC_DIR)/tkTextTag.c \
+	$(GENERIC_DIR)/tkTextTagSet.c $(GENERIC_DIR)/tkTextUndo.c \
+	$(GENERIC_DIR)/tkTextWind.c \
 	$(GENERIC_DIR)/tkOldConfig.c \
 	$(GENERIC_DIR)/tkSquare.c $(GENERIC_DIR)/tkTest.c \
 	$(GENERIC_DIR)/tkStubInit.c
@@ -1027,6 +1030,9 @@ tkAtom.o: $(GENERIC_DIR)/tkAtom.c
 tkBind.o: $(GENERIC_DIR)/tkBind.c
 	$(CC) -c $(CC_SWITCHES) $(GENERIC_DIR)/tkBind.c
 
+tkBitField.o: $(GENERIC_DIR)/tkBitField.c
+	$(CC) -c $(CC_SWITCHES) $(GENERIC_DIR)/tkBitField.c
+
 tkBitmap.o: $(GENERIC_DIR)/tkBitmap.c
 	$(CC) -c $(CC_SWITCHES) $(GENERIC_DIR)/tkBitmap.c
 
@@ -1172,7 +1178,7 @@ tkScrollbar.o: $(GENERIC_DIR)/tkScrollbar.c
 	$(CC) -c $(CC_SWITCHES) $(GENERIC_DIR)/tkScrollbar.c
 
 tkSquare.o: $(GENERIC_DIR)/tkSquare.c
-	$(CC) -c $(APP_CC_SWITCHES) $(GENERIC_DIR)/tkSquare.c
+	$(CC) -c $(CC_SWITCHES) -DUSE_TK_STUBS $(GENERIC_DIR)/tkSquare.c
 
 tkCanvas.o: $(GENERIC_DIR)/tkCanvas.c
 	$(CC) -c $(CC_SWITCHES) $(GENERIC_DIR)/tkCanvas.c
@@ -1240,8 +1246,14 @@ tkImgPhoto.o: $(GENERIC_DIR)/tkImgPhoto.c $(GENERIC_DIR)/tkImgPhoto.h
 tkImgPhInstance.o: $(GENERIC_DIR)/tkImgPhInstance.c $(GENERIC_DIR)/tkImgPhoto.h
 	$(CC) -c $(CC_SWITCHES) $(GENERIC_DIR)/tkImgPhInstance.c
 
+tkRangeList.o: $(GENERIC_DIR)/tkRangeList.c
+	$(CC) -c $(CC_SWITCHES) $(GENERIC_DIR)/tkRangeList.c
+
+tkIntSet.o: $(GENERIC_DIR)/tkIntSet.c
+	$(CC) -c $(CC_SWITCHES) $(GENERIC_DIR)/tkIntSet.c
+
 tkTest.o: $(GENERIC_DIR)/tkTest.c tkUuid.h
-	$(CC) -c $(APP_CC_SWITCHES) $(GENERIC_DIR)/tkTest.c
+	$(CC) -c $(CC_SWITCHES) -DUSE_TK_STUBS $(GENERIC_DIR)/tkTest.c
 
 tkText.o: $(GENERIC_DIR)/tkText.c
 	$(CC) -c $(CC_SWITCHES) $(GENERIC_DIR)/tkText.c
@@ -1258,11 +1270,20 @@ tkTextImage.o: $(GENERIC_DIR)/tkTextImage.c
 tkTextIndex.o: $(GENERIC_DIR)/tkTextIndex.c
 	$(CC) -c $(CC_SWITCHES) $(GENERIC_DIR)/tkTextIndex.c
 
+tkTextLineBreak.o: $(GENERIC_DIR)/tkTextLineBreak.c
+	$(CC) -c $(CC_SWITCHES) $(GENERIC_DIR)/tkTextLineBreak.c
+
 tkTextMark.o: $(GENERIC_DIR)/tkTextMark.c
 	$(CC) -c $(CC_SWITCHES) $(GENERIC_DIR)/tkTextMark.c
 
 tkTextTag.o: $(GENERIC_DIR)/tkTextTag.c
 	$(CC) -c $(CC_SWITCHES) $(GENERIC_DIR)/tkTextTag.c
+
+tkTextTagSet.o: $(GENERIC_DIR)/tkTextTagSet.c
+	$(CC) -c $(CC_SWITCHES) $(GENERIC_DIR)/tkTextTagSet.c
+
+tkTextUndo.o: $(GENERIC_DIR)/tkTextUndo.c
+	$(CC) -c $(CC_SWITCHES) $(GENERIC_DIR)/tkTextUndo.c
 
 tkTextWind.o: $(GENERIC_DIR)/tkTextWind.c
 	$(CC) -c $(CC_SWITCHES) $(GENERIC_DIR)/tkTextWind.c
