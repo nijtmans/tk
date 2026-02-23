@@ -2297,7 +2297,7 @@ Tk_SetWindowColormap(
  *----------------------------------------------------------------------
  */
 
-int
+bool
 Tk_SetWindowVisual(
     Tk_Window tkwin,		/* Window to manipulate. */
     Visual *visual,		/* New visual for window. */
@@ -2308,7 +2308,7 @@ Tk_SetWindowVisual(
 
     if (winPtr->window != None) {
 	/* Too late! */
-	return 0;
+	return false;
     }
 
     winPtr->visual = visual;
@@ -2325,7 +2325,7 @@ Tk_SetWindowVisual(
     if (!(winPtr->dirtyAtts & CWBorderPixmap)) {
 	winPtr->dirtyAtts |= CWBorderPixel;
     }
-    return 1;
+    return true;
 }
 
 /*
@@ -2823,12 +2823,12 @@ Tk_MainWindow(
  *----------------------------------------------------------------------
  */
 
-int
+bool
 Tk_StrictMotif(
     Tk_Window tkwin)		/* Window whose application is to be
 				 * checked. */
 {
-    return ((TkWindow *) tkwin)->mainPtr->strictMotif;
+    return ((TkWindow *) tkwin)->mainPtr->strictMotif != 0;
 }
 
 /*
@@ -2884,12 +2884,12 @@ Tk_GetNumMainWindows(void)
  *----------------------------------------------------------------------
  */
 
-int
+bool
 Tk_AlwaysShowSelection(
     Tk_Window tkwin)		/* Window whose application is to be
 				 * checked. */
 {
-    return ((TkWindow *) tkwin)->mainPtr->alwaysShowSelection;
+    return ((TkWindow *) tkwin)->mainPtr->alwaysShowSelection != 0;
 }
 
 /*

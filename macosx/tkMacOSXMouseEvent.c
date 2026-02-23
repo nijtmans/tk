@@ -28,7 +28,7 @@ typedef struct {
 static Tk_Window captureWinPtr = NULL;	/* Current capture window; may be
 					 * NULL. */
 
-static int		GenerateButtonEvent(MouseEventData *medPtr);
+static bool		GenerateButtonEvent(MouseEventData *medPtr);
 
 #pragma mark TKApplication(TKMouseEvent)
 
@@ -699,7 +699,7 @@ XQueryPointer(
  *----------------------------------------------------------------------
  */
 
-MODULE_SCOPE int
+MODULE_SCOPE bool
 TkGenerateButtonEventForXPointer(
     Window window)		/* X Window containing button event. */
 {
@@ -736,7 +736,7 @@ TkGenerateButtonEventForXPointer(
  *----------------------------------------------------------------------
  */
 
-static int
+static bool
 GenerateButtonEvent(
     MouseEventData *medPtr)
 {
