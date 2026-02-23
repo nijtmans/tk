@@ -224,12 +224,12 @@ test textWind-2.11 {TkTextWindowCmd procedure} -setup {
     .t insert end "This is the first line"
     .t insert end "\nAnd this is a second line, which wraps around"
     frame .f -width 10 -height 6 -bg $color
-    .t window create 2.2 -window .f -align baseline -padx 1 -pady 2 -tags tag1 -create foo
+    .t window create 2.2 -window .f -align baseline -padx 1 -pady 2 -create foo
     update
     .t window configure .f
 } -cleanup {
     destroy .f
-} -result  {{-align {} {} center baseline} {-create {} {} {} foo} {-owner {} {} 1 1} {-padx {} {} 0 1} {-pady {} {} 0 2} {-stretch {} {} 0 0} {-tags {} {} {} tag1} {-window {} {} {} .f}}
+} -result  {{-align {} {} center baseline} {-create {} {} {} foo} {-padx {} {} 0 1} {-pady {} {} 0 2} {-stretch {} {} 0 0} {-window {} {} {} .f}}
 test textWind-2.12 {TkTextWindowCmd procedure} -setup {
     destroy .f
     frame .f -width 10 -height 6 -bg $color
@@ -286,7 +286,7 @@ test textWind-2.17 {TkTextWindowCmd procedure} -setup {
     .t delete 1.0 end
 } -body {
     list [catch {.t window create 1.0} msg] $msg [.t window configure 1.0]
-} -result {0 {} {{-align {} {} center center} {-create {} {} {} {}} {-owner {} {} 1 1} {-padx {} {} 0 {}} {-pady {} {} 0 {}} {-stretch {} {} 0 0} {-tags {} {} {} {}} {-window {} {} {} {}}}}
+} -result {0 {} {{-align {} {} center center} {-create {} {} {} {}} {-padx {} {} 0 {}} {-pady {} {} 0 {}} {-stretch {} {} 0 0} {-window {} {} {} {}}}}
 test textWind-2.18 {TkTextWindowCmd procedure} -setup {
     destroy .f
     frame .f -width 20 -height 10 -bg $color
@@ -777,7 +777,7 @@ test textWind-10.4 {EmbWinLayoutProc procedure, error in creating window} -setup
     destroy .t.f
     rename bgerror {}
 } -result [list \
-    {{can't embed .t.f.f relative to .t}} \
+    {{can't embed .t.f.f relative to .t}} {{window name "f" already exists in parent}} \
     [list [xchar 5] [expr {[yline 1]+$fixedHeight/2}] 0 0] \
     1]
 
@@ -808,7 +808,9 @@ test textWind-10.6 {EmbWinLayoutProc procedure, error in creating window} -setup
     .t delete 1.0 end
     proc bgerror args {
 	global msg
-	lappend msg $args
+	if {[lsearch -exact $msg $args] < 0} {
+	    lappend msg $args
+	}
     }
 } -body {
     .t insert 1.0 "Some sample text"
@@ -845,7 +847,7 @@ test textWind-10.7 {EmbWinLayoutProc procedure, error in creating window} -setup
 } -cleanup {
     rename bgerror {}
 } -result [list \
-    {{can't embed .t2 relative to .t}} \
+    {{can't embed .t2 relative to .t}} {{window name "t2" already exists in parent}} \
     [list [xchar 5] [expr {[yline 1]+$fixedHeight/2}] 0 0]]
 
 test textWind-10.8 {EmbWinLayoutProc procedure, error in creating window} -setup {
@@ -870,7 +872,7 @@ test textWind-10.8 {EmbWinLayoutProc procedure, error in creating window} -setup
 } -cleanup {
     destroy .t2
     rename bgerror {}
-} -result {{{can't embed .t2 relative to .t}}}
+} -result {{{can't embed .t2 relative to .t}} {{window name "t2" already exists in parent}}}
 
 test textWind-10.9 {EmbWinLayoutProc procedure, steal window from self} -setup {
     .t delete 1.0 end
