@@ -525,7 +525,7 @@ DisplayFileProc(
  *	routine. This routine will service at most one event per invocation.
  *
  * Results:
- *	Returns false if the timeout has expired, otherwise returns true.
+ *	Returns 0 if the timeout has expired, otherwise returns 1.
  *
  * Side effects:
  *	Can invoke arbitrary Tcl scripts.

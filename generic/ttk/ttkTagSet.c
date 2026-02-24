@@ -172,43 +172,45 @@ void Ttk_FreeTagSet(Ttk_TagSet tagset)
 
 /* Ttk_TagSetContains -- test if tag set contains a tag.
  */
-bool Ttk_TagSetContains(Ttk_TagSet tagset, Ttk_Tag tag)
+int Ttk_TagSetContains(Ttk_TagSet tagset, Ttk_Tag tag)
 {
     Tcl_Size i;
     for (i = 0; i < tagset->nTags; ++i) {
 	if (tagset->tags[i] == tag) {
-	    return true;
+	    return 1;
 	}
     }
-    return false;
+    return 0;
 }
 
 /* Ttk_TagSetAdd -- add a tag to a tag set.
  *
- * Returns: false if tagset already contained tag,
- * true if tagset was modified.
+ * Returns: 0 if tagset already contained tag,
+ * 1 if tagset was modified.
  */
-bool Ttk_TagSetAdd(Ttk_TagSet tagset, Ttk_Tag tag)
+int Ttk_TagSetAdd(Ttk_TagSet tagset, Ttk_Tag tag)
 {
     Tcl_Size i;
     for (i = 0; i < tagset->nTags; ++i) {
 	if (tagset->tags[i] == tag) {
-	    return false;
+	    return 0;
 	}
     }
     tagset->tags = (Ttk_Tag *)Tcl_Realloc(tagset->tags,
 	    (tagset->nTags+1)*sizeof(tagset->tags[0]));
     tagset->tags[tagset->nTags++] = tag;
-    return true;
+    return 1;
 }
 
 /* Ttk_TagSetAddSet -- add a tag set to a tag set.
  *
+ * Returns: 0 if tagset already contained tags,
+ * 1 if tagset was modified.
  */
-void Ttk_TagSetAddSet(Ttk_TagSet tagset, Ttk_TagSet tagsetFrom)
+int Ttk_TagSetAddSet(Ttk_TagSet tagset, Ttk_TagSet tagsetFrom)
 {
     Tcl_Size i, j, total, nTags = tagset->nTags;
-    bool found;
+    int result = 0, found;
     Ttk_Tag tag;
 
     total = tagsetFrom->nTags + tagset->nTags;
@@ -216,24 +218,26 @@ void Ttk_TagSetAddSet(Ttk_TagSet tagset, Ttk_TagSet tagsetFrom)
 	    (total)*sizeof(tagset->tags[0]));
     for (j = 0; j < tagsetFrom->nTags; ++j) {
 	tag = tagsetFrom->tags[j];
-	found = false;
+	found = 0;
 	for (i = 0; i < nTags; ++i) {
 	    if (tagset->tags[i] == tag) {
-		found = true;
+		found = 1;
 		break;
 	    }
 	}
 	if (found) continue;
 	tagset->tags[tagset->nTags++] = tag;
+	result = 1;
     }
+    return result;
 }
 
 /* Ttk_TagSetRemove -- remove a tag from a tag set.
  *
- * Returns: false if tagset did not contain tag,
- * true if tagset was modified.
+ * Returns: 0 if tagset did not contain tag,
+ * 1 if tagset was modified.
  */
-bool Ttk_TagSetRemove(Ttk_TagSet tagset, Ttk_Tag tag)
+int Ttk_TagSetRemove(Ttk_TagSet tagset, Ttk_Tag tag)
 {
     Tcl_Size i = 0, j = 0;
     while (i < tagset->nTags) {

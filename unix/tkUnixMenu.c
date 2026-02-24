@@ -1426,7 +1426,7 @@ TkpDrawMenuEntry(
     int y,			/* Y-coordinate of topleft of entry */
     int width,			/* Width of the entry rectangle */
     int height,			/* Height of the current rectangle */
-    bool strictMotif,		/* Boolean flag */
+    int strictMotif,		/* Boolean flag */
     int drawArrow)		/* Whether or not to draw the cascade arrow
 				 * for cascade items. */
 {

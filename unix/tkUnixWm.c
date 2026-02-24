@@ -2289,7 +2289,7 @@ WmIconifyCmd(
 	Tcl_SetErrorCode(interp, "TK", "WM", "ICONIFY", "EMBEDDED", (char *)NULL);
 	return TCL_ERROR;
     }
-    if (!TkpWmSetState(winPtr, IconicState)) {
+    if (TkpWmSetState(winPtr, IconicState) == 0) {
 	Tcl_SetObjResult(interp, Tcl_NewStringObj(
 		"couldn't send iconify message to window manager", TCL_INDEX_NONE));
 	Tcl_SetErrorCode(interp, "TK", "WM", "COMMUNICATION", (char *)NULL);
@@ -3446,7 +3446,7 @@ WmStateCmd(
 
 	if (index == OPT_NORMAL) {
 	    wmPtr->flags &= ~WM_WITHDRAWN;
-	    TkpWmSetState(winPtr, NormalState);
+	    (void) TkpWmSetState(winPtr, NormalState);
 	} else if (index == OPT_ICONIC) {
 	    if (Tk_Attributes((Tk_Window) winPtr)->override_redirect) {
 		Tcl_SetObjResult(interp, Tcl_ObjPrintf(
@@ -3464,7 +3464,7 @@ WmStateCmd(
 			NULL);
 		return TCL_ERROR;
 	    }
-	    if (!TkpWmSetState(winPtr, IconicState)) {
+	    if (TkpWmSetState(winPtr, IconicState) == 0) {
 		Tcl_SetObjResult(interp, Tcl_NewStringObj(
 			"couldn't send iconify message to window manager",
 			-1));
@@ -3473,7 +3473,7 @@ WmStateCmd(
 	    }
 	} else { /* OPT_WITHDRAWN */
 	    wmPtr->flags |= WM_WITHDRAWN;
-	    if (!TkpWmSetState(winPtr, WithdrawnState)) {
+	    if (TkpWmSetState(winPtr, WithdrawnState) == 0) {
 		Tcl_SetObjResult(interp, Tcl_NewStringObj(
 			"couldn't send withdraw message to window manager",
 			-1));
@@ -3681,7 +3681,7 @@ WmTransientCmd(
     }
     if (!(wmPtr->flags & WM_NEVER_MAPPED)) {
 	if (wmPtr->containerPtr != NULL && !Tk_IsMapped(wmPtr->containerPtr)) {
-	    if (!TkpWmSetState(winPtr, WithdrawnState)) {
+	    if (TkpWmSetState(winPtr, WithdrawnState) == 0) {
 		Tcl_SetObjResult(interp, Tcl_NewStringObj(
 			"couldn't send withdraw message to window manager",
 			-1));
@@ -3741,7 +3741,7 @@ WmWithdrawCmd(
 	return TCL_ERROR;
     }
     wmPtr->flags |= WM_WITHDRAWN;
-    if (!TkpWmSetState(winPtr, WithdrawnState)) {
+    if (TkpWmSetState(winPtr, WithdrawnState) == 0) {
 	Tcl_SetObjResult(interp, Tcl_NewStringObj(
 		"couldn't send withdraw message to window manager", TCL_INDEX_NONE));
 	Tcl_SetErrorCode(interp, "TK", "WM", "COMMUNICATION", (char *)NULL);
@@ -3785,10 +3785,10 @@ WmWaitMapProc(
 
     if (eventPtr->type == MapNotify) {
 	if (!(winPtr->wmInfoPtr->flags & WM_WITHDRAWN)) {
-	    TkpWmSetState(winPtr, NormalState);
+	    (void) TkpWmSetState(winPtr, NormalState);
 	}
     } else if (eventPtr->type == UnmapNotify) {
-	TkpWmSetState(winPtr, WithdrawnState);
+	(void) TkpWmSetState(winPtr, WithdrawnState);
     }
 }
 
@@ -7421,7 +7421,7 @@ UpdateCommand(
  *	toplevel window.
  *
  * Results:
- *	false on error, true otherwise
+ *	0 on error, 1 otherwise
  *
  * Side effects:
  *	May minimize, restore, or withdraw a window.

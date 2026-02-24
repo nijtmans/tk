@@ -620,7 +620,7 @@ DisplayMenu(
     TkMenuEntry *mePtr;
     Tk_Window tkwin = menuPtr->tkwin;
     Tcl_Size index;
-    bool strictMotif;
+    int strictMotif;
     Tk_Font tkfont;
     Tk_FontMetrics menuMetrics;
     int width;

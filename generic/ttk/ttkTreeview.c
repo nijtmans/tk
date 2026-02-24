@@ -4281,7 +4281,7 @@ static int TreeviewCtagHasCommand(
 	return TCL_OK;
     } else if (objc == 6) {	/* Test if cell has specified tag */
 	Ttk_Tag tag = Ttk_GetTagFromObj(tv->tree.tagTable, objv[4]);
-	bool result = false;
+	int result = 0;
 	if (GetCellFromObj(interp, tv, objv[5], 0, NULL, &cell) != TCL_OK) {
 	    return TCL_ERROR;
 	}
@@ -4298,7 +4298,7 @@ static int TreeviewCtagHasCommand(
 	    }
 	}
 
-	Tcl_SetObjResult(interp, Tcl_NewBooleanObj(result));
+	Tcl_SetObjResult(interp, Tcl_NewWideIntObj(result));
 	return TCL_OK;
     } else {
 	Tcl_WrongNumArgs(interp, 4, objv, "tagName ?cell?");
