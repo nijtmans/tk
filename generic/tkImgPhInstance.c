@@ -18,7 +18,6 @@
  *	   Australian National University.
  */
 
-#include "tkInt.h"
 #include "tkImgPhoto.h"
 #include "tkPort.h"
 

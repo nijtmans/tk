@@ -121,27 +121,7 @@ TkpPrintWindowId(
     snprintf(buf, TCL_INTEGER_SPACE, "0x%" TCL_Z_MODIFIER "x", (size_t)window);
 }
 
-int
-TkPutImage(
-    unsigned long *colors,	/* Array of pixel values used by this image.
-				 * May be NULL. */
-    int ncolors,		/* Number of colors used, or 0. */
-    Display *display,
-    Drawable d,			/* Destination drawable. */
-    GC gc,
-    XImage *image,		/* Source image. */
-    int src_x, int src_y,	/* Offset of subimage. */
-    int dest_x, int dest_y,	/* Position of subimage origin in drawable. */
-    unsigned int width, unsigned int height)
-				/* Dimensions of subimage. */
-{
-    (void)colors;
-    (void)ncolors;
-
-    return XPutImage(display, d, gc, image, src_x, src_y, dest_x, dest_y, width, height);
-}
-
-	/* TODO: To be implemented for Cygwin */
+/* TODO: To be implemented for Cygwin */
 #	define Tk_AttachHWND 0
 #	define Tk_GetHWND 0
 #	define Tk_HWNDToWindow 0
@@ -170,7 +150,7 @@ TkPutImage(
 #   endif
 #endif /* !_WIN32 */
 
-#if defined(MAC_OSX_TCL)
+#if !defined(_WIN32)
 
 int
 TkPutImage(
