@@ -48,6 +48,11 @@ MODULE_SCOPE void	TkpDrawCheckIndicator(Tk_Window tkwin,
  */
 
 static void		SetHelpMenu(TkMenu *menuPtr);
+static void		DrawMenuEntryAccelerator(TkMenu *menuPtr,
+			    TkMenuEntry *mePtr, Drawable d, GC gc,
+			    Tk_Font tkfont, const Tk_FontMetrics *fmPtr,
+			    Tk_3DBorder activeBorder, Tk_3DBorder bgBorder,
+			    int x, int y, int width, int height, int drawArrow);
 static void		DrawMenuEntryBackground(TkMenu *menuPtr,
 			    TkMenuEntry *mePtr, Drawable d,
 			    Tk_3DBorder activeBorder, Tk_3DBorder bgBorder,
@@ -481,7 +486,7 @@ DrawMenuEntryAccelerator(
     int y,			/* Top coordinate of entry rect */
     int width,			/* Width of entry */
     int height,			/* Height of entry */
-    bool drawArrow)		/* Whether or not to draw arrow. */
+    int drawArrow)		/* Whether or not to draw arrow. */
 {
     XPoint points[3];
     int borderWidth, activeBorderWidth;
@@ -1421,7 +1426,9 @@ TkpDrawMenuEntry(
     int y,			/* Y-coordinate of topleft of entry */
     int width,			/* Width of the entry rectangle */
     int height,			/* Height of the current rectangle */
-    DrawMenuFlags drawingParameters)	/* Flags */
+    int strictMotif,		/* Boolean flag */
+    int drawArrow)		/* Whether or not to draw the cascade arrow
+				 * for cascade items. */
 {
     GC gc, indicatorGC;
     XColor *indicatorColor, *disableColor = NULL;
@@ -1437,7 +1444,7 @@ TkpDrawMenuEntry(
      * Choose the gc for drawing the foreground part of the entry.
      */
 
-    if ((mePtr->state == ENTRY_ACTIVE) && !(drawingParameters & DRAW_MENU_ENTRY_STRICTMOTIF)) {
+    if ((mePtr->state == ENTRY_ACTIVE) && !strictMotif) {
 	gc = mePtr->activeGC;
 	if (gc == NULL) {
 	    gc = menuPtr->activeGC;
@@ -1494,7 +1501,7 @@ TkpDrawMenuEntry(
     bgBorder = Tk_Get3DBorderFromObj(menuPtr->tkwin,
 	    (mePtr->borderPtr == NULL)
 	    ? menuPtr->borderPtr : mePtr->borderPtr);
-    if (drawingParameters & DRAW_MENU_ENTRY_STRICTMOTIF) {
+    if (strictMotif) {
 	activeBorder = bgBorder;
     } else {
 	activeBorder = Tk_Get3DBorderFromObj(menuPtr->tkwin,
@@ -1530,7 +1537,7 @@ TkpDrawMenuEntry(
 		width, adjustedHeight);
 	DrawMenuEntryAccelerator(menuPtr, mePtr, d, gc, tkfont, fmPtr,
 		activeBorder, bgBorder, x, adjustedY, width, adjustedHeight,
-		(drawingParameters & DRAW_MENU_ENTRY_ARROW) != 0);
+		drawArrow);
 	if (!mePtr->hideMargin) {
 	    if (mePtr->state == ENTRY_ACTIVE) {
 		bgBorder = activeBorder;
