@@ -37,6 +37,19 @@ typedef struct {
  * For cursors not available in GLFW, we'll use bitmap data.
  */
 
+#ifndef GLFW_RESIZE_ALL_CURSOR
+#   define GLFW_RESIZE_ALL_CURSOR -1 /* Will use bitmap */
+#endif
+#ifndef GLFW_RESIZE_NESW_CURSOR
+#   define GLFW_RESIZE_NESW_CURSOR -1 /* Will use bitmap */
+#endif
+#ifndef GLFW_RESIZE_NS_CURSOR
+#   define GLFW_RESIZE_NS_CURSOR -1 /* Will use bitmap */
+#endif
+#ifndef GLFW_RESIZE_EW_CURSOR
+#   define GLFW_RESIZE_EW_CURSOR -1 /* Will use bitmap */
+#endif
+
 static const struct CursorName {
     const char *name;
     int shape;			/* GLFW cursor shape enum, or -1 for bitmap */
