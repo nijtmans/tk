@@ -22,6 +22,11 @@ to the userbase.
  - [crash in text sync subcommand](https://core.tcl-lang.org/tk/tktview/8e4fb0])
  - [Random semantic color values on macOS 10.15.6 Catalina](https://core.tcl-lang.org/tk/tktview/544140])
  - [Widgets on aqua no longer receive <Deactivate> events](https://core.tcl-lang.org/tk/tktview/9654e3])
+ - [X11: crash by wm forget on menu](https://core.tcl-lang.org/tk/tktview/c77b42)
+ - [fails to build with glibc 2.43](https://core.tcl-lang.org/tk/tktview/5d2061)
+ - [Pointer warp relative to the screen's root window fails if the Tk root window is withdrawn](https://core.tcl-lang.org/tk/tktview/e2418c)
+ - [Directory library/demos unexpectedly embedded into tcl9tk9x.dll](https://core.tcl-lang.org/tk/tktview/6a9bae)
+ - [Use the native selection colors for listbox and ttk::treeview widgets on aqua](https://core.tcl-lang.org/tk/tktview/c6292f)
 
 Release Tk 9.0.3 arises from the check-in with tag `core-9-0-3`.
 

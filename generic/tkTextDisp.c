@@ -1170,7 +1170,8 @@ LayoutDLine(
 				 * numBytes > 0. Used to drop 0-sized chunks
 				 * from the end of the line. */
     Tcl_Size byteOffset;
-    int ascent, descent, code, elide, elidesize;
+    int ascent, descent, code, elidesize;
+	int elide;
     StyleValues *sValuePtr;
     TkTextElideInfo info;	/* Keep track of elide state. */
 
@@ -3144,18 +3145,6 @@ GenerateWidgetViewSyncEvent(
     Bool NewSyncState = (InSync != 0); /* ensure 0 or 1 value */
     Bool OldSyncState = !(textPtr->dInfoPtr->flags & OUT_OF_SYNC);
 
-    /*
-     * OSX 10.14 needs to be told to display the window when the Text Widget
-     * is in sync.  (That is, to run DisplayText inside of the drawRect
-     * method.)  Otherwise the screen might not get updated until an event
-     * like a mouse click is received.  But that extra drawing corrupts the
-     * data that the test suite is trying to collect.
-     */
-
-    if (!tkTextDebug) {
-	TkpRedrawWidget(textPtr->tkwin);
-    }
-
     if (NewSyncState != OldSyncState) {
 	if (NewSyncState) {
 	    textPtr->dInfoPtr->flags &= ~OUT_OF_SYNC;
@@ -4345,7 +4334,7 @@ DisplayText(
 	 * calling TextInvalidateRegion to mark the display blocks as stale.
 	 */
 
-	damageRgn = TkCreateRegion();
+	damageRgn = XCreateRegion();
 	if (TkScrollWindow(textPtr->tkwin, dInfoPtr->scrollGC, dInfoPtr->x,
 		oldY, dInfoPtr->maxX-dInfoPtr->x, height, 0, y-oldY,
 		damageRgn)) {
@@ -4355,7 +4344,7 @@ DisplayText(
 #endif
 	}
 	numCopies++;
-	TkDestroyRegion(damageRgn);
+	XDestroyRegion(damageRgn);
     }
 
     /*
@@ -4723,18 +4712,18 @@ TkTextRedrawRegion(
     int width, int height)	/* Width and height of area to be redrawn. */
 {
     TextDInfo *dInfoPtr = textPtr->dInfoPtr;
-    TkRegion damageRgn = TkCreateRegion();
+    TkRegion damageRgn = XCreateRegion();
     XRectangle rect;
 
     rect.x = x;
     rect.y = y;
     rect.width = width;
     rect.height = height;
-    TkUnionRectWithRegion(&rect, damageRgn, damageRgn);
+    XUnionRectWithRegion(&rect, damageRgn, damageRgn);
 
     TextInvalidateRegion(textPtr, damageRgn);
 
-    TkDestroyRegion(damageRgn);
+    XDestroyRegion(damageRgn);
 
     /*
      * Schedule the redisplay operation if there isn't one already scheduled.
@@ -4779,12 +4768,12 @@ TextInvalidateRegion(
      * redisplay.
      */
 
-    TkClipBox(region, &rect);
+    XClipBox(region, &rect);
     maxY = rect.y + rect.height;
     for (dlPtr = dInfoPtr->dLinePtr; dlPtr != NULL;
 	    dlPtr = dlPtr->nextPtr) {
 	if ((!(dlPtr->flags & OLD_Y_INVALID))
-		&& (TkRectInRegion(region, rect.x, dlPtr->y,
+		&& (XRectInRegion(region, rect.x, dlPtr->y,
 		rect.width, (unsigned int) dlPtr->height) != RectangleOut)) {
 	    dlPtr->flags |= OLD_Y_INVALID;
 	}

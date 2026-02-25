@@ -2569,7 +2569,11 @@ WmForgetCmd(
 {
     Tk_Window frameWin = (Tk_Window)winPtr;
 
-    if (Tk_IsTopLevel(frameWin)) {
+    /*
+     * Tk ticket c77b426d: avoid panic on usage after wm forget
+     */
+
+    if (Tk_IsTopLevel(frameWin) && Tk_IsManageable(frameWin)) {
 	MacDrawable *macWin;
 
 	Tk_MakeWindowExist(frameWin);
@@ -6911,6 +6915,7 @@ TkMacOSXMakeRealWindowExist(
  *----------------------------------------------------------------------
  */
 
+#undef TkpRedrawWidget
 void
 TkpRedrawWidget(Tk_Window tkwin) {
     (void) tkwin;
@@ -7251,10 +7256,9 @@ TkpChangeFocus(
 				 * didn't originally belong to topLevelPtr's
 				 * application. */
 {
-    if (!winPtr ||
-	(winPtr->flags & TK_ALREADY_DEAD) ||
-	!Tk_IsMapped(winPtr) ||
-	winPtr->atts.override_redirect) {
+    if (!winPtr || (winPtr->flags & TK_ALREADY_DEAD)
+	    || !Tk_IsMapped(winPtr) ||
+	    winPtr->atts.override_redirect) {
 	return 0;
     }
     if (Tk_IsTopLevel(winPtr) && !Tk_IsEmbedded(winPtr)) {
