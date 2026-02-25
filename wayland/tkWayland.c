@@ -43,13 +43,11 @@ TkGetServerInfo(
     const char *platform = "Wayland";
     
     /* Try to detect if we're actually running on X11 through GLFW */
-    if (glfwGetCurrentContext()) {
-        if (glfwGetPlatform() == GLFW_PLATFORM_X11) {
-            platform = "x11";
-        } else if (glfwGetPlatform() == GLFW_PLATFORM_WAYLAND) {
-            platform = "wayland";
-        }
+#ifdef GLFW_PLATFORM_X11
+    if (glfwGetCurrentContext() && (glfwGetPlatform() == GLFW_PLATFORM_X11)) {
+        platform = "x11";
     }
+#endif
     
     Tcl_SetObjResult(interp, Tcl_ObjPrintf("%s %s (via GLFW)", backend, platform));
 }
