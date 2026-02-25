@@ -7851,9 +7851,9 @@ printf "%s\n" "$as_me: xkbcommon >= 0.5.0 not found" >&6;}
 
 
 
-        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for glfw3 >= 3.4 with Wayland support" >&5
-printf %s "checking for glfw3 >= 3.4 with Wayland support... " >&6; }
-        if pkg-config --exists "glfw3 >= 3.4"; then
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for glfw3 >= 3.3 with Wayland support" >&5
+printf %s "checking for glfw3 >= 3.3 with Wayland support... " >&6; }
+        if pkg-config --exists "glfw3 >= 3.3"; then
             { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: glfw3 found" >&5
 printf "%s\n" "glfw3 found" >&6; }
             GLFW_CFLAGS="$(pkg-config --cflags glfw3)"
@@ -8215,11 +8215,10 @@ Required (all mandatory when --enable-wayland is used):
   - glesv2 (OpenGL ES 3.0)
   - fontconfig >= 2.12
   - libsystemd (sd-bus)
-  - wayland-scanner
   - wayland-protocols (containing unstable/text-input/text-input-unstable-v3.xml)
 
 On Debian/Ubuntu:
-  sudo apt install wayland-protocols wayland-scanner libwayland-dev \
+  sudo apt install wayland-protocols libwayland-dev \
     libxkbcommon-dev libglfw3-dev libgles2-mesa-dev \
     libfontconfig-dev libsystemd-dev
 " "$LINENO" 5

@@ -300,8 +300,8 @@ if test $tk_aqua = no; then
         AC_SUBST([XKBCOMMON_CFLAGS])
         AC_SUBST([XKBCOMMON_LIBS])
 
-        AC_MSG_CHECKING([for glfw3 >= 3.4 with Wayland support])
-        if pkg-config --exists "glfw3 >= 3.4"; then
+        AC_MSG_CHECKING([for glfw3 >= 3.3 with Wayland support])
+        if pkg-config --exists "glfw3 >= 3.3"; then
             AC_MSG_RESULT([glfw3 found])
             GLFW_CFLAGS="$(pkg-config --cflags glfw3)"
             GLFW_LIBS="$(pkg-config --libs glfw3)"
@@ -469,11 +469,10 @@ Required (all mandatory when --enable-wayland is used):
   - glesv2 (OpenGL ES 3.0)
   - fontconfig >= 2.12
   - libsystemd (sd-bus)
-  - wayland-scanner
   - wayland-protocols (containing unstable/text-input/text-input-unstable-v3.xml)
 
 On Debian/Ubuntu:
-  sudo apt install wayland-protocols wayland-scanner libwayland-dev \
+  sudo apt install wayland-protocols libwayland-dev \
     libxkbcommon-dev libglfw3-dev libgles2-mesa-dev \
     libfontconfig-dev libsystemd-dev
 ])
