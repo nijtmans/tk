@@ -590,7 +590,7 @@ XFillArc(
 int
 XFillArcs(
     TCL_UNUSED(Display *),
-    Drawable d,
+    TCL_UNUSED(Drawable),
     GC gc,
     XArc *arcArr,
     int nArcs)

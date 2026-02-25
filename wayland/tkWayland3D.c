@@ -106,7 +106,7 @@ TkpFreeBorder(
 void
 Tk_3DVerticalBevel(
 		   Tk_Window tkwin,        /* Window for which border was allocated. */
-		   Drawable drawable,      /* X window or pixmap in which to draw. */
+		   TCL_UNUSED(Drawable),   /* X window or pixmap in which to draw. */
 		   Tk_3DBorder border,     /* Token for border to draw. */
 		   int x, int y, int width, int height,
 		   int leftBevel,          /* Non-zero means this bevel forms the left side */
@@ -115,7 +115,6 @@ Tk_3DVerticalBevel(
     TkBorder *borderPtr = (TkBorder *) border;
     WaylandBorder *waylandBorderPtr = (WaylandBorder *) borderPtr;
     NVGcolor leftColor, rightColor;
-    TkWaylandDrawingContext dc;
     GC gc;
 
     if ((borderPtr->lightGC == NULL) && (relief != TK_RELIEF_FLAT)) {
@@ -221,7 +220,7 @@ Tk_3DVerticalBevel(
 void
 Tk_3DHorizontalBevel(
 		     Tk_Window tkwin,        /* Window for which border was allocated. */
-		     Drawable drawable,      /* X window or pixmap in which to draw. */
+		     TCL_UNUSED(Drawable),   /* X window or pixmap in which to draw. */
 		     Tk_3DBorder border,     /* Token for border to draw. */
 		     int x, int y, int width, int height,
 		     int leftIn, int rightIn,/* Whether left/right edges angle in/out */
@@ -232,7 +231,6 @@ Tk_3DHorizontalBevel(
     WaylandBorder *waylandBorderPtr = (WaylandBorder *) borderPtr;
     NVGcolor topColor, bottomColor;
     int bottom, halfway, x1, x2, x1Delta, x2Delta;
-    TkWaylandDrawingContext dc;
     GC gc;
 
     if ((borderPtr->lightGC == NULL) && (relief != TK_RELIEF_FLAT) &&

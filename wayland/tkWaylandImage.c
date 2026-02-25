@@ -212,7 +212,7 @@ CreateNVGImageFromDrawableRect(
 
 
 XImage* TkWaylandCreateXImageWithNVGImage(
-    NVGcontext* vg,
+    TCL_UNUSED(NVGcontext *),
     NVGImageData* nvgImage,
     TCL_UNUSED(Display *))
 {
