@@ -42,20 +42,6 @@ static Drawable       nextDrawableId     = 1000; /* avoid zero/conflicts */
 /*
  *----------------------------------------------------------------------
  *
- * Static helpers – window mapping list
- *
- *----------------------------------------------------------------------
- */
-
-static WindowMapping *FindMappingByGLFW(GLFWwindow *glfwWindow);
-static WindowMapping *FindMappingByTk(TkWindow *tkWin);
-static WindowMapping *FindMappingByDrawable(Drawable drawable);
-static void           RemoveMapping(WindowMapping *mapping);
-static void           CleanupAllMappings(void);
-
-/*
- *----------------------------------------------------------------------
- *
  * Decoration support
  *
  *----------------------------------------------------------------------
@@ -542,7 +528,16 @@ TkGlfwBeginDraw(
 
     glfwMakeContextCurrent(mapping->glfwWindow);
 
+    /* Clear to transparent (widget will draw its background). */
+    glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+
+    /* Begin NanoVG frame with pixel-perfect coordinates */
     nvgBeginFrame(dcPtr->vg, (float)dcPtr->width, (float)dcPtr->height, 1.0f);
+
+    /* Set pixel-aligned rendering to avoid blurriness. */
+    nvgSave(dcPtr->vg);
+    nvgTranslate(dcPtr->vg, 0.5f, 0.5f);  /* Helps with crisp lines at pixel boundaries */
 
     if (gc) {
         TkGlfwApplyGC(dcPtr->vg, gc);
@@ -550,6 +545,7 @@ TkGlfwBeginDraw(
 
     return TCL_OK;
 }
+
 
 /*
  *----------------------------------------------------------------------
@@ -617,8 +613,11 @@ TkGlfwGetNVGContext(void)
         }
     }
 
+    /* Ensure some context is current – the caller is responsible
+     * for having made the correct window current via TkGlfwBeginDraw. */
     if (glfwGetCurrentContext() == NULL) {
-        glfwMakeContextCurrent(glfwContext.mainWindow);
+        fprintf(stderr, "TkGlfwGetNVGContext: No current GLFW context!\n");
+        return NULL;
     }
 
     return glfwContext.vg;
@@ -908,7 +907,7 @@ TkpDisplayWarning(
  *----------------------------------------------------------------------
  */
 
-static WindowMapping *
+WindowMapping *
 FindMappingByGLFW(
     GLFWwindow *glfwWindow)
 {
@@ -936,7 +935,7 @@ FindMappingByGLFW(
  *----------------------------------------------------------------------
  */
 
-static WindowMapping *
+WindowMapping *
 FindMappingByTk(
     TkWindow *tkWin)
 {
@@ -964,7 +963,7 @@ FindMappingByTk(
  *----------------------------------------------------------------------
  */
 
-static WindowMapping *
+WindowMapping *
 FindMappingByDrawable(
     Drawable drawable)
 {
@@ -992,7 +991,7 @@ FindMappingByDrawable(
  *----------------------------------------------------------------------
  */
 
-static void
+void
 RemoveMapping(
     WindowMapping *mapping)
 {
@@ -1026,7 +1025,7 @@ RemoveMapping(
  *----------------------------------------------------------------------
  */
 
-static void
+void
 CleanupAllMappings(void)
 {
     WindowMapping *cur  = windowMappingList;

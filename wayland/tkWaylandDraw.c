@@ -15,7 +15,7 @@
 #include "tkInt.h"
 #include "tkPort.h"
 #include "tkGlfwInt.h"
-#include <GLES3/gl3.h>
+#include <GLES2/gl2.h>
 #include "nanovg.h"
 #include <math.h>
 #include <X11/Xutil.h>
@@ -41,41 +41,40 @@
 int
 XDrawLines(
     TCL_UNUSED(Display *),
-    Drawable d,
+    TCL_UNUSED(Drawable),
     GC gc,
     XPoint *points,
     int npoints,
     int mode)
 {
-    TkWaylandDrawingContext dc;
     int i;
     
     if (npoints < 2 || points == NULL) {
         return BadValue;
     }
     
-    if (TkGlfwBeginDraw(d, gc, &dc) != TCL_OK) {
-        return BadDrawable;
-    }
+    NVGcontext *vg = TkGlfwGetNVGContext();
+    if (!vg) return BadDrawable;
+
     
     /* Apply GC settings (line width, color, etc.) */
-    TkGlfwApplyGC(dc.vg, gc);
+    TkGlfwApplyGC(vg, gc);
     
-    nvgBeginPath(dc.vg);
-    nvgMoveTo(dc.vg, points[0].x, points[0].y);
+    nvgBeginPath(vg);
+    nvgMoveTo(vg, points[0].x, points[0].y);
     
     for (i = 1; i < npoints; i++) {
         if (mode == CoordModeOrigin) {
-            nvgLineTo(dc.vg, points[i].x, points[i].y);
+            nvgLineTo(vg, points[i].x, points[i].y);
         } else {  /* CoordModePrevious */
-            nvgLineTo(dc.vg, points[i-1].x + points[i].x,
+            nvgLineTo(vg, points[i-1].x + points[i].x,
                       points[i-1].y + points[i].y);
         }
     }
     
-    nvgStroke(dc.vg);
+    nvgStroke(vg);
     
-    TkGlfwEndDraw(&dc);
+
     return Success;
 }
 
@@ -98,29 +97,26 @@ XDrawLines(
 int
 XDrawSegments(
     TCL_UNUSED(Display *),
-    Drawable d,
+    TCL_UNUSED(Drawable),
     GC gc,
     XSegment *segments,
     int nsegments)
 {
-    TkWaylandDrawingContext dc;
     int i;
     
-    if (TkGlfwBeginDraw(d, gc, &dc) != TCL_OK) {
-        return BadDrawable;
-    }
+    NVGcontext *vg = TkGlfwGetNVGContext();
+    if (!vg) return BadDrawable;
     
     /* Apply GC settings. */
-    TkGlfwApplyGC(dc.vg, gc);
+    TkGlfwApplyGC(vg, gc);
     
     for (i = 0; i < nsegments; i++) {
-        nvgBeginPath(dc.vg);
-        nvgMoveTo(dc.vg, segments[i].x1, segments[i].y1);
-        nvgLineTo(dc.vg, segments[i].x2, segments[i].y2);
-        nvgStroke(dc.vg);
+        nvgBeginPath(vg);
+        nvgMoveTo(vg, segments[i].x1, segments[i].y1);
+        nvgLineTo(vg, segments[i].x2, segments[i].y2);
+        nvgStroke(vg);
     }
     
-    TkGlfwEndDraw(&dc);
     return Success;
 }
 
@@ -143,14 +139,14 @@ XDrawSegments(
 int
 XFillPolygon(
     TCL_UNUSED(Display *),
-    Drawable d,
+    TCL_UNUSED(Drawable),
     GC gc,
     XPoint *points,
     int npoints,
     TCL_UNUSED(int),  /* shape - ignored */
     int mode)
 {
-    TkWaylandDrawingContext dc;
+	
     XGCValues gcValues;
     int i;
     
@@ -158,42 +154,40 @@ XFillPolygon(
         return BadValue;
     }
     
-    if (TkGlfwBeginDraw(d, gc, &dc) != TCL_OK) {
-        return BadDrawable;
-    }
+    NVGcontext *vg = TkGlfwGetNVGContext();
+    if (!vg) return BadDrawable;
     
     /* Apply GC settings (fill color, etc.) */
-    TkGlfwApplyGC(dc.vg, gc);
+    TkGlfwApplyGC(vg, gc);
     
     /* Get GC values for fill rule. */
     if (TkWaylandGetGCValues(gc, GCFillRule, &gcValues) == 0) {
         gcValues.fill_rule = WindingRule; /* Default */
     }
     
-    nvgBeginPath(dc.vg);
-    nvgMoveTo(dc.vg, points[0].x, points[0].y);
+    nvgBeginPath(vg);
+    nvgMoveTo(vg, points[0].x, points[0].y);
     
     for (i = 1; i < npoints; i++) {
         if (mode == CoordModeOrigin) {
-            nvgLineTo(dc.vg, points[i].x, points[i].y);
+            nvgLineTo(vg, points[i].x, points[i].y);
         } else {  /* CoordModePrevious */
-            nvgLineTo(dc.vg, points[i-1].x + points[i].x,
+            nvgLineTo(vg, points[i-1].x + points[i].x,
                       points[i-1].y + points[i].y);
         }
     }
     
-    nvgClosePath(dc.vg);
+    nvgClosePath(vg);
     
     /* Set winding based on fill rule. */
     if (gcValues.fill_rule == EvenOddRule) {
-        nvgPathWinding(dc.vg, NVG_HOLE);
+        nvgPathWinding(vg, NVG_HOLE);
     } else {
-        nvgPathWinding(dc.vg, NVG_SOLID);
+        nvgPathWinding(vg, NVG_SOLID);
     }
     
-    nvgFill(dc.vg);
+    nvgFill(vg);
     
-    TkGlfwEndDraw(&dc);
     return Success;
 }
 
@@ -216,30 +210,27 @@ XFillPolygon(
 int
 XDrawRectangle(
     TCL_UNUSED(Display *),
-    Drawable d,
+    TCL_UNUSED(Drawable),
     GC gc,
     int x, int y,
     unsigned int width,
     unsigned int height)
 {
-    TkWaylandDrawingContext dc;
-    
+
     if (width == 0 || height == 0) {
         return BadValue;
     }
     
-    if (TkGlfwBeginDraw(d, gc, &dc) != TCL_OK) {
-        return BadDrawable;
-    }
+    NVGcontext *vg = TkGlfwGetNVGContext();
+    if (!vg) return BadDrawable;
     
     /* Apply GC settings. */
-    TkGlfwApplyGC(dc.vg, gc);
+    TkGlfwApplyGC(vg, gc);
     
-    nvgBeginPath(dc.vg);
-    nvgRect(dc.vg, x, y, width, height);
-    nvgStroke(dc.vg);
+    nvgBeginPath(vg);
+    nvgRect(vg, x, y, width, height);
+    nvgStroke(vg);
     
-    TkGlfwEndDraw(&dc);
     return Success;
 }
 
@@ -262,29 +253,26 @@ XDrawRectangle(
 int
 XDrawRectangles(
     TCL_UNUSED(Display *),
-    Drawable d,
+    TCL_UNUSED(Drawable),
     GC gc,
     XRectangle *rectArr,
     int nRects)
 {
-    TkWaylandDrawingContext dc;
     int i;
     
-    if (TkGlfwBeginDraw(d, gc, &dc) != TCL_OK) {
-        return BadDrawable;
-    }
+    NVGcontext *vg = TkGlfwGetNVGContext();
+    if (!vg) return BadDrawable;
     
     /* Apply GC settings. */
-    TkGlfwApplyGC(dc.vg, gc);
+    TkGlfwApplyGC(vg, gc);
     
     for (i = 0; i < nRects; i++) {
-        nvgBeginPath(dc.vg);
-        nvgRect(dc.vg, rectArr[i].x, rectArr[i].y,
+        nvgBeginPath(vg);
+        nvgRect(vg, rectArr[i].x, rectArr[i].y,
                 rectArr[i].width, rectArr[i].height);
-        nvgStroke(dc.vg);
+        nvgStroke(vg);
     }
     
-    TkGlfwEndDraw(&dc);
     return Success;
 }
 
@@ -307,29 +295,26 @@ XDrawRectangles(
 int
 XFillRectangles(
     TCL_UNUSED(Display *),
-    Drawable d,
+    TCL_UNUSED(Drawable),
     GC gc,
     XRectangle *rectangles,
     int n_rectangles)
 {
-    TkWaylandDrawingContext dc;
     int i;
     
-    if (TkGlfwBeginDraw(d, gc, &dc) != TCL_OK) {
-        return BadDrawable;
-    }
+    NVGcontext *vg = TkGlfwGetNVGContext();
+    if (!vg) return BadDrawable;
     
     /* Apply GC settings (fill color). */
-    TkGlfwApplyGC(dc.vg, gc);
+    TkGlfwApplyGC(vg, gc);
     
     for (i = 0; i < n_rectangles; i++) {
-        nvgBeginPath(dc.vg);
-        nvgRect(dc.vg, rectangles[i].x, rectangles[i].y,
+        nvgBeginPath(vg);
+        nvgRect(vg, rectangles[i].x, rectangles[i].y,
                 rectangles[i].width, rectangles[i].height);
-        nvgFill(dc.vg);
+        nvgFill(vg);
     }
     
-    TkGlfwEndDraw(&dc);
     return Success;
 }
 
@@ -387,7 +372,7 @@ XFillRectangle(
 int
 XDrawArc(
     TCL_UNUSED(Display *),
-    Drawable d,
+    TCL_UNUSED(Drawable),
     GC gc,
     int x, int y,
     unsigned int width,
@@ -395,7 +380,6 @@ XDrawArc(
     int angle1,
     int angle2)
 {
-    TkWaylandDrawingContext dc;
     float cx, cy, rx, ry;
     float startAngle, endAngle;
     
@@ -403,12 +387,11 @@ XDrawArc(
         return BadValue;
     }
     
-    if (TkGlfwBeginDraw(d, gc, &dc) != TCL_OK) {
-        return BadDrawable;
-    }
+    NVGcontext *vg = TkGlfwGetNVGContext();
+    if (!vg) return BadDrawable;
     
     /* Apply GC settings. */
-    TkGlfwApplyGC(dc.vg, gc);
+    TkGlfwApplyGC(vg, gc);
     
     cx = x + width / 2.0f;
     cy = y + height / 2.0f;
@@ -418,23 +401,22 @@ XDrawArc(
     startAngle = -radians(angle1 / 64.0);
     endAngle = -radians((angle1 + angle2) / 64.0);
     
-    nvgBeginPath(dc.vg);
+    nvgBeginPath(vg);
     
     if (width == height) {
-        nvgArc(dc.vg, cx, cy, rx, startAngle, endAngle, NVG_CW);
+        nvgArc(vg, cx, cy, rx, startAngle, endAngle, NVG_CW);
     } else {
         /* Ellipse: scale transform. */
-        nvgSave(dc.vg);
-        nvgTranslate(dc.vg, cx, cy);
-        nvgScale(dc.vg, 1.0f, ry / rx);
-        nvgTranslate(dc.vg, -cx, -cy);
-        nvgArc(dc.vg, cx, cy, rx, startAngle, endAngle, NVG_CW);
-        nvgRestore(dc.vg);
+        nvgSave(vg);
+        nvgTranslate(vg, cx, cy);
+        nvgScale(vg, 1.0f, ry / rx);
+        nvgTranslate(vg, -cx, -cy);
+        nvgArc(vg, cx, cy, rx, startAngle, endAngle, NVG_CW);
+        nvgRestore(vg);
     }
     
-    nvgStroke(dc.vg);
+    nvgStroke(vg);
     
-    TkGlfwEndDraw(&dc);
     return Success;
 }
 
@@ -457,20 +439,18 @@ XDrawArc(
 int
 XDrawArcs(
     TCL_UNUSED(Display *),
-    Drawable d,
+    TCL_UNUSED(Drawable),
     GC gc,
     XArc *arcArr,
     int nArcs)
 {
-    TkWaylandDrawingContext dc;
     int i;
     
-    if (TkGlfwBeginDraw(d, gc, &dc) != TCL_OK) {
-        return BadDrawable;
-    }
+    NVGcontext *vg = TkGlfwGetNVGContext();
+    if (!vg) return BadDrawable;
     
     /* Apply GC settings. */
-    TkGlfwApplyGC(dc.vg, gc);
+    TkGlfwApplyGC(vg, gc);
     
     for (i = 0; i < nArcs; i++) {
         float cx, cy, rx, ry;
@@ -489,23 +469,22 @@ XDrawArcs(
         startAngle = -radians(arcArr[i].angle1 / 64.0);
         endAngle = -radians((arcArr[i].angle1 + arcArr[i].angle2) / 64.0);
         
-        nvgBeginPath(dc.vg);
+        nvgBeginPath(vg);
         
         if (arcArr[i].width == arcArr[i].height) {
-            nvgArc(dc.vg, cx, cy, rx, startAngle, endAngle, NVG_CW);
+            nvgArc(vg, cx, cy, rx, startAngle, endAngle, NVG_CW);
         } else {
-            nvgSave(dc.vg);
-            nvgTranslate(dc.vg, cx, cy);
-            nvgScale(dc.vg, 1.0f, ry / rx);
-            nvgTranslate(dc.vg, -cx, -cy);
-            nvgArc(dc.vg, cx, cy, rx, startAngle, endAngle, NVG_CW);
-            nvgRestore(dc.vg);
+            nvgSave(vg);
+            nvgTranslate(vg, cx, cy);
+            nvgScale(vg, 1.0f, ry / rx);
+            nvgTranslate(vg, -cx, -cy);
+            nvgArc(vg, cx, cy, rx, startAngle, endAngle, NVG_CW);
+            nvgRestore(vg);
         }
         
-        nvgStroke(dc.vg);
+        nvgStroke(vg);
     }
     
-    TkGlfwEndDraw(&dc);
     return Success;
 }
 
@@ -528,7 +507,7 @@ XDrawArcs(
 int
 XFillArc(
     TCL_UNUSED(Display *),
-    Drawable d,
+    TCL_UNUSED(Drawable),
     GC gc,
     int x, int y,
     unsigned int width,
@@ -536,7 +515,6 @@ XFillArc(
     int angle1,
     int angle2)
 {
-    TkWaylandDrawingContext dc;
     XGCValues gcValues;
     float cx, cy, rx, ry;
     float startAngle, endAngle;
@@ -545,12 +523,11 @@ XFillArc(
         return BadValue;
     }
     
-    if (TkGlfwBeginDraw(d, gc, &dc) != TCL_OK) {
-        return BadDrawable;
-    }
+    NVGcontext *vg = TkGlfwGetNVGContext();
+    if (!vg) return BadDrawable;
     
     /* Apply GC settings (fill color) */
-    TkGlfwApplyGC(dc.vg, gc);
+    TkGlfwApplyGC(vg, gc);
     
     /* Get GC values for arc mode. */
     if (TkWaylandGetGCValues(gc, GCArcMode, &gcValues) == 0) {
@@ -565,32 +542,32 @@ XFillArc(
     startAngle = -radians(angle1 / 64.0);
     endAngle = -radians((angle1 + angle2) / 64.0);
     
-    nvgBeginPath(dc.vg);
+    nvgBeginPath(vg);
     
     if (gcValues.arc_mode == ArcPieSlice) {
         /* Pie slice: line from center to start, arc, line back to center. */
-        nvgMoveTo(dc.vg, cx, cy);
+        nvgMoveTo(vg, cx, cy);
     }
     
     if (width == height) {
-        nvgArc(dc.vg, cx, cy, rx, startAngle, endAngle, NVG_CW);
+        nvgArc(vg, cx, cy, rx, startAngle, endAngle, NVG_CW);
     } else {
-        nvgSave(dc.vg);
-        nvgTranslate(dc.vg, cx, cy);
-        nvgScale(dc.vg, 1.0f, ry / rx);
-        nvgTranslate(dc.vg, -cx, -cy);
-        nvgArc(dc.vg, cx, cy, rx, startAngle, endAngle, NVG_CW);
-        nvgRestore(dc.vg);
+        nvgSave(vg);
+        nvgTranslate(vg, cx, cy);
+        nvgScale(vg, 1.0f, ry / rx);
+        nvgTranslate(vg, -cx, -cy);
+        nvgArc(vg, cx, cy, rx, startAngle, endAngle, NVG_CW);
+        nvgRestore(vg);
     }
     
     if (gcValues.arc_mode == ArcPieSlice) {
-        nvgLineTo(dc.vg, cx, cy);
+        nvgLineTo(vg, cx, cy);
     }
     
-    nvgClosePath(dc.vg);
-    nvgFill(dc.vg);
+    nvgClosePath(vg);
+    nvgFill(vg);
     
-    TkGlfwEndDraw(&dc);
+
     return Success;
 }
 
@@ -622,12 +599,11 @@ XFillArcs(
     XGCValues gcValues;
     int i;
     
-    if (TkGlfwBeginDraw(d, gc, &dc) != TCL_OK) {
-        return BadDrawable;
-    }
+    NVGcontext *vg = TkGlfwGetNVGContext();
+    if (!vg) return BadDrawable;
     
     /* Apply GC settings (fill color). */
-    TkGlfwApplyGC(dc.vg, gc);
+    TkGlfwApplyGC(vg, gc);
     
     /* Get GC values for arc mode. */
     if (TkWaylandGetGCValues(gc, GCArcMode, &gcValues) == 0) {
@@ -651,32 +627,31 @@ XFillArcs(
         startAngle = -radians(arcArr[i].angle1 / 64.0);
         endAngle = -radians((arcArr[i].angle1 + arcArr[i].angle2) / 64.0);
         
-        nvgBeginPath(dc.vg);
+        nvgBeginPath(vg);
         
         if (gcValues.arc_mode == ArcPieSlice) {
-            nvgMoveTo(dc.vg, cx, cy);
+            nvgMoveTo(vg, cx, cy);
         }
         
         if (arcArr[i].width == arcArr[i].height) {
-            nvgArc(dc.vg, cx, cy, rx, startAngle, endAngle, NVG_CW);
+            nvgArc(vg, cx, cy, rx, startAngle, endAngle, NVG_CW);
         } else {
-            nvgSave(dc.vg);
-            nvgTranslate(dc.vg, cx, cy);
-            nvgScale(dc.vg, 1.0f, ry / rx);
-            nvgTranslate(dc.vg, -cx, -cy);
-            nvgArc(dc.vg, cx, cy, rx, startAngle, endAngle, NVG_CW);
-            nvgRestore(dc.vg);
+            nvgSave(vg);
+            nvgTranslate(vg, cx, cy);
+            nvgScale(vg, 1.0f, ry / rx);
+            nvgTranslate(vg, -cx, -cy);
+            nvgArc(vg, cx, cy, rx, startAngle, endAngle, NVG_CW);
+            nvgRestore(vg);
         }
         
         if (gcValues.arc_mode == ArcPieSlice) {
-            nvgLineTo(dc.vg, cx, cy);
+            nvgLineTo(vg, cx, cy);
         }
         
-        nvgClosePath(dc.vg);
-        nvgFill(dc.vg);
+        nvgClosePath(vg);
+        nvgFill(vg);
     }
     
-    TkGlfwEndDraw(&dc);
     return Success;
 }
 

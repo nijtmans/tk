@@ -27,23 +27,6 @@ typedef enum {
 static TkWaylandDecorMode decorationMode = DECOR_AUTO;
 static int ssdAvailable = 0;
 
-/* Decoration constants. */
-#define TITLE_BAR_HEIGHT    30
-#define BORDER_WIDTH        1
-#define BUTTON_WIDTH        30
-#define BUTTON_HEIGHT       30
-#define BUTTON_SPACING      5
-#define CORNER_RADIUS       6.0f
-#define SHADOW_BLUR         20.0f
-
-
-
-#define RESIZE_NONE     0
-#define RESIZE_LEFT     (1 << 0)
-#define RESIZE_RIGHT    (1 << 1)
-#define RESIZE_TOP      (1 << 2)
-#define RESIZE_BOTTOM   (1 << 3)
-
 /* Forward declarations. */
 static void DrawTitleBar(NVGcontext *vg, TkWaylandDecoration *decor, int width, int height);
 static void DrawBorder(NVGcontext *vg, TkWaylandDecoration *decor, int width, int height);
@@ -339,34 +322,48 @@ TkWaylandDestroyDecoration(TkWaylandDecoration *decor)
  
 void
 TkWaylandDrawDecoration(TkWaylandDecoration *decor,
-			NVGcontext *vg)
+                        NVGcontext *vg)
 {
     int width, height;
+    WindowMapping *mapping;
 
     if (decor == NULL || !decor->enabled || vg == NULL) {
-	return;
+        return;
     }
 
     glfwGetWindowSize(decor->glfwWindow, &width, &height);
 
+    /* Get the client area size from mapping */
+    mapping = FindMappingByGLFW(decor->glfwWindow);
+    if (!mapping) return;
+
     nvgSave(vg);
 
-    NVGpaint shadowPaint = nvgBoxGradient(vg, 
-					  0, 0, width, height,
-					  CORNER_RADIUS, SHADOW_BLUR,
-					  nvgRGBA(0, 0, 0, 64), nvgRGBA(0, 0, 0, 0));
-
+    /* Draw shadow (outside window bounds). */
+    NVGpaint shadowPaint = nvgBoxGradient(vg,
+                                          -BORDER_WIDTH, -TITLE_BAR_HEIGHT,
+                                          width + 2*BORDER_WIDTH,
+                                          height + TITLE_BAR_HEIGHT + BORDER_WIDTH,
+                                          CORNER_RADIUS, SHADOW_BLUR,
+                                          nvgRGBA(0, 0, 0, 64), nvgRGBA(0, 0, 0, 0));
     nvgBeginPath(vg);
-    nvgRect(vg, -SHADOW_BLUR, -SHADOW_BLUR, 
-	    width + 2*SHADOW_BLUR, height + 2*SHADOW_BLUR);
+    nvgRect(vg, -SHADOW_BLUR - BORDER_WIDTH, -SHADOW_BLUR - TITLE_BAR_HEIGHT,
+            width + 2*(SHADOW_BLUR + BORDER_WIDTH),
+            height + 2*SHADOW_BLUR + TITLE_BAR_HEIGHT + BORDER_WIDTH);
     nvgFillPaint(vg, shadowPaint);
     nvgFill(vg);
 
+    /* Draw border and title bar. */
     DrawBorder(vg, decor, width, height);
     DrawTitleBar(vg, decor, width, height);
 
+    /* Set scissor to client area for widget drawing */
+    nvgIntersectScissor(vg, BORDER_WIDTH, TITLE_BAR_HEIGHT,
+                        mapping->width, mapping->height);
+
     nvgRestore(vg);
 }
+
 
 /*
  *----------------------------------------------------------------------

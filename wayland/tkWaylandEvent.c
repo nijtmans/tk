@@ -16,7 +16,7 @@
 #include "tkInt.h"
 #include "tkGlfwInt.h"
 #include <GLFW/glfw3.h>
-#include <GLES3/gl3.h>
+#include <GLES2/gl2.h>
 #include <errno.h>
 #include <signal.h>
 #include <time.h>
@@ -73,6 +73,7 @@ TkGlfwSetupCallbacks(
     glfwSetScrollCallback          (glfwWindow, TkGlfwScrollCallback);
     glfwSetKeyCallback             (glfwWindow, TkGlfwKeyCallback);
     glfwSetCharCallback            (glfwWindow, TkGlfwCharCallback);
+	glfwSetWindowRefreshCallback   (glfwWindow, TkGlfwWindowRefreshCallback);
 }
 
 /*
@@ -106,13 +107,15 @@ TkGlfwWindowCloseCallback(GLFWwindow *window)
  *
  * TkGlfwWindowSizeCallback --
  *
- *      Called when window size changes.
+ *      Called when window size changes. Updates window geometry,
+ *      generates ConfigureNotify event, and queues an expose for redraw.
  *
  * Results:
  *      None.
  *
  * Side effects:
- *      Updates window geometry, generates ConfigureNotify event.
+ *      Updates window geometry, generates ConfigureNotify event,
+ *      queues Expose event for redraw.
  *
  *----------------------------------------------------------------------
  */
@@ -120,38 +123,74 @@ TkGlfwWindowCloseCallback(GLFWwindow *window)
 MODULE_SCOPE void
 TkGlfwWindowSizeCallback(
     GLFWwindow *window,
-    int width,
-    int height)
+    int width,           /* Total window width including decorations. */
+    int height)          /* Total window height including decorations. */
 {
     TkWindow *winPtr = TkGlfwGetTkWindow(window);
+    TkWaylandDecoration *decor;
     XEvent event;
-    
+    int clientWidth, clientHeight;
+
     if (!winPtr) {
         return;
     }
 
+    /* Update the mapping with new total window size. */
     TkGlfwUpdateWindowSize(window, width, height);
 
-    winPtr->changes.width  = width;
-    winPtr->changes.height = height;
+    /* Calculate client area size (inset from decorations if enabled). */
+    decor = TkWaylandGetDecoration(winPtr);
+    if (decor && decor->enabled) {
+        /* Client area is inset by border width on sides and
+         * title bar height + border width on top. */
+        clientWidth = width - (2 * BORDER_WIDTH);
+        clientHeight = height - TITLE_BAR_HEIGHT - BORDER_WIDTH;
 
+        /* Ensure minimum size. */
+        if (clientWidth < 1) clientWidth = 1;
+        if (clientHeight < 1) clientHeight = 1;
+    } else {
+        /* No decorations - client area equals total window. */
+        clientWidth = width;
+        clientHeight = height;
+    }
+
+    /* Update Tk's window dimensions. */
+    winPtr->changes.width = clientWidth;
+    winPtr->changes.height = clientHeight;
+
+    /* Generate ConfigureNotify event. */
     memset(&event, 0, sizeof(XEvent));
     event.type = ConfigureNotify;
-    event.xconfigure.serial          = LastKnownRequestProcessed(winPtr->display);
-    event.xconfigure.send_event       = False;
-    event.xconfigure.display          = winPtr->display;
-    event.xconfigure.event            = Tk_WindowId((Tk_Window)winPtr);
-    event.xconfigure.window           = Tk_WindowId((Tk_Window)winPtr);
-    event.xconfigure.x                = winPtr->changes.x;
-    event.xconfigure.y                = winPtr->changes.y;
-    event.xconfigure.width            = width;
-    event.xconfigure.height           = height;
-    event.xconfigure.border_width     = winPtr->changes.border_width;
-    event.xconfigure.above            = None;
+    event.xconfigure.serial = LastKnownRequestProcessed(winPtr->display);
+    event.xconfigure.send_event = False;
+    event.xconfigure.display = winPtr->display;
+    event.xconfigure.event = Tk_WindowId((Tk_Window)winPtr);
+    event.xconfigure.window = Tk_WindowId((Tk_Window)winPtr);
+    event.xconfigure.x = winPtr->changes.x;
+    event.xconfigure.y = winPtr->changes.y;
+    event.xconfigure.width = clientWidth;
+    event.xconfigure.height = clientHeight;
+    event.xconfigure.border_width = winPtr->changes.border_width;
+    event.xconfigure.above = None;
     event.xconfigure.override_redirect = winPtr->atts.override_redirect;
 
     Tk_QueueWindowEvent(&event, TCL_QUEUE_TAIL);
-}
+
+    /* Queue Expose event for the entire client area. */
+    memset(&event, 0, sizeof(XEvent));
+    event.type = Expose;
+    event.xexpose.serial = LastKnownRequestProcessed(winPtr->display);
+    event.xexpose.send_event = False;
+    event.xexpose.display = winPtr->display;
+    event.xexpose.window = Tk_WindowId((Tk_Window)winPtr);
+    event.xexpose.x = 0;
+    event.xexpose.y = 0;
+    event.xexpose.width = clientWidth;
+    event.xexpose.height = clientHeight;
+    event.xexpose.count = 0;
+
+    Tk_QueueWindowEvent(&event, TCL_QUEUE_TAIL); }
 
 /*
  *----------------------------------------------------------------------
@@ -830,6 +869,94 @@ TkWaylandGetPendingCharacter(void)
     unsigned int codepoint = pendingCodepoint;
     pendingCodepoint = 0;
     return codepoint;
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * TkGlfwWindowRefreshCallback --
+ *
+ *      Called by GLFW when window needs redraw. Generates Expose event.
+ *
+ * Results:
+ *      None.
+ *
+ * Side effects:
+ *      Queues Expose event for client area.
+ *
+ *----------------------------------------------------------------------
+ */
+
+MODULE_SCOPE void
+TkGlfwWindowRefreshCallback(GLFWwindow *window) {
+    TkWindow *winPtr = TkGlfwGetTkWindow(window);
+    XEvent event;
+
+    if (!winPtr) {
+        return;
+    }
+
+    memset(&event, 0, sizeof(XEvent));
+    event.type = Expose;
+    event.xexpose.serial = LastKnownRequestProcessed(winPtr->display);
+    event.xexpose.send_event = False;
+    event.xexpose.display = winPtr->display;
+    event.xexpose.window = Tk_WindowId((Tk_Window)winPtr);
+    event.xexpose.x = 0;
+    event.xexpose.y = 0;
+    event.xexpose.width = winPtr->changes.width;
+    event.xexpose.height = winPtr->changes.height;
+    event.xexpose.count = 0;
+
+    Tk_QueueWindowEvent(&event, TCL_QUEUE_TAIL); 
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * TkpHandleExpose --
+ *
+ *      Platform‑specific handling of Expose events.
+ *      Begins a NanoVG frame, lets Tk handle the expose,
+ *      then ends the frame and swaps buffers.
+ *
+ * Results:
+ *      None.
+ *
+ * Side effects:
+ *      The window is redrawn; the framebuffer is swapped.
+ *
+ *----------------------------------------------------------------------
+ */
+
+void
+TkpHandleExpose(
+    TCL_UNUSED(Display *),    /* Not used, but required by Tk's API. */
+    XEvent  *eventPtr,       /* The Expose event. */
+    TkWindow *winPtr)        /* Tk window that received the event. */
+{
+    Drawable drawable = Tk_WindowId((Tk_Window)winPtr);
+    TkWaylandDrawingContext dc;
+    TkWaylandDecoration *decoration;
+
+
+    /* Begin the frame – NULL GC means no global GC is applied. */
+    if (TkGlfwBeginDraw(drawable, NULL, &dc) != TCL_OK) {
+        return;                 /* Unable to draw (e.g., window not mapped). */
+    }
+
+    /* Let Tk handle the expose event - this will call the widget's
+     * display procedure through Tk's normal event dispatching */
+    Tk_HandleEvent(eventPtr);
+
+    /* Draw decorations on top if enabled */
+    decoration = TkWaylandGetDecoration(winPtr);
+    if (decoration && decoration->enabled) {
+        TkWaylandDrawDecoration(decoration, dc.vg);
+    }
+
+    /* Finish the frame and present the result. */
+    TkGlfwEndDraw(&dc);
 }
 
 /*
