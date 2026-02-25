@@ -40,6 +40,9 @@ typedef struct {
 #ifndef GLFW_RESIZE_ALL_CURSOR
 #   define GLFW_RESIZE_ALL_CURSOR -1 /* Will use bitmap */
 #endif
+#ifndef GLFW_RESIZE_NWSE_CURSOR
+#   define GLFW_RESIZE_NWSE_CURSOR -1 /* Will use bitmap */
+#endif
 #ifndef GLFW_RESIZE_NESW_CURSOR
 #   define GLFW_RESIZE_NESW_CURSOR -1 /* Will use bitmap */
 #endif
