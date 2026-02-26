@@ -14,7 +14,6 @@
 
 
 #include <windows.h>
-#include <math.h>
 #include <wtypes.h>
 #include <winspool.h>
 #include <commdlg.h>
