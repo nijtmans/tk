@@ -67,9 +67,6 @@
 #if defined(__GNUC__) && !defined(__cplusplus)
 #   pragma GCC diagnostic ignored "-Wc++-compat"
 #endif
-#include <X11/cursorfont.h>
-#include <X11/keysym.h>
-#include <X11/Xatom.h>
 
 #ifndef __GNUC__
 #    define strncasecmp _strnicmp
