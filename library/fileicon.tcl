@@ -9253,7 +9253,7 @@ proc ::tk::fileicon {filename size} {
     if {[tk windowingsystem] eq "aqua"} {
         return [image create nsimage [expr {rand()}] -source $filename -as path -height $size]
     }
-    if {[tk windowingsystem] eq "x11" || [tk windowingsystem] eq "wayland"} {
+    if {[tk windowingsystem] eq "x11"} {
 	set ext [string tolower [file extension $filename]]
 	if {[file isdirectory $filename]} {
 	    return [::tk::icons::svgPhoto folder $size]

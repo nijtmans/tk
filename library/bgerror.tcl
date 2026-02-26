@@ -171,7 +171,7 @@ proc ::tk::dialog::error::bgerror {err {flag 1}} {
 
     if {$windowingsystem eq "aqua"} {
 	::tk::unsupported::MacWindowStyle style $dlg moveableAlert {}
-    } elseif {$windowingsystem eq "x11" || $windowingsystem eq "wayland"} {
+    } elseif {$windowingsystem eq "x11"} {
 	wm attributes $dlg -type dialog
     }
 

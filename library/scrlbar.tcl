@@ -14,8 +14,8 @@
 # The code below creates the default class bindings for scrollbars.
 #-------------------------------------------------------------------------
 
-# Standard Motif bindings for x11, aqua and wayland. 
-if {[tk windowingsystem] ne "win32"} {
+# Standard Motif bindings:
+if {[tk windowingsystem] eq "x11" || [tk windowingsystem] eq "aqua"} {
 
 bind Scrollbar <Enter> {
     if {$tk_strictMotif} {
