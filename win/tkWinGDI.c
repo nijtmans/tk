@@ -13,11 +13,16 @@
  */
 
 
-#include "tkWinInt.h"
+#include <windows.h>
+#include <math.h>
 #include <wtypes.h>
 #include <winspool.h>
 #include <commdlg.h>
 #include <wingdi.h>
+
+#include <tcl.h>
+
+#include "tkWinInt.h"
 
 #define DEG2RAD(x) (0.017453292519943295 * (x))
 #define ROUND32(x) ((LONG)floor((x) + 0.5))

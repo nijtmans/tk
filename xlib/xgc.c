@@ -13,6 +13,10 @@
  */
 
 #include "tkInt.h"
+#include <X11/Xlib.h>
+#if defined(MAC_OSX_TK)
+#endif
+
 
 #define MAX_DASH_LIST_SIZE 10
 typedef struct {

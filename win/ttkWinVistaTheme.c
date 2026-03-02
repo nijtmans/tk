@@ -16,6 +16,7 @@
  */
 
 #include "tkWinInt.h"
+#include <windows.h>
 #include <uxtheme.h>
 #include <vssym32.h>
 #include "ttk/ttkThemeInt.h"
