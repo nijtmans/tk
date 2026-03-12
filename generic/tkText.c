@@ -2236,8 +2236,8 @@ ConfigureText(
     } else {
 	textPtr->selTagPtr->selFgColor = textPtr->selFgColorPtr;
     }
-    textPtr->selTagPtr->affectsDisplay = 0;
-    textPtr->selTagPtr->affectsDisplayGeometry = 0;
+    textPtr->selTagPtr->affectsDisplay = false;
+    textPtr->selTagPtr->affectsDisplayGeometry = false;
     if ((textPtr->selTagPtr->elide >= 0)
 	    || (textPtr->selTagPtr->tkfont != NULL)
 	    || (textPtr->selTagPtr->justify != TK_JUSTIFY_NULL)
@@ -2254,8 +2254,8 @@ ConfigureText(
 	    || (textPtr->selTagPtr->wrapMode == TEXT_WRAPMODE_CHAR)
 	    || (textPtr->selTagPtr->wrapMode == TEXT_WRAPMODE_NONE)
 	    || (textPtr->selTagPtr->wrapMode == TEXT_WRAPMODE_WORD)) {
-	textPtr->selTagPtr->affectsDisplay = 1;
-	textPtr->selTagPtr->affectsDisplayGeometry = 1;
+	textPtr->selTagPtr->affectsDisplay = true;
+	textPtr->selTagPtr->affectsDisplayGeometry = true;
     }
     if ((textPtr->selTagPtr->border != NULL)
 	    || (textPtr->selTagPtr->selBorder != NULL)
@@ -2270,9 +2270,9 @@ ConfigureText(
 	    || (textPtr->selTagPtr->underlineColor != NULL)
 	    || (textPtr->selTagPtr->lMarginColor != NULL)
 	    || (textPtr->selTagPtr->rMarginColor != NULL)) {
-	textPtr->selTagPtr->affectsDisplay = 1;
+	textPtr->selTagPtr->affectsDisplay = true;
     }
-    TkTextRedrawTag(NULL, textPtr, NULL, NULL, textPtr->selTagPtr, 1);
+    TkTextRedrawTag(NULL, textPtr, NULL, NULL, textPtr->selTagPtr, true);
 
     /*
      * Claim the selection if we've suddenly started exporting it and there
@@ -2515,7 +2515,7 @@ TextEventProc(
 	    }
 	    if (textPtr->inactiveSelBorder != textPtr->selBorder) {
 		TkTextRedrawTag(NULL, textPtr, NULL, NULL, textPtr->selTagPtr,
-			1);
+			true);
 	    }
 	    TkTextMarkSegToIndex(textPtr, textPtr->insertMarkPtr, &index);
 	    TkTextIndexForwChars(NULL, &index, 1, &index2, COUNT_INDICES);
@@ -3545,7 +3545,7 @@ TkTextLostSelection(
 	TkTextMakeByteIndex(textPtr->sharedTextPtr->tree, textPtr,
 		TkBTreeNumLines(textPtr->sharedTextPtr->tree, textPtr),
 		0, &end);
-	TkTextRedrawTag(NULL, textPtr, &start, &end, textPtr->selTagPtr, 1);
+	TkTextRedrawTag(NULL, textPtr, &start, &end, textPtr->selTagPtr, true);
 	TkBTreeTag(&start, &end, textPtr->selTagPtr, 0);
     }
 

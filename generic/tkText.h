@@ -62,8 +62,8 @@ typedef struct TkTextLine {
 
 typedef struct TkTextToggle {
     struct TkTextTag *tagPtr;	/* Tag that starts or ends here. */
-    int inNodeCounts;		/* 1 means this toggle has been accounted for
-				 * in node toggle counts; 0 means it hasn't,
+    bool inNodeCounts;		/* True means this toggle has been accounted for
+				 * in node toggle counts; false means it hasn't,
 				 * yet. */
 } TkTextToggle;
 
@@ -93,7 +93,7 @@ typedef struct TkTextEmbWindowClient {
 				 * the window hasn't been created yet. */
     int chunkCount;		/* Number of display chunks that refer to this
 				 * window. */
-    int displayed;		/* Non-zero means that the window has been
+    bool displayed;		/* True means that the window has been
 				 * displayed on the screen recently. */
     struct TkTextSegment *parent;
     struct TkTextEmbWindowClient *next;
@@ -119,8 +119,8 @@ typedef struct TkTextEmbWindow {
     Tcl_Obj *padXObj, *padYObj;		/* Padding to leave around each side of window. */
     TkAlignMode align;		/* How to align window in vertical space. See
 				 * definitions in tkTextWind.c. */
-    int stretch;		/* Should window stretch to fill vertical
-				 * space of line (except for pady)? 0 or 1. */
+    bool stretch;		/* Should window stretch to fill vertical
+				 * space of line (except for pady)? false or true. */
     Tk_OptionTable optionTable;	/* Token representing the configuration
 				 * specifications. */
     TkTextEmbWindowClient *clients;
@@ -404,15 +404,15 @@ typedef struct TkTextTag {
 				 * use wrapmode for whole widget. */
     int elide;			/* Non-zero means that data under this tag
 				 * should not be displayed. -1 means not specified. */
-    int affectsDisplay;		/* Non-zero means that this tag affects the
+    bool affectsDisplay;		/* True means that this tag affects the
 				 * way information is displayed on the screen
 				 * (so need to redisplay if tag changes). */
-    Tk_OptionTable optionTable;	/* Token representing the configuration
-				 * specifications. */
-    int affectsDisplayGeometry;	/* Non-zero means that this tag affects the
+    bool affectsDisplayGeometry;	/* True means that this tag affects the
 				 * size with which information is displayed on
 				 * the screen (so need to recalculate line
 				 * dimensions if tag changes). */
+    Tk_OptionTable optionTable;	/* Token representing the configuration
+				 * specifications. */
 } TkTextTag;
 
 #define TK_TAG_AFFECTS_DISPLAY	0x1
@@ -446,7 +446,7 @@ typedef struct TkTextSearch {
     Tcl_Size linesLeft;		/* Lines left to search (including curIndex
 				 * and stopIndex). When this becomes <= 0 the
 				 * search is over. */
-    int allTags;		/* Non-zero means ignore tag check: search for
+    bool allTags;		/* True means ignore tag check: search for
 				 * transitions on all tags. */
 } TkTextSearch;
 
@@ -892,7 +892,7 @@ typedef int TkTextCountType;
 #define LOTSA_TAGS 1000
 typedef struct TkTextElideInfo {
     Tcl_Size numTags;		/* Total tags in widget. */
-    int elide;			/* Is the state currently elided. */
+    bool elide;			/* Is the state currently elided. */
     Tcl_Size elidePriority;			/* Tag priority controlling elide state. */
     TkTextSegment *segPtr;	/* Segment to look at next. */
     Tcl_Size segOffset;		/* Offset of segment within line. */
@@ -982,7 +982,7 @@ MODULE_SCOPE const Tk_SegType tkTextEmbImageType;
 MODULE_SCOPE int	TkBTreeAdjustPixelHeight(const TkText *textPtr,
 			    TkTextLine *linePtr, int newPixelHeight,
 			    int mergedLogicalLines);
-MODULE_SCOPE int	TkBTreeCharTagged(const TkTextIndex *indexPtr,
+MODULE_SCOPE bool	TkBTreeCharTagged(const TkTextIndex *indexPtr,
 			    TkTextTag *tagPtr);
 MODULE_SCOPE void	TkBTreeCheck(TkTextBTree tree);
 MODULE_SCOPE TkTextBTree TkBTreeCreate(TkSharedText *sharedTextPtr);
@@ -1124,7 +1124,7 @@ MODULE_SCOPE void	TkTextRedrawRegion(TkText *textPtr, int x, int y,
 MODULE_SCOPE void	TkTextRedrawTag(TkSharedText *sharedTextPtr,
 			    TkText *textPtr, TkTextIndex *index1Ptr,
 			    TkTextIndex *index2Ptr, TkTextTag *tagPtr,
-			    int withTag);
+			    bool withTag);
 MODULE_SCOPE void	TkTextRelayoutWindow(TkText *textPtr, int mask);
 MODULE_SCOPE int	TkTextScanCmd(TkText *textPtr, Tcl_Interp *interp,
 			    Tcl_Size objc, Tcl_Obj *const objv[]);
