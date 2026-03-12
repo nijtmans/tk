@@ -556,12 +556,12 @@ typedef struct TkSharedText {
      */
 
     TkUndoRedoStack *undoStack;	/* The undo/redo stack. */
-    int undo;			/* Non-zero means the undo/redo behaviour is
-				 * enabled. */
     int maxUndo;		/* The maximum depth of the undo stack
 				 * expressed as the maximum number of compound
 				 * statements. */
-    int autoSeparators;		/* Non-zero means the separators will be
+    bool undo;			/* True means the undo/redo behaviour is
+				 * enabled. */
+    bool autoSeparators;		/* True means the separators will be
 				 * inserted automatically. */
     int isDirty;		/* Flag indicating the 'dirtyness' of the
 				 * text widget. If the flag is not zero,
@@ -612,7 +612,7 @@ typedef struct TkText {
 				 * the end. */
     int pixelReference;		/* Counter into the current tree reference
 				 * index corresponding to this widget. */
-    int abortSelections;	/* Set to 1 whenever the text is modified in a
+    bool abortSelections;	/* Set to true whenever the text is modified in a
 				 * way that interferes with selection
 				 * retrieval: used to abort incremental
 				 * selection retrievals. */
@@ -683,8 +683,6 @@ typedef struct TkText {
 				 * use wrapmode for whole widget. */
     int width;		/* Desired dimensions for window, measured in characters */
     Tcl_Obj *heightObj;
-    int setGrid;		/* Non-zero means pass gridding information to
-				 * window manager. */
     int prevWidth, prevHeight;	/* Last known dimensions of window; used to
 				 * detect changes in size. */
     TkTextIndex topIndex;	/* Identifies first character in top display
@@ -709,8 +707,6 @@ typedef struct TkText {
     XColor *selFgColorPtr;	/* Foreground color for selected text. This is
 				 * a copy of information in *selTagPtr, so it
 				 * shouldn't be explicitly freed. */
-    int exportSelection;	/* Non-zero means tie "sel" tag to X
-				 * selection. */
     TkTextIndex selIndex;	/* Used during multi-pass selection
 				 * retrievals. This index identifies the next
 				 * character to be returned from the
@@ -769,21 +765,25 @@ typedef struct TkText {
 				 * specifications. */
     Tcl_Size refCount;		/* Number of cached TkTextIndex objects
 				 * refering to us. */
-    int insertCursorType;	/* 0 = standard insertion cursor, 1 = block
+    bool insertCursorType;	/* false = standard insertion cursor, true = block
 				 * cursor. */
+    bool setGrid;		/* True means pass gridding information to
+				 * window manager. */
+    bool exportSelection;	/* True means tie "sel" tag to X
+				 * selection. */
 
     /*
      * Copies of information from the shared section relating to the undo/redo
      * functonality
      */
 
-    int undo;			/* Non-zero means the undo/redo behaviour is
+    bool undo;			/* True means the undo/redo behaviour is
 				 * enabled. */
+    bool autoSeparators;		/* True means the separators will be
+				 * inserted automatically. */
     int maxUndo;		/* The maximum depth of the undo stack
 				 * expressed as the maximum number of compound
 				 * statements. */
-    int autoSeparators;		/* Non-zero means the separators will be
-				 * inserted automatically. */
     Tcl_Obj *afterSyncCmd;	/* Command to be executed when lines are up to
 				 * date */
 } TkText;

@@ -228,7 +228,7 @@ TkTextTagCmd(
 				TkTextLostSelection, textPtr);
 			textPtr->flags |= GOT_SELECTION;
 		    }
-		    textPtr->abortSelections = 1;
+		    textPtr->abortSelections = true;
 		}
 	    }
 	}
