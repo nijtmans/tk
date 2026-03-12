@@ -327,6 +327,7 @@ TK_OBJS = \
 	tkArgv.$(OBJEXT) \
 	tkAtom.$(OBJEXT) \
 	tkBind.$(OBJEXT) \
+	tkBitField.$(OBJEXT) \
 	tkBitmap.$(OBJEXT) \
 	tkBusy.$(OBJEXT) \
 	tkButton.$(OBJEXT) \
@@ -368,6 +369,7 @@ TK_OBJS = \
 	tkImgPhoto.$(OBJEXT) \
 	tkImgPhInstance.$(OBJEXT) \
 	tkImgUtil.$(OBJEXT) \
+	tkIntSet.$(OBJEXT) \
 	tkListbox.$(OBJEXT) \
 	tkMacWinMenu.$(OBJEXT) \
 	tkMain.$(OBJEXT) \
@@ -384,6 +386,7 @@ TK_OBJS = \
 	tkPkgConfig.$(OBJEXT) \
 	tkPlace.$(OBJEXT) \
 	tkPointer.$(OBJEXT) \
+	tkRangeList.$(OBJEXT) \
 	tkRectOval.$(OBJEXT) \
 	tkScale.$(OBJEXT) \
 	tkScrollbar.$(OBJEXT) \
@@ -394,11 +397,13 @@ TK_OBJS = \
 	tkTextDisp.$(OBJEXT) \
 	tkTextImage.$(OBJEXT) \
 	tkTextIndex.$(OBJEXT) \
+	tkTextLineBreak.$(OBJEXT) \
 	tkTextMark.$(OBJEXT) \
 	tkTextTag.$(OBJEXT) \
+	tkTextTagSet.$(OBJEXT) \
+	tkTextUndo.$(OBJEXT) \
 	tkTextWind.$(OBJEXT) \
 	tkTrig.$(OBJEXT) \
-	tkUndo.$(OBJEXT) \
 	tkUtil.$(OBJEXT) \
 	tkVisual.$(OBJEXT) \
 	tkStubInit.$(OBJEXT) \
@@ -775,13 +780,13 @@ testMain.$(OBJEXT): winMain.c
 	$(CC) -c $(CC_SWITCHES) -DTK_TEST -DUNICODE=1 -D_UNICODE=1 @DEPARG@ $(CC_OBJNAME)
 
 tkTest.$(OBJEXT): tkTest.c
-	$(CC) -c $(CC_SWITCHES) @DEPARG@ $(CC_OBJNAME)
+	$(CC) -c $(CC_SWITCHES) -DUSE_TK_STUBS @DEPARG@ $(CC_OBJNAME)
 
 tkWinTest.$(OBJEXT): tkWinTest.c
-	$(CC) -c $(CC_SWITCHES) @DEPARG@ $(CC_OBJNAME)
+	$(CC) -c $(CC_SWITCHES) -DUSE_TK_STUBS @DEPARG@ $(CC_OBJNAME)
 
 tkSquare.$(OBJEXT): tkSquare.c
-	$(CC) -c $(CC_SWITCHES) @DEPARG@ $(CC_OBJNAME)
+	$(CC) -c $(CC_SWITCHES) -DUSE_TK_STUBS @DEPARG@ $(CC_OBJNAME)
 
 tkStubLib.$(OBJEXT): tkStubLib.c
 	$(CC) -c $(CC_SWITCHES) @CFLAGS_NOLTO@ @DEPARG@ $(CC_OBJNAME)

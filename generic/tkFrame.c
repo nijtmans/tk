@@ -94,7 +94,7 @@ typedef struct {
     Tk_Image bgimg;		/* Derived from bgimgPtr by calling
 				 * Tk_GetImage, or NULL if bgimgPtr is
 				 * NULL. */
-    bool tile1;			/* Whether to tile the bgimg. */
+    bool tile;			/* Whether to tile the bgimg. */
 #ifndef TK_NO_DOUBLE_BUFFERING
     GC copyGC;			/* GC for copying when double-buffering. */
 #endif /* TK_NO_DOUBLE_BUFFERING */
@@ -235,7 +235,7 @@ static const Tk_OptionSpec frameOptSpec[] = {
     {TK_OPTION_RELIEF, "-relief", "relief", "Relief",
 	DEF_FRAME_RELIEF, TCL_INDEX_NONE, offsetof(Frame, relief), 0, 0, 0},
     {TK_OPTION_BOOLEAN, "-tile", "tile", "Tile",
-	DEF_FRAME_BG_TILE, TCL_INDEX_NONE, offsetof(Frame, tile1), TK_OPTION_VAR(bool), 0, 0},
+	DEF_FRAME_BG_TILE, TCL_INDEX_NONE, offsetof(Frame, tile), TK_OPTION_VAR(bool), 0, 0},
     {TK_OPTION_END, NULL, NULL, NULL,
 	NULL, 0, 0, 0, commonOptSpec, 0}
 };
@@ -261,7 +261,7 @@ static const Tk_OptionSpec toplevelOptSpec[] = {
 	DEF_TOPLEVEL_SCREEN, offsetof(Frame, screenNameObj), TCL_INDEX_NONE,
 	TK_OPTION_NULL_OK, 0, 0},
     {TK_OPTION_BOOLEAN, "-tile", "tile", "Tile",
-	DEF_FRAME_BG_TILE, TCL_INDEX_NONE, offsetof(Frame, tile1), TK_OPTION_VAR(bool), 0, 0},
+	DEF_FRAME_BG_TILE, TCL_INDEX_NONE, offsetof(Frame, tile), TK_OPTION_VAR(bool), 0, 0},
     {TK_OPTION_STRING, "-use", "use", "Use",
 	DEF_TOPLEVEL_USE, offsetof(Frame, useThisObj), TCL_INDEX_NONE,
 	TK_OPTION_NULL_OK, 0, 0},
@@ -1481,7 +1481,7 @@ DisplayFrame(
 		borderWidth, framePtr->relief);
 	if (framePtr->bgimg) {
 	    DrawFrameBackground(tkwin, pixmap, highlightWidth, borderWidth,
-		    framePtr->bgimg, framePtr->tile1);
+		    framePtr->bgimg, framePtr->tile);
 	}
     } else {
 	Labelframe *labelframePtr = (Labelframe *) framePtr;

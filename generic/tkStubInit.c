@@ -32,6 +32,7 @@
 /* TODO: These ought to come in some other way */
 #include "tkPlatDecls.h"
 #include "tkIntXlibDecls.h"
+#include "tkText.h"
 
 MODULE_SCOPE const TkStubs tkStubs;
 
@@ -41,6 +42,18 @@ MODULE_SCOPE const TkStubs tkStubs;
 
 #undef TkPutImage
 #undef XPutImage
+#define TkpTesttextCmd TkrTesttextCmd
+#define TkTextGetIndex TkrTextGetIndex
+#define TkTextIndexBackBytes TkrTextIndexBackBytes
+#define TkTextIndexForwBytes TkrTextIndexForwBytes
+#define TkTextMakeByteIndex TkrTextMakeByteIndex
+#define TkTextPrintIndex TkrTextPrintIndex
+#define TkTextSetMark TkrTextSetMark
+#define TkTextXviewCmd TkrTextXviewCmd
+#define TkTextChanged TkrTextChanged
+#define TkBTreeNumLines TkrBTreeNumLines
+#define TkTextInsertDisplayProc TkrTextInsertDisplayProc
+
 #define TkUnusedStubEntry 0
 
 #if !defined(MAC_OSX_TK)
