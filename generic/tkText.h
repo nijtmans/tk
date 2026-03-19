@@ -1582,11 +1582,8 @@ typedef struct TkText {
 
 #ifdef TK_CHECK_ALLOCS
     size_t widgetNumber;
-#else
-    size_t widgetNumberNotUsed;
 #endif
 #ifdef BUILD_tk
-    int borderWidth;
     int padX, padY;
     int height, highlightWidth;
     int insertWidth, insertBorderWidth;

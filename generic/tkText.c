@@ -213,7 +213,7 @@ static const Tk_OptionSpec optionSpecs[] = {
     {TK_OPTION_BOOLEAN, "-blockcursor", "blockCursor",
 	"BlockCursor", DEF_TEXT_BLOCK_CURSOR, TCL_INDEX_NONE, offsetof(TkText, blockCursorType), 0, 0, 0},
     {TK_OPTION_PIXELS, "-borderwidth", "borderWidth", "BorderWidth",
-	DEF_TEXT_BORDER_WIDTH, TCL_INDEX_NONE, offsetof(TkText, borderWidth), 0, 0, TK_TEXT_LINE_GEOMETRY},
+	DEF_TEXT_BORDER_WIDTH, offsetof(TkText, borderWidthObj), TCL_INDEX_NONE, 0, 0, TK_TEXT_LINE_GEOMETRY},
     {TK_OPTION_CURSOR, "-cursor", "cursor", "Cursor",
 	DEF_TEXT_CURSOR, TCL_INDEX_NONE, offsetof(TkText, cursor), TK_OPTION_NULL_OK, 0, 0},
     {TK_OPTION_CUSTOM, "-endindex", NULL, NULL,
@@ -4284,7 +4284,6 @@ TkConfigureText(
     textPtr->spacing2 = MAX(textPtr->spacing2, 0);
     textPtr->spacing3 = MAX(textPtr->spacing3, 0);
     textPtr->highlightWidth = MAX(textPtr->highlightWidth, 0);
-    textPtr->borderWidth = MAX(textPtr->borderWidth, 0);
     textPtr->insertWidth = MAX(textPtr->insertWidth, 0);
     textPtr->syncTime = MAX(0, textPtr->syncTime);
     textPtr->selAttrs.borderWidth = MAX(textPtr->selAttrs.borderWidth, 0);
@@ -4504,7 +4503,7 @@ TextWorldChanged(
     int mask)			/* OR'd collection of bits showing what has changed. */
 {
     Tk_FontMetrics fm;
-    int border;
+    int border, borderWidth = 0;
     int oldLineHeight = textPtr->lineHeight;
 
     Tk_GetFontMetrics(textPtr->tkfont, &fm);
@@ -4516,7 +4515,10 @@ TextWorldChanged(
 	TkTextFontHeightChanged(textPtr);
     }
 
-    border = textPtr->borderWidth + textPtr->highlightWidth;
+    if (textPtr->borderWidthObj) {
+	Tk_GetPixelsFromObj(NULL, textPtr->tkwin, textPtr->borderWidthObj, &borderWidth);
+    }
+    border = borderWidth + textPtr->highlightWidth;
     Tk_GeometryRequest(textPtr->tkwin,
 	    textPtr->width*textPtr->charWidth + 2*textPtr->padX + 2*border,
 	    textPtr->height*(fm.linespace + textPtr->spacing1 + textPtr->spacing3)
@@ -4667,10 +4669,14 @@ TextEventProc(
 	     * by the geometry manager), see ProcessConfigureNotify() for more
 	     * information.
 	     */
+	    int borderWidth = 0;
 
+	    if (textPtr->borderWidthObj) {
+		Tk_GetPixelsFromObj(NULL, textPtr->tkwin, textPtr->borderWidthObj, &borderWidth);
+	    }
 	    if (Tk_IsMapped(textPtr->tkwin)
 		    || (Tk_Width(textPtr->tkwin) >
-			MAX(1, 2*(textPtr->highlightWidth + textPtr->borderWidth + textPtr->padX)))) {
+			MAX(1, 2*(textPtr->highlightWidth + borderWidth + textPtr->padX)))) {
 		ProcessConfigureNotify(textPtr, textPtr->prevWidth != Tk_Width(textPtr->tkwin));
 	    }
 	}
@@ -6164,7 +6170,11 @@ TextBlinkProc(
 	int x, y, w, h;
 
 	if (TkTextGetCursorBbox(textPtr, &x, &y, &w, &h)) {
-	    int inset = textPtr->borderWidth + textPtr->highlightWidth;
+	    int borderWidth = 0;
+	    if (textPtr->borderWidthObj) {
+		Tk_GetPixelsFromObj(NULL, textPtr->tkwin, textPtr->borderWidthObj, &borderWidth);
+	    }
+	    int inset = borderWidth + textPtr->highlightWidth;
 	    TkTextRedrawRegion(textPtr, x + inset, y + inset, w, h);
 	}
     }

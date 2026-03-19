@@ -8767,12 +8767,16 @@ DisplayText(
 	    goto end;
 	}
 
+	int borderWidth = 0;
+	if (textPtr->borderWidthObj) {
+	    Tk_GetPixelsFromObj(NULL, textPtr->tkwin, textPtr->borderWidthObj, &borderWidth);
+	}
 	Tk_Draw3DRectangle(textPtr->tkwin, Tk_WindowId(textPtr->tkwin),
 		textPtr->border, textPtr->highlightWidth,
 		textPtr->highlightWidth,
 		Tk_Width(textPtr->tkwin) - 2*textPtr->highlightWidth,
 		Tk_Height(textPtr->tkwin) - 2*textPtr->highlightWidth,
-		textPtr->borderWidth, textPtr->relief);
+		borderWidth, textPtr->relief);
 	if (textPtr->highlightWidth > 0) {
 	    GC fgGC, bgGC;
 
@@ -8786,7 +8790,7 @@ DisplayText(
 			textPtr->highlightWidth, Tk_WindowId(textPtr->tkwin));
 	    }
 	}
-	borders = textPtr->borderWidth + textPtr->highlightWidth;
+	borders = borderWidth + textPtr->highlightWidth;
 	if (textPtr->padY > 0) {
 	    Tk_Fill3DRectangle(textPtr->tkwin, Tk_WindowId(textPtr->tkwin),
 		    textPtr->border, borders, borders,
@@ -9137,7 +9141,11 @@ TextInvalidateRegion(
 
     dInfoPtr = textPtr->dInfoPtr;
     ComputeCursorExtents(textPtr, &extent1, &extent2);
-    inset = textPtr->borderWidth + textPtr->highlightWidth;
+    int borderWidth = 0;
+    if (textPtr->borderWidthObj) {
+	Tk_GetPixelsFromObj(NULL, textPtr->tkwin, textPtr->borderWidthObj, &borderWidth);
+    }
+    inset = borderWidth + textPtr->highlightWidth;
 
     textRect.x = inset + textPtr->padX - extent1;
     textRect.width = Tk_Width(textPtr->tkwin) - 2 * (inset + textPtr->padX) + extent1 + extent2;
@@ -9723,10 +9731,13 @@ TkTextRelayoutWindow(
      */
 
     assert(textPtr->highlightWidth >= 0);
-    assert(textPtr->borderWidth >= 0);
 
-    dInfoPtr->x = textPtr->highlightWidth + textPtr->borderWidth + textPtr->padX;
-    dInfoPtr->y = textPtr->highlightWidth + textPtr->borderWidth + textPtr->padY;
+    int borderWidth = 0;
+    if (textPtr->borderWidthObj) {
+	Tk_GetPixelsFromObj(NULL, textPtr->tkwin, textPtr->borderWidthObj, &borderWidth);
+    }
+    dInfoPtr->x = textPtr->highlightWidth + borderWidth + textPtr->padX;
+    dInfoPtr->y = textPtr->highlightWidth + borderWidth + textPtr->padY;
 
     dInfoPtr->maxX = MAX(Tk_Width(textPtr->tkwin) - dInfoPtr->x, dInfoPtr->x + 1);
 
