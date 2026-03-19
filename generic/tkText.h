@@ -393,16 +393,11 @@ typedef struct TkTextEmbWindow {
 				 * definitions in tkTextWind.c. */
     Tcl_Obj *padXObj, *padYObj;		/* Padding to leave around each side of
 				 * window, in pixels. */
-    int stretch;		/* Should window stretch to fill vertical
+    bool stretch;		/* Should window stretch to fill vertical
 				 * space of line (except for pady)? 0 or 1. */
-    int isOwner;		/* Should destroy the window when un-embed? This will only be
+    bool isOwner;		/* Should destroy the window when un-embed? This will only be
 				 * done if the text widget is the owner. Default is true
 				 * (this is compatible to older versions). */
-#ifdef BUILD_tk
-    int padX, padY;
-#else
-    int padXUnused, padYUnused;
-#endif
     Tk_OptionTable optionTable;	/* Token representing the configuration
 				 * specifications. */
     TkTextEmbWindowClient *clients;
@@ -436,11 +431,6 @@ typedef struct TkTextEmbImage {
 				 * definitions in tkTextImage.c. */
     Tcl_Obj *padXObj, *padYObj;	/* Padding to leave around each side of image,
 				 * in pixels. */
-#ifdef BUILD_tk
-    int padX, padY;
-#else
-    int padXUnused, padYUnused;
-#endif
     Tk_OptionTable optionTable;	/* Token representing the configuration
 				 * specifications. */
 } TkTextEmbImage;
@@ -1003,7 +993,7 @@ typedef struct TkTextTag {
 				 * NUL. */
     int elide;			/* > 0 means that data under this tag
 				 * should not be displayed. -1 means not specified. */
-    int undo;			/* True means that any change of tagging with this tag will be pushed
+    bool undo;			/* True means that any change of tagging with this tag will be pushed
 				 * on the undo stack (if undo stack is enabled), otherwise this tag
 				 * will not regarded in the undo/redo process. */
 
@@ -1243,7 +1233,7 @@ typedef struct TkSharedText {
 				 * maximum number of compound statements. */
     int maxUndoSize;		/* The maximum number of bytes kept on the undo stack. */
     int autoSeparators;		/* Non-zero means the separators will be inserted automatically. */
-    int undo;			/* Non-zero means the undo/redo behaviour is enabled. */
+    bool undo;			/* True means the undo/redo behaviour is enabled. */
     int isModified;		/* Flag indicating the computed 'modified' state of the text widget. */
     int isAltered;		/* Flag indicating the computed 'altered' state of the text widget. */
     int isIrreversible;	/* Flag indicating the computed 'irreversible' flag. Value
@@ -1255,7 +1245,7 @@ typedef struct TkSharedText {
     int undoStackEvent;	/* Flag indicating whether <<UndoStack>> is already triggered. */
     int pushSeparator;		/* Flag indicating whether a separator has to be pushed before next
 				 * insert/delete item. */
-    int undoTagging;		/* Global default value for TkTextTag::undo. */
+    bool undoTagging;		/* Global default value for TkTextTag::undo. */
     size_t undoLevel;		/* The undo level which corresponds to the unmodified state. */
     TkTextEditMode lastEditMode;/* Keeps track of what the last edit mode was. */
     int lastUndoTokenType;	/* Type of newest undo token on stack. */
@@ -1574,7 +1564,7 @@ typedef struct TkText {
      * Copies of information from the shared section relating to the undo/redo functionality:
      */
 
-    int undo;			/* Non-zero means the undo/redo behaviour is
+    bool undo;			/* Non-zero means the undo/redo behaviour is
 				 * enabled. */
     int maxUndoDepth;		/* The maximum depth of the undo stack expressed as the
 				 * maximum number of compound statements. */
@@ -1582,7 +1572,7 @@ typedef struct TkText {
 				 * maximum number of compound statements. */
     int maxUndoSize;		/* The maximum number of bytes kept on the undo stack. */
     int autoSeparators;		/* Non-zero means the separators will be inserted automatically. */
-    int undoTagging;		/* Global default value for TkTextTag::undo. */
+    bool undoTagging;		/* Global default value for TkTextTag::undo. */
 
     /*
      * Support of sync command:
@@ -2118,7 +2108,7 @@ MODULE_SCOPE void	TkTextDispAllocStatistic();
 MODULE_SCOPE int	TkTextLineIsElided(const TkSharedText *sharedTextPtr, const TkTextLine *linePtr,
 			    const TkText *textPtr);
 MODULE_SCOPE int	TkTextIsElided(const TkTextIndex *indexPtr);
-MODULE_SCOPE int	TkTextTestTag(const TkTextIndex *indexPtr, const TkTextTag *tagPtr);
+MODULE_SCOPE bool	TkTextTestTag(const TkTextIndex *indexPtr, const TkTextTag *tagPtr);
 inline int		TkTextIsDeadPeer(const TkText *textPtr);
 MODULE_SCOPE void	TkTextGenerateWidgetViewSyncEvent(TkText *textPtr, int sendImmediately);
 MODULE_SCOPE void	TkTextRunAfterSyncCmd(TkText *textPtr);
@@ -2129,7 +2119,7 @@ MODULE_SCOPE int	TkTextMarkCmd(TkText *textPtr, Tcl_Interp *interp,
 			    Tcl_Size objc, Tcl_Obj *const objv[]);
 MODULE_SCOPE TkTextSegment * TkTextFindMark(const TkText *textPtr, const char *name);
 MODULE_SCOPE TkTextSegment * TkTextFreeMarks(TkSharedText *sharedTextPtr, int retainPrivateMarks);
-MODULE_SCOPE int	TkTextMarkNameToIndex(TkText *textPtr, const char *name, TkTextIndex *indexPtr);
+MODULE_SCOPE bool	TkTextMarkNameToIndex(TkText *textPtr, const char *name, TkTextIndex *indexPtr);
 MODULE_SCOPE void	TkTextMarkSegToIndex(TkText *textPtr,
 			    TkTextSegment *markPtr, TkTextIndex *indexPtr);
 MODULE_SCOPE TkTextSegment * TkTextMakeStartEndMark(TkText *textPtr, Tk_SegType const *typePtr);
@@ -2188,11 +2178,11 @@ MODULE_SCOPE int	TkTextTagCmd(TkText *textPtr, Tcl_Interp *interp,
 			    Tcl_Size objc, Tcl_Obj *const objv[]);
 MODULE_SCOPE int	TkTextImageCmd(TkText *textPtr, Tcl_Interp *interp,
 			    Tcl_Size objc, Tcl_Obj *const objv[]);
-MODULE_SCOPE int	TkTextImageIndex(TkText *textPtr, const char *name, TkTextIndex *indexPtr);
+MODULE_SCOPE bool	TkTextImageIndex(TkText *textPtr, const char *name, TkTextIndex *indexPtr);
 MODULE_SCOPE TkTextSegment * TkTextMakeImage(TkText *textPtr, Tcl_Obj *options);
 MODULE_SCOPE int	TkTextWindowCmd(TkText *textPtr, Tcl_Interp *interp,
 			    Tcl_Size objc, Tcl_Obj *const objv[]);
-MODULE_SCOPE int	TkTextWindowIndex(TkText *textPtr, const char *name, TkTextIndex *indexPtr);
+MODULE_SCOPE bool	TkTextWindowIndex(TkText *textPtr, const char *name, TkTextIndex *indexPtr);
 MODULE_SCOPE TkTextSegment * TkTextMakeWindow(TkText *textPtr, Tcl_Obj *options);
 MODULE_SCOPE int	TkTextYviewCmd(TkText *textPtr, Tcl_Interp *interp,
 			    Tcl_Size objc, Tcl_Obj *const objv[]);
