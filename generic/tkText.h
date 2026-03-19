@@ -1584,7 +1584,6 @@ typedef struct TkText {
     size_t widgetNumber;
 #endif
 #ifdef BUILD_tk
-    int padX, padY;
     int height, highlightWidth;
     int insertWidth, insertBorderWidth;
     int spacing1, spacing2, spacing3;

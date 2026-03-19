@@ -286,9 +286,9 @@ static const Tk_OptionSpec optionSpecs[] = {
     {TK_OPTION_INT, "-maxredo", "maxRedo", "MaxRedo",
 	"TCL_INDEX_NONE", TCL_INDEX_NONE, offsetof(TkText, maxRedoDepth), TK_OPTION_DONT_SET_DEFAULT, 0, 0},
     {TK_OPTION_PIXELS, "-padx", "padX", "Pad",
-	DEF_TEXT_PADX, TCL_INDEX_NONE, offsetof(TkText, padX), 0, 0, TK_TEXT_LINE_GEOMETRY},
+	DEF_TEXT_PADX, offsetof(TkText, padXObj), TCL_INDEX_NONE, 0, 0, TK_TEXT_LINE_GEOMETRY},
     {TK_OPTION_PIXELS, "-pady", "padY", "Pad",
-	DEF_TEXT_PADY, TCL_INDEX_NONE, offsetof(TkText, padY), 0, 0, 0},
+	DEF_TEXT_PADY, offsetof(TkText, padYObj), TCL_INDEX_NONE, 0, 0, 0},
     {TK_OPTION_RELIEF, "-relief", "relief", "Relief",
 	DEF_TEXT_RELIEF, TCL_INDEX_NONE, offsetof(TkText, relief), 0, 0, 0},
     {TK_OPTION_INT, "-responsiveness", "responsiveness", "Responsiveness",
@@ -4503,7 +4503,7 @@ TextWorldChanged(
     int mask)			/* OR'd collection of bits showing what has changed. */
 {
     Tk_FontMetrics fm;
-    int border, borderWidth = 0;
+    int border, borderWidth = 0, padX = 0, padY = 0;
     int oldLineHeight = textPtr->lineHeight;
 
     Tk_GetFontMetrics(textPtr->tkfont, &fm);
@@ -4518,15 +4518,21 @@ TextWorldChanged(
     if (textPtr->borderWidthObj) {
 	Tk_GetPixelsFromObj(NULL, textPtr->tkwin, textPtr->borderWidthObj, &borderWidth);
     }
+    if (textPtr->padXObj) {
+	Tk_GetPixelsFromObj(NULL, textPtr->tkwin, textPtr->padXObj, &padX);
+    }
+    if (textPtr->padYObj) {
+	Tk_GetPixelsFromObj(NULL, textPtr->tkwin, textPtr->padYObj, &padY);
+    }
     border = borderWidth + textPtr->highlightWidth;
     Tk_GeometryRequest(textPtr->tkwin,
-	    textPtr->width*textPtr->charWidth + 2*textPtr->padX + 2*border,
+	    textPtr->width*textPtr->charWidth + 2 * padX + 2*border,
 	    textPtr->height*(fm.linespace + textPtr->spacing1 + textPtr->spacing3)
-		    + 2*textPtr->padY + 2*border);
+		    + 2 * padY + 2*border);
 
     Tk_SetInternalBorderEx(textPtr->tkwin,
-	    border + textPtr->padX, border + textPtr->padX,
-	    border + textPtr->padY, border + textPtr->padY);
+	    border + padX, border + padX,
+	    border + padY, border + padY);
     if (textPtr->setGrid) {
 	Tk_SetGrid(textPtr->tkwin, textPtr->width, textPtr->height,
 		textPtr->charWidth, textPtr->lineHeight);
@@ -4669,14 +4675,17 @@ TextEventProc(
 	     * by the geometry manager), see ProcessConfigureNotify() for more
 	     * information.
 	     */
-	    int borderWidth = 0;
+	    int borderWidth = 0, padX = 0;
 
 	    if (textPtr->borderWidthObj) {
 		Tk_GetPixelsFromObj(NULL, textPtr->tkwin, textPtr->borderWidthObj, &borderWidth);
 	    }
+	    if (textPtr->padXObj) {
+		Tk_GetPixelsFromObj(NULL, textPtr->tkwin, textPtr->padXObj, &padX);
+	    }
 	    if (Tk_IsMapped(textPtr->tkwin)
 		    || (Tk_Width(textPtr->tkwin) >
-			MAX(1, 2*(textPtr->highlightWidth + borderWidth + textPtr->padX)))) {
+			MAX(1, 2*(textPtr->highlightWidth + borderWidth + padX)))) {
 		ProcessConfigureNotify(textPtr, textPtr->prevWidth != Tk_Width(textPtr->tkwin));
 	    }
 	}
