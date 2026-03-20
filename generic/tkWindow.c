@@ -14,7 +14,6 @@
 
 #include "tkInt.h"
 #include "tkPort.h"
-#include "tkText.h"
 #ifdef _WIN32
 #include "tkWinInt.h"
 #elif !defined(MAC_OSX_TK)
@@ -153,7 +152,7 @@ static const TkCmd commands[] = {
     {"scale",		Tk_ScaleObjCmd,		ISSAFE},
     {"scrollbar",	Tk_ScrollbarObjCmd, PASSMAINWINDOW|ISSAFE},
     {"spinbox",		Tk_SpinboxObjCmd,	ISSAFE},
-    {"text",		Tk_RTextObjCmd,		PASSMAINWINDOW|ISSAFE},
+    {"text",		Tk_TextObjCmd,		PASSMAINWINDOW|ISSAFE},
     {"toplevel",	Tk_ToplevelObjCmd,	0},
 
     /*
@@ -175,7 +174,7 @@ static const TkCmd commands[] = {
     {"::tk::scale",	Tk_ScaleObjCmd,		ISSAFE},
     {"::tk::scrollbar",	Tk_ScrollbarObjCmd, PASSMAINWINDOW|ISSAFE},
     {"::tk::spinbox",	Tk_SpinboxObjCmd,	ISSAFE},
-    {"::tk::text",	Tk_RTextObjCmd,		PASSMAINWINDOW|ISSAFE},
+    {"::tk::text",	Tk_TextObjCmd,		PASSMAINWINDOW|ISSAFE},
     {"::tk::toplevel",	Tk_ToplevelObjCmd,	0},
 
     /*
@@ -1045,7 +1044,6 @@ TkCreateMainWindow(
 #ifdef PURIFY
 		".purify"
 #endif
-		".revised-text"
 #ifdef STATIC_BUILD
 		".static"
 #endif

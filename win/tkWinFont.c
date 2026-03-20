@@ -2,11 +2,13 @@
  * tkWinFont.c --
  *
  *	Contains the Windows implementation of the platform-independent font
- *	package interface.
+ *	package interface with support for shaping and RTL support with complex
+ *  script languages like Arabic. 
  *
  * Copyright © 1994 Software Research Associates, Inc.
  * Copyright © 1995-1997 Sun Microsystems, Inc.
  * Copyright © 1998-1999 Scriptics Corporation.
+ * Copyright 2026 Kevin Walzer
  *
  * See the file "license.terms" for information on usage and redistribution of
  * this file, and for a DISCLAIMER OF ALL WARRANTIES.
@@ -14,6 +16,7 @@
 
 #include "tkWinInt.h"
 #include "tkFont.h"
+#include <usp10.h>      /* Uniscribe */
 
 /*
  * The following structure represents a font family. It is assumed that all
@@ -33,57 +36,25 @@
 #define FONTMAP_PAGES		(FONTMAP_NUMCHARS / FONTMAP_BITSPERPAGE)
 
 typedef struct FontFamily {
-    struct FontFamily *nextPtr;	/* Next in list of all known font families. */
-    size_t refCount;		/* How many SubFonts are referring to this
-				 * FontFamily. When the refCount drops to
-				 * zero, this FontFamily may be freed. */
-    /*
-     * Key.
-     */
+    struct FontFamily *nextPtr;
+    size_t refCount;
+    Tk_Uid faceName;
 
-    Tk_Uid faceName;		/* Face name key for this FontFamily. */
-
-    /*
-     * Derived properties.
-     */
-
-    Tcl_Encoding encoding;	/* Encoding for this font family. */
-    int isSymbolFont;		/* Non-zero if this is a symbol font. */
-    int isWideFont;		/* 1 if this is a double-byte font, 0
-				 * otherwise. */
+    Tcl_Encoding encoding;
+    int isSymbolFont;
+    int isWideFont;
     BOOL (WINAPI *textOutProc)(HDC hdc, int x, int y, WCHAR *str, int len);
-				/* The procedure to use to draw text after it
-				 * has been converted from UTF-8 to the
-				 * encoding of this font. */
     BOOL (WINAPI *getTextExtentPoint32Proc)(HDC, WCHAR *, int, LPSIZE);
-				/* The procedure to use to measure text after
-				 * it has been converted from UTF-8 to the
-				 * encoding of this font. */
 
     char *fontMap[FONTMAP_PAGES];
-				/* Two-level sparse table used to determine
-				 * quickly if the specified character exists.
-				 * As characters are encountered, more pages
-				 * in this table are dynamically added. The
-				 * contents of each page is a bitmask
-				 * consisting of FONTMAP_BITSPERPAGE bits,
-				 * representing whether this font can be used
-				 * to display the given character at the
-				 * corresponding bit position. The high bits
-				 * of the character are used to pick which
-				 * page of the table is used. */
 
     /*
-     * Cached Truetype font info.
+     * Cached TrueType font info.
+     * Now uses ULONG to hold 32-bit codepoints.
      */
-
-    int segCount;		/* The length of the following arrays. */
-    USHORT *startCount;		/* Truetype information about the font, */
-    USHORT *endCount;		/* indicating which characters this font can
-				 * display (malloced). The format of this
-				 * information is (relatively) compact, but
-				 * would take longer to search than indexing
-				 * into the fontMap[][] table. */
+    int segCount;           /* Number of segments (length of arrays below) */
+    ULONG *startCount;      /* Start codepoint of each segment */
+    ULONG *endCount;        /* End codepoint of each segment */
 } FontFamily;
 
 /*
@@ -126,6 +97,19 @@ typedef struct WinFont {
 				 * attributes. Usually points to
 				 * staticSubFonts, but may point to malloced
 				 * space if there are lots of SubFonts. */
+    SCRIPT_CACHE staticScriptCaches[SUBFONT_SPACE];
+				/* Inline SCRIPT_CACHE storage parallel to
+				 * staticSubFonts.  Each slot corresponds to
+				 * the SubFont at the same index and is passed
+				 * to ScriptShape/ScriptPlace so that Uniscribe
+				 * can amortise per-font analysis work across
+				 * calls.  Must be zero-initialised; freed with
+				 * ScriptFreeCache() in ReleaseFont(). */
+    SCRIPT_CACHE *scriptCacheArray;
+				/* Points to staticScriptCaches normally, or
+				 * to a malloced array when subFontArray
+				 * overflows SUBFONT_SPACE.  Always kept in
+				 * sync with subFontArray. */
     HWND hwnd;			/* Toplevel window of application that owns
 				 * this font, used for getting HDC for
 				 * offscreen measurements. */
@@ -151,6 +135,45 @@ typedef struct CanUse {
     SubFont *subFontPtr;
     SubFont **subFontPtrPtr;
 } CanUse;
+
+/*
+ * The following structure represents a single fully-shaped, bidi-reordered
+ * run ready for drawing or advance-width summation.  The shaping layer
+ * produces an array of these; the drawing layer consumes them without any
+ * further Unicode processing.
+ *
+ * Ownership: glyphs, advances, and offsets are allocated by
+ * TkWinShapeString() and freed by TkWinFreeShapedRuns().
+ *
+ * The scriptCache field points into the owning WinFont's scriptCacheArray at
+ * the slot that was used for ScriptShape and ScriptPlace.  ScriptTextOut
+ * MUST receive the same cache pointer; passing NULL causes Uniscribe to
+ * discard all shaping work and produce no visible output.  Do not free this
+ * pointer here — it is owned by the WinFont.
+ */
+typedef struct TkWinShapedRun {
+    HFONT        hFont;         /* Font selected when ScriptTextOut is called.
+				 * Owned by the WinFont subfont; do not delete
+				 * here. */
+    SubFont     *subFontPtr;    /* The SubFont that owns hFont.  Used by the
+				 * draw layer to retrieve the face name for
+				 * constructing rotated variants of this run's
+				 * font.  Points into fontPtr->subFontArray;
+				 * do not free. */
+    SCRIPT_CACHE *scriptCache;  /* Points to fontPtr->scriptCacheArray[i] for
+				 * the subfont that shaped this run.  Must be
+				 * the same slot passed to ScriptShape and
+				 * ScriptPlace, and must be passed to
+				 * ScriptTextOut.  Never NULL after a
+				 * successful shape+place. Do not free here. */
+    SCRIPT_ANALYSIS sa;         /* Uniscribe analysis for this run (carries
+				 * bidi level, script tag, etc.). */
+    int          glyphCount;    /* Number of entries in glyphs[]. */
+    WORD        *glyphs;        /* Glyph index array (malloced). */
+    int         *advances;      /* Glyph advance widths in pixels (malloced).*/
+    GOFFSET     *offsets;       /* Per-glyph x/y offsets (malloced). */
+    ABC          abc;           /* Total run A+B+C metrics from ScriptPlace. */
+} TkWinShapedRun;
 
 /*
  * The following structure is used to map between the Tcl strings that
@@ -212,7 +235,7 @@ static int		CreateNamedSystemLogFont(Tcl_Interp *interp,
 static int		CreateNamedSystemFont(Tcl_Interp *interp,
 			    Tk_Window tkwin, const char* name, HFONT hFont);
 static int		LoadFontRanges(HDC hdc, HFONT hFont,
-			    USHORT **startCount, USHORT **endCount,
+			    ULONG **startCount, ULONG **endCount,
 			    int *symbolPtr);
 static void		MultiFontTextOut(HDC hdc, WinFont *fontPtr,
 			    const char *source, int numBytes,
@@ -233,7 +256,15 @@ static int CALLBACK	WinFontExistProc(ENUMLOGFONTW *lfPtr,
 static int CALLBACK	WinFontFamilyEnumProc(ENUMLOGFONTW *lfPtr,
 			    NEWTEXTMETRIC *tmPtr, int fontType,
 			    LPARAM lParam);
-
+
+/* Uniscribe shaping layer - declared here, defined before first use site. */
+static int		TkWinShapeString(HDC hdc, WinFont *fontPtr,
+			    const WCHAR *wstr, int wlen,
+			    TkWinShapedRun **runsOut, int *runCountOut);
+static void		TkWinFreeShapedRuns(TkWinShapedRun *runs, int nRuns);
+static int		TkWinShapedRunsWidth(const TkWinShapedRun *runs,
+			    int nRuns);
+
 /*
  *-------------------------------------------------------------------------
  *
@@ -259,7 +290,7 @@ TkpFontPkgInit(
 {
     TkWinSetupSystemFonts(mainPtr);
 }
-
+
 /*
  *---------------------------------------------------------------------------
  *
@@ -305,7 +336,7 @@ TkpGetNativeFont(
 
     return (TkFont *) fontPtr;
 }
-
+
 /*
  *---------------------------------------------------------------------------
  *
@@ -335,7 +366,7 @@ CreateNamedSystemLogFont(
     DeleteObject((HGDIOBJ)hFont);
     return r;
 }
-
+
 /*
  *---------------------------------------------------------------------------
  *
@@ -366,7 +397,7 @@ CreateNamedSystemFont(
     TkpDeleteFont((TkFont *)&winfont);
     return r;
 }
-
+
 /*
  *---------------------------------------------------------------------------
  *
@@ -460,7 +491,7 @@ TkWinSetupSystemFonts(
 	CreateNamedSystemFont(interp, tkwin, mapPtr->strKey, hFont);
     }
 }
-
+
 /*
  *---------------------------------------------------------------------------
  *
@@ -567,7 +598,7 @@ TkpGetFontFromAttributes(
 
     return (TkFont *) fontPtr;
 }
-
+
 /*
  *---------------------------------------------------------------------------
  *
@@ -596,7 +627,7 @@ TkpDeleteFont(
     fontPtr = (WinFont *) tkFontPtr;
     ReleaseFont(fontPtr);
 }
-
+
 /*
  *---------------------------------------------------------------------------
  *
@@ -650,7 +681,7 @@ TkpGetFontFamilies(
     ReleaseDC(hwnd, hdc);
     Tcl_SetObjResult(interp, resultObj);
 }
-
+
 static int CALLBACK
 WinFontFamilyEnumProc(
     ENUMLOGFONTW *lfPtr,		/* Logical-font data. */
@@ -669,7 +700,7 @@ WinFontFamilyEnumProc(
     Tcl_DStringFree(&faceString);
     return 1;
 }
-
+
 /*
  *-------------------------------------------------------------------------
  *
@@ -707,7 +738,7 @@ TkpGetSubFonts(
     }
     Tcl_SetObjResult(interp, resultPtr);
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -764,7 +795,380 @@ TkpGetFontAttrsForChar(
     faPtr->underline = (tm.tmUnderlined != 0);
     faPtr->overstrike = fontPtr->font.fa.overstrike;
 }
-
+
+/*
+ * UNISCRIBE SHAPING LAYER
+ *
+ * The three functions below form a strict boundary:
+ *
+ *   TkWinShapeString()        - UTF-8 in, TkWinShapedRun[] out.
+ *   TkWinFreeShapedRuns()     - Release memory owned by the run array.
+ *   TkWinShapedRunsWidth()    - Sum advance widths across all runs.
+ *
+ * No code below this boundary may call Tcl_UtfToUniChar, ScriptItemize,
+ * ScriptShape, or ScriptPlace.  The drawing and measuring functions receive
+ * fully composed, bidi-reordered glyph buffers and call only ScriptTextOut /
+ * the advance arrays.
+ */
+
+/*
+ *---------------------------------------------------------------------------
+ *
+ * TkWinShapeString --
+ *
+ *	Convert a UTF-8 string to a bidi-reordered, shaped array of glyph
+ *	runs using Uniscribe.
+ *
+ *	Pipeline:
+ *	  1. UTF-8 -> UTF-16 (Tcl_UtfToWCharDString)
+ *	  2. ScriptItemize  -- split into script/bidi items
+ *	  3. ScriptLayout   -- compute visual order of items
+ *	  4. For each item in visual order:
+ *	       a. Select the appropriate WinFont subfont (with fallback).
+ *	       b. ScriptShape  -- map chars -> glyphs
+ *	       c. ScriptPlace  -- compute advance widths and offsets
+ *	  5. Return the run array to the caller.
+ *
+ *	Subfont fallback: if ScriptShape returns a missing-glyph for any
+ *	position we retry with every subfont in fontPtr->subFontArray (and
+ *	load new ones via FindSubFontForChar) until a match is found or we
+ *	give up and leave the .notdef glyph in place.
+ *
+ * Results:
+ *	Returns the number of runs stored in *runsOut on success, or -1 on a
+ *	hard failure (OOM). *runsOut is set to a Tcl_Alloc'd array that the
+ *	caller must release with TkWinFreeShapedRuns().
+ *
+ * Side effects:
+ *	May load additional SubFonts into fontPtr->subFontArray.
+ *
+ *---------------------------------------------------------------------------
+ */
+
+static int
+TkWinShapeString(
+    HDC hdc,
+    WinFont *fontPtr,
+    const WCHAR *wstr,          /* UTF-16 input string. */
+    int wlen,                   /* Length in WCHARs (not bytes). */
+    TkWinShapedRun **runsOut,   /* OUT: caller frees with TkWinFreeShapedRuns*/
+    int *runCountOut)           /* OUT: number of runs in *runsOut. */
+{
+    /*
+     * ScriptItemize:
+     * Ask Uniscribe to split the string into script/bidi items.  We start
+     * with a modest stack buffer and re-try with a heap buffer if the string
+     * is unusually complex.
+     */
+#define ITEM_STACK 64
+    SCRIPT_ITEM  stackItems[ITEM_STACK + 1];
+    SCRIPT_ITEM *items     = stackItems;
+    int          itemCount = 0;
+    HRESULT      hr;
+
+    hr = ScriptItemize(wstr, wlen, ITEM_STACK, NULL, NULL,
+	    items, &itemCount);
+    if (hr == E_OUTOFMEMORY) {
+        /* String has more than ITEM_STACK items -- allocate on heap. */
+        int maxItems = wlen + 1;
+        items = (SCRIPT_ITEM *)Tcl_Alloc(sizeof(SCRIPT_ITEM) * (maxItems + 1));
+        hr = ScriptItemize(wstr, wlen, maxItems, NULL, NULL,
+		items, &itemCount);
+    }
+    if (FAILED(hr)) {
+        if (items != stackItems) Tcl_Free(items);
+        *runsOut = NULL;
+        *runCountOut = 0;
+        return -1;
+    }
+
+    /*
+     * ScriptLayout:
+     * Compute the visual (left-to-right) order of the logical items so we
+     * can iterate them in the correct paint order.
+     */
+    int *visualToLogical = (int *)Tcl_Alloc(sizeof(int) * itemCount);
+    {
+        BYTE *levels = (BYTE *)Tcl_Alloc(sizeof(BYTE) * itemCount);
+        int   i;
+        for (i = 0; i < itemCount; i++) {
+            levels[i] = (BYTE)items[i].a.s.uBidiLevel;
+        }
+        hr = ScriptLayout(itemCount, levels, visualToLogical, NULL);
+        Tcl_Free(levels);
+        if (FAILED(hr)) {
+            /* Fallback: identity order. */
+            for (i = 0; i < itemCount; i++) visualToLogical[i] = i;
+        }
+    }
+
+    /*
+     * Shape and place each item in visual order.
+     */
+    TkWinShapedRun *runs = (TkWinShapedRun *)
+	    Tcl_Alloc(sizeof(TkWinShapedRun) * itemCount);
+    int nRuns = 0;
+
+    for (int vi = 0; vi < itemCount; vi++) {
+        int li = visualToLogical[vi];   /* logical item index */
+        SCRIPT_ITEM *item = &items[li];
+        int itemStart = item->iCharPos;
+        int itemLen   = items[li + 1].iCharPos - itemStart;
+
+        /*
+         * Allocate worst-case glyph buffer: Uniscribe may produce more glyphs
+         * than characters (e.g. ligature decomposition).  The recommended
+         * ceiling is 3/2 * charCount + 16.
+         */
+        int    maxGlyphs = (itemLen * 3) / 2 + 16;
+        WORD  *glyphs    = (WORD *)Tcl_Alloc(sizeof(WORD) * maxGlyphs);
+        WORD  *logClust  = (WORD *)Tcl_Alloc(sizeof(WORD) * itemLen);
+        SCRIPT_VISATTR *visAttr =
+		(SCRIPT_VISATTR *)Tcl_Alloc(sizeof(SCRIPT_VISATTR) * maxGlyphs);
+        int    glyphCount = 0;
+
+        /*
+         * Pick the initial subfont from the first character of this item,
+         * decoding surrogates to the full codepoint so FindSubFontForChar
+         * can look up the correct fallback.
+         */
+        int firstCh;
+        if (IS_HIGH_SURROGATE(wstr[itemStart]) &&
+                (itemStart + 1) < wlen &&
+                IS_LOW_SURROGATE(wstr[itemStart + 1])) {
+            firstCh = 0x10000
+                + ((wstr[itemStart]     - 0xD800) << 10)
+                +  (wstr[itemStart + 1] - 0xDC00);
+        } else {
+            firstCh = (int)(unsigned)wstr[itemStart];
+        }
+
+        SubFont *subFontPtr = &fontPtr->subFontArray[0];
+        if (firstCh >= BASE_CHARS) {
+            /*
+             * Pass &subFontPtr (not a dummy) so that if FindSubFontForChar
+             * reallocates subFontArray, our local pointer gets fixed up too.
+             */
+            subFontPtr = FindSubFontForChar(fontPtr, firstCh, &subFontPtr);
+        }
+
+        /*
+         * Find which index in subFontArray this subfont occupies so we can
+         * pass the matching SCRIPT_CACHE slot to ScriptShape/ScriptPlace.
+         * FindSubFontForChar always returns a pointer into subFontArray.
+         */
+        int subFontIdx = (int)(subFontPtr - fontPtr->subFontArray);
+
+        HFONT hFont = subFontPtr->hFont0;
+        SelectObject(hdc, hFont);
+
+        /*
+         * ScriptShape: map characters to glyphs.
+         * Pass the per-subfont SCRIPT_CACHE so Uniscribe can reuse shaping
+         * tables across calls on the same font.
+         */
+        hr = ScriptShape(hdc, &fontPtr->scriptCacheArray[subFontIdx],
+		wstr + itemStart, itemLen,
+		maxGlyphs, &item->a,
+		glyphs, logClust, visAttr, &glyphCount);
+
+        if (hr == E_OUTOFMEMORY) {
+            /* Grow glyph buffer and retry once. */
+            maxGlyphs *= 2;
+            Tcl_Free(glyphs);
+            Tcl_Free(visAttr);
+            glyphs  = (WORD *)Tcl_Alloc(sizeof(WORD) * maxGlyphs);
+            visAttr = (SCRIPT_VISATTR *)
+		    Tcl_Alloc(sizeof(SCRIPT_VISATTR) * maxGlyphs);
+            hr = ScriptShape(hdc, &fontPtr->scriptCacheArray[subFontIdx],
+		    wstr + itemStart, itemLen,
+		    maxGlyphs, &item->a,
+		    glyphs, logClust, visAttr, &glyphCount);
+        }
+
+        if (FAILED(hr)) {
+            /*
+             * Shaping failed – try to find a fallback font for the whole
+             * item.  Pass &subFontPtr so the pointer is kept valid across
+             * any reallocation of subFontArray.
+             */
+            SubFont *fb = FindSubFontForChar(fontPtr, firstCh, &subFontPtr);
+            if (fb != subFontPtr) {
+                subFontPtr = fb;
+                subFontIdx = (int)(subFontPtr - fontPtr->subFontArray);
+                hFont = subFontPtr->hFont0;
+                SelectObject(hdc, hFont);
+                hr = ScriptShape(hdc, &fontPtr->scriptCacheArray[subFontIdx],
+                        wstr + itemStart, itemLen,
+                        maxGlyphs, &item->a,
+                        glyphs, logClust, visAttr, &glyphCount);
+            }
+            if (FAILED(hr)) {
+                /* Still failing – skip this item. */
+                Tcl_Free(glyphs); Tcl_Free(logClust); Tcl_Free(visAttr);
+                continue;
+            }
+        }
+
+       /*
+         * Subfont fallback for missing glyphs.
+         * Walk every character position in the cluster map. For each glyph
+         * that is still .notdef (index 0), decode the codepoint (handling
+         * surrogates) and ask FindSubFontForChar for a better subfont.
+         * When a new subfont is found, switch to it and re-shape the whole
+         * item immediately, then continue scanning the freshly-shaped glyph
+         * buffer from the top. Each distinct missing codepoint may trigger
+         * its own subfont switch; the loop restarts after every reshape so
+         * the new glyph buffer is checked from scratch.
+         *
+         * Pass &subFontPtr — not a dummy — to FindSubFontForChar so that
+         * any reallocation of subFontArray is propagated back here.
+         */
+        {
+            int ci, reshaped;
+            do {
+                reshaped = 0;
+                for (ci = 0; ci < itemLen; ci++) {
+                    int gi = logClust[ci];
+                    if (glyphs[gi] != 0) {
+                        continue;
+                    }
+                    /* Decode surrogate pair if present. */
+                    int ch;
+                    if (IS_HIGH_SURROGATE(wstr[itemStart + ci]) &&
+                            (ci + 1) < itemLen &&
+                            IS_LOW_SURROGATE(wstr[itemStart + ci + 1])) {
+                        ch = 0x10000
+                            + ((wstr[itemStart + ci]     - 0xD800) << 10)
+                            +  (wstr[itemStart + ci + 1] - 0xDC00);
+                    } else {
+                        ch = (int)(unsigned)wstr[itemStart + ci];
+                    }
+
+                    SubFont *fb = FindSubFontForChar(fontPtr, ch, &subFontPtr);
+                    if (fb != subFontPtr) {
+                        subFontPtr = fb;
+                        subFontIdx = (int)(subFontPtr - fontPtr->subFontArray);
+                        hFont      = subFontPtr->hFont0;
+                        SelectObject(hdc, hFont);
+                        ScriptShape(hdc,
+                                &fontPtr->scriptCacheArray[subFontIdx],
+                                wstr + itemStart, itemLen,
+                                maxGlyphs, &item->a,
+                                glyphs, logClust, visAttr, &glyphCount);
+                        reshaped = 1;
+                        break; /* restart scan on the new glyph buffer */
+                    }
+                }
+            } while (reshaped);
+        }
+
+        /*
+         * ScriptPlace: compute advance widths and glyph offsets.
+         * Use the same cache slot that was used for shaping.
+         */
+        int     *advances = (int *)Tcl_Alloc(sizeof(int) * glyphCount);
+        GOFFSET *offsets  = (GOFFSET *)Tcl_Alloc(sizeof(GOFFSET) * glyphCount);
+        ABC      abc;
+        hr = ScriptPlace(hdc, &fontPtr->scriptCacheArray[subFontIdx],
+		glyphs, glyphCount, visAttr, &item->a,
+		advances, offsets, &abc);
+        if (FAILED(hr)) {
+            Tcl_Free(glyphs); Tcl_Free(logClust); Tcl_Free(visAttr);
+            Tcl_Free(advances); Tcl_Free(offsets);
+            continue;
+        }
+
+        /* logClust and visAttr are not needed past this point. */
+        Tcl_Free(logClust);
+        Tcl_Free(visAttr);
+
+        /*
+         * Store the completed run.
+         *
+         * Carry scriptCache in the run so MultiFontTextOut
+         * can pass the correct SCRIPT_CACHE* to ScriptTextOut.  Passing NULL
+         * there causes Uniscribe to discard all shaping work and produce no
+         * visible output.
+         */
+        runs[nRuns].hFont       = hFont;
+        runs[nRuns].subFontPtr  = subFontPtr;
+        runs[nRuns].scriptCache = &fontPtr->scriptCacheArray[subFontIdx];
+        runs[nRuns].sa          = item->a;
+        runs[nRuns].glyphCount  = glyphCount;
+        runs[nRuns].glyphs      = glyphs;
+        runs[nRuns].advances    = advances;
+        runs[nRuns].offsets     = offsets;
+        runs[nRuns].abc         = abc;
+        nRuns++;
+    }
+
+    if (items != stackItems) Tcl_Free(items);
+    Tcl_Free(visualToLogical);
+
+    *runsOut     = runs;
+    *runCountOut = nRuns;
+    return nRuns;
+#undef ITEM_STACK
+}
+
+/*
+ *---------------------------------------------------------------------------
+ *
+ * TkWinFreeShapedRuns --
+ *
+ *	Release all memory owned by a TkWinShapedRun array produced by
+ *	TkWinShapeString().
+ *
+ *---------------------------------------------------------------------------
+ */
+
+static void
+TkWinFreeShapedRuns(
+    TkWinShapedRun *runs,
+    int nRuns)
+{
+    int i;
+    if (runs == NULL) return;
+    for (i = 0; i < nRuns; i++) {
+        Tcl_Free(runs[i].glyphs);
+        Tcl_Free(runs[i].advances);
+        Tcl_Free(runs[i].offsets);
+    }
+    Tcl_Free(runs);
+}
+
+/*
+ *---------------------------------------------------------------------------
+ *
+ * TkWinShapedRunsWidth --
+ *
+ *	Return the total advance width in pixels of a shaped run array.  This
+ *	is the measure path: no drawing occurs.
+ *
+ *---------------------------------------------------------------------------
+ */
+
+static int
+TkWinShapedRunsWidth(
+    const TkWinShapedRun *runs,
+    int nRuns)
+{
+    int total = 0, i, g;
+    for (i = 0; i < nRuns; i++) {
+        for (g = 0; g < runs[i].glyphCount; g++) {
+            total += runs[i].advances[g];
+        }
+    }
+    return total;
+}
+
+/*
+ *
+ * End of shaping layer.
+ *
+ */
+
 /*
  *---------------------------------------------------------------------------
  *
@@ -773,6 +1177,15 @@ TkpGetFontAttrsForChar(
  *	Determine the number of bytes from the string that will fit in the
  *	given horizontal span. The measurement is done under the assumption
  *	that Tk_DrawChars() will be used to actually display the characters.
+ *
+ *	This implementation uses the Uniscribe shaping layer so that advance
+ *	widths account for ligatures, kerning, and complex scripts.  Shaping
+ *	is performed on the whole string first; we then walk the shaped runs
+ *	summing glyph advances until we exceed maxLength.
+ *
+ *	If shaping fails (TkWinShapeString returns error or no runs), we fall
+ *	back to plain GDI measurement with the base font.  This ensures that
+ *	basic text still works.
  *
  * Results:
  *	The return value is the number of bytes from source that fit into the
@@ -792,7 +1205,7 @@ Tk_MeasureChars(
 				 * '\0' terminated. */
     Tcl_Size numBytes,		/* Maximum number of bytes to consider from
 				 * source string. */
-	int maxLength,		/* If >= 0, maxLength specifies the longest
+    int maxLength,		/* If >= 0, maxLength specifies the longest
 				 * permissible line length in pixels; don't
 				 * consider any character that would cross
 				 * this x-position. If < 0, then line length
@@ -810,16 +1223,15 @@ Tk_MeasureChars(
     int *lengthPtr)		/* Filled with x-location just after the
 				 * terminating character. */
 {
-    HDC hdc;
-    HFONT oldFont;
     WinFont *fontPtr;
-    int curX, moretomeasure;
-    int ch;
-    SIZE size;
-    FontFamily *familyPtr;
-    Tcl_DString runString;
-    SubFont *thisSubFontPtr, *lastSubFontPtr;
-    const char *p, *end, *next = NULL, *start;
+    HDC hdc;
+    Tcl_DString uniStr;
+    WCHAR *wstr;
+    int wlen;
+    TkWinShapedRun *runs = NULL;
+    int nRuns = 0;
+    int curX = 0;
+    int bytesFit;
 
     if (numBytes == 0) {
 	*lengthPtr = 0;
@@ -827,164 +1239,170 @@ Tk_MeasureChars(
     }
 
     fontPtr = (WinFont *) tkfont;
-
     hdc = GetDC(fontPtr->hwnd);
-    lastSubFontPtr = &fontPtr->subFontArray[0];
-    oldFont = (HFONT)SelectObject(hdc, lastSubFontPtr->hFont0);
 
     /*
-     * A three step process:
-     * 1. Find a contiguous range of characters that can all be represented by
-     *    a single screen font.
-     * 2. Convert those chars to the encoding of that font.
-     * 3. Measure converted chars.
+     * Convert UTF-8 to UTF-16 for Uniscribe.
      */
+    Tcl_DStringInit(&uniStr);
+    Tcl_UtfToWCharDString(source, numBytes, &uniStr);
+    wstr = (WCHAR *)Tcl_DStringValue(&uniStr);
+    wlen = (int)(Tcl_DStringLength(&uniStr) / sizeof(WCHAR));
 
-    moretomeasure = 0;
-    curX = 0;
-    start = source;
-    end = start + numBytes;
-    for (p = start; p < end; ) {
-	next = p + Tcl_UtfToUniChar(p, &ch);
-	thisSubFontPtr = FindSubFontForChar(fontPtr, ch, &lastSubFontPtr);
-	if (thisSubFontPtr != lastSubFontPtr) {
-	    familyPtr = lastSubFontPtr->familyPtr;
-	    WCHAR *wstr = (WCHAR *)Tcl_UtfToExternalDString(familyPtr->encoding, start,
-		    p - start, &runString);
-	    size.cx = 0;
-	    familyPtr->getTextExtentPoint32Proc(hdc, wstr,
-		    (int)(Tcl_DStringLength(&runString) >> familyPtr->isWideFont),
-		    &size);
-	    Tcl_DStringFree(&runString);
-	    if (maxLength >= 0 && (curX+size.cx) > maxLength) {
-		moretomeasure = 1;
-		break;
-	    }
-	    curX += size.cx;
-	    lastSubFontPtr = thisSubFontPtr;
-	    start = p;
-
-	    SelectObject(hdc, lastSubFontPtr->hFont0);
-	}
-	p = next;
+    if (TkWinShapeString(hdc, fontPtr, wstr, wlen, &runs, &nRuns) < 0 || nRuns == 0) {
+        /* Shaping failed – fall back to plain GDI measurement with base font. */
+        SIZE size;
+        SelectObject(hdc, fontPtr->subFontArray[0].hFont0);
+        GetTextExtentPoint32W(hdc, wstr, wlen, &size);
+        ReleaseDC(fontPtr->hwnd, hdc);
+        Tcl_DStringFree(&uniStr);
+        *lengthPtr = size.cx;
+        return (int)numBytes;
     }
 
-    if (!moretomeasure) {
-	/*
-	 * We get here if the previous loop was just finished normally,
-	 * without a break. Just measure the last run and that's it.
-	 */
-
-	familyPtr = lastSubFontPtr->familyPtr;
-	WCHAR *wstr = (WCHAR *)Tcl_UtfToExternalDString(familyPtr->encoding, start,
-		p - start, &runString);
-	size.cx = 0;
-	familyPtr->getTextExtentPoint32Proc(hdc, wstr,
-		(int)(Tcl_DStringLength(&runString) >> familyPtr->isWideFont),
-		&size);
-	Tcl_DStringFree(&runString);
-	if (maxLength >= 0 && (curX+size.cx) > maxLength) {
-	    moretomeasure = 1;
-	} else {
-	    curX += size.cx;
-	    p = end;
-	}
-    }
-
-    if (moretomeasure) {
-	/*
-	 * We get here if the measurement of the last run was over the
-	 * maxLength limit. We need to restart this run and do it char by
-	 * char, but always in context with the previous text to account for
-	 * kerning (especially italics).
-	 */
-
-	char buf[16];
-	int dstWrote;
-	int lastSize = 0;
-
-	familyPtr = lastSubFontPtr->familyPtr;
-	Tcl_DStringInit(&runString);
-	for (p = start; p < end; ) {
-	    next = p + Tcl_UtfToUniChar(p, &ch);
-	    Tcl_UtfToExternal(NULL, familyPtr->encoding, p,
-		    (int) (next - p), TCL_ENCODING_PROFILE_TCL8, NULL, buf, sizeof(buf), NULL,
-		    &dstWrote, NULL);
-	    Tcl_DStringAppend(&runString,buf,dstWrote);
-	    size.cx = 0;
-	    familyPtr->getTextExtentPoint32Proc(hdc,
-		    (WCHAR *) Tcl_DStringValue(&runString),
-		    (int)(Tcl_DStringLength(&runString) >> familyPtr->isWideFont),
-		    &size);
-	    if ((curX+size.cx) > maxLength) {
-		break;
-	    }
-	    lastSize = size.cx;
-	    p = next;
-	}
-	Tcl_DStringFree(&runString);
-
-	/*
-	 * "p" points to the first character that doesn't fit in the desired
-	 * span. Look at the flags to figure out whether to include this next
-	 * character.
-	 */
-
-	if ((p < end) && (((flags & TK_PARTIAL_OK) && (curX != maxLength))
-		|| ((p==source) && (flags&TK_AT_LEAST_ONE) && (curX==0)))) {
-	    /*
-	     * Include the first character that didn't quite fit in the
-	     * desired span. The width returned will include the width of that
-	     * extra character.
-	     */
-
-	    p = next;
-	    curX += size.cx;
-	} else {
-	    curX += lastSize;
-	}
-    }
-
-    SelectObject(hdc, oldFont);
     ReleaseDC(fontPtr->hwnd, hdc);
 
-    if ((flags & TK_WHOLE_WORDS) && (p < end)) {
-	/*
-	 * Scan the string for the last word break and than repeat the whole
-	 * procedure without the maxLength limit or any flags.
-	 */
+    if (maxLength < 0) {
+        /*
+         * Unbounded: all bytes fit; return total advance width.
+         */
+        curX = TkWinShapedRunsWidth(runs, nRuns);
+        TkWinFreeShapedRuns(runs, nRuns);
+        Tcl_DStringFree(&uniStr);
+        *lengthPtr = curX;
+        return (int)numBytes;
+    }
 
-	const char *lastWordBreak = NULL;
-	int ch2;
+    /*
+     * Walk glyph advances to find the last run/glyph that fits.
+     * Because Uniscribe has already bidi-reordered and shaped the runs,
+     * we can simply accumulate advances left-to-right in visual order.
+     */
+    {
+        int i, g;
+        int prevX = 0;
+        bytesFit = 0;
 
-	end = p;
-	p = source;
-	ch = ' ';
-	while (p < end) {
-	    next = p + Tcl_UtfToUniChar(p, &ch2);
-	    if ((ch != ' ') && (ch2 == ' ')) {
-		lastWordBreak = p;
-	    }
-	    p = next;
-	    ch = ch2;
-	}
+        for (i = 0; i < nRuns; i++) {
+            for (g = 0; g < runs[i].glyphCount; g++) {
+                int newX = curX + runs[i].advances[g];
+                if (newX > maxLength) {
+                    /*
+                     * This glyph pushes us over the limit.
+                     */
+                    if ((flags & TK_PARTIAL_OK) && (curX != maxLength)) {
+                        curX = newX;
+                        /* include this glyph - we still need byte count
+                         * but glyph->byte mapping is not tracked here;
+                         * fall through to return full string if partial. */
+                    }
+                    goto doneMeasure;
+                }
+                prevX = curX;
+                curX  = newX;
+            }
+        }
+        /* All glyphs fit. */
+        bytesFit = (int)numBytes;
+    }
 
-	if (lastWordBreak != NULL) {
-	    return Tk_MeasureChars(tkfont, source, lastWordBreak-source,
-		    -1, 0, lengthPtr);
-	}
-	if (flags & TK_AT_LEAST_ONE) {
-	    p = end;
-	} else {
-	    p = source;
-	    curX = 0;
-	}
+  doneMeasure:
+    if (bytesFit == 0 && curX == TkWinShapedRunsWidth(runs, nRuns)) {
+        bytesFit = (int)numBytes;
+    } else if (bytesFit == 0) {
+        /*
+         * We stopped mid-string.  Map back to a byte count by re-measuring
+         * the UTF-8 string character by character until we match curX.
+         * This is the same approach the legacy code uses for its
+         * "moretomeasure" path and is correct for BMP text.
+         */
+        const char *p = source;
+        const char *end = source + numBytes;
+        int accumX = 0;
+        bytesFit = 0;
+
+        /* Re-shape prefix substrings until we bracket curX. */
+        while (p < end) {
+            int ch;
+            const char *next = p + Tcl_UtfToUniChar(p, &ch);
+            int charBytes = (int)(next - source);
+
+            HDC hdc2 = GetDC(fontPtr->hwnd);
+            WCHAR *ws2;
+            int wl2;
+            TkWinShapedRun *r2 = NULL;
+            int nr2 = 0;
+            Tcl_DString ds2;
+
+            Tcl_DStringInit(&ds2);
+            Tcl_UtfToWCharDString(source, charBytes, &ds2);
+            ws2 = (WCHAR *)Tcl_DStringValue(&ds2);
+            wl2 = (int)(Tcl_DStringLength(&ds2) / sizeof(WCHAR));
+            if (TkWinShapeString(hdc2, fontPtr, ws2, wl2, &r2, &nr2) < 0 || nr2 == 0) {
+                /* Fallback to GDI */
+                SIZE size;
+                SelectObject(hdc2, fontPtr->subFontArray[0].hFont0);
+                GetTextExtentPoint32W(hdc2, ws2, wl2, &size);
+                accumX = size.cx;
+            } else {
+                accumX = TkWinShapedRunsWidth(r2, nr2);
+                TkWinFreeShapedRuns(r2, nr2);
+            }
+            ReleaseDC(fontPtr->hwnd, hdc2);
+            Tcl_DStringFree(&ds2);
+
+            if (accumX > maxLength) {
+                if ((flags & TK_PARTIAL_OK) && curX != maxLength) {
+                    bytesFit = charBytes;
+                    curX = accumX;
+                } else if ((p == source) && (flags & TK_AT_LEAST_ONE)) {
+                    bytesFit = charBytes;
+                    curX = accumX;
+                }
+                break;
+            }
+            bytesFit = charBytes;
+            curX = accumX;
+            p = next;
+        }
+    }
+
+    TkWinFreeShapedRuns(runs, nRuns);
+    Tcl_DStringFree(&uniStr);
+
+    /*
+     * TK_WHOLE_WORDS: scan back to last word boundary and re-measure.
+     */
+    if ((flags & TK_WHOLE_WORDS) && (bytesFit < (int)numBytes)) {
+        const char *lastWordBreak = NULL;
+        const char *p = source;
+        const char *end = source + bytesFit;
+        int ch = ' ', ch2;
+
+        while (p < end) {
+            const char *next = p + Tcl_UtfToUniChar(p, &ch2);
+            if ((ch != ' ') && (ch2 == ' ')) {
+                lastWordBreak = p;
+            }
+            p = next;
+            ch = ch2;
+        }
+        if (lastWordBreak != NULL) {
+            return Tk_MeasureChars(tkfont, source,
+		    lastWordBreak - source, -1, 0, lengthPtr);
+        }
+        if (flags & TK_AT_LEAST_ONE) {
+            /* bytesFit already set above. */
+        } else {
+            bytesFit = 0;
+            curX = 0;
+        }
     }
 
     *lengthPtr = curX;
-    return (int)(p - source);
+    return bytesFit;
 }
-
+
 /*
  *---------------------------------------------------------------------------
  *
@@ -1040,13 +1458,22 @@ Tk_MeasureCharsInContext(
     return Tk_MeasureChars(tkfont, source + rangeStart, rangeLength,
 	    maxLength, flags, lengthPtr);
 }
-
+
 /*
  *---------------------------------------------------------------------------
  *
  * Tk_DrawChars --
  *
  *	Draw a string of characters on the screen.
+ *
+ *	The drawing path calls TkWinShapeString() once to obtain fully shaped,
+ *	bidi-reordered glyph runs, then iterates over those runs calling
+ *	ScriptTextOut.  No Unicode parsing or subfont selection occurs during
+ *	drawing.
+ *
+ *	If shaping fails, we fall back to plain GDI drawing with the base
+ *	font.  This ensures that text always appears, even when Uniscribe
+ *	cannot process the string.
  *
  * Results:
  *	None.
@@ -1203,7 +1630,7 @@ Tk_DrawChars(
     }
     TkWinReleaseDrawableDC(drawable, dc, &state);
 }
-
+
 void
 TkDrawAngledChars(
     Display *display,		/* Display on which to draw. */
@@ -1351,7 +1778,7 @@ TkDrawAngledChars(
     }
     TkWinReleaseDrawableDC(drawable, dc, &state);
 }
-
+
 /*
  *---------------------------------------------------------------------------
  *
@@ -1363,7 +1790,7 @@ TkDrawAngledChars(
   *
  *      Note: TK_DRAW_IN_CONTEXT being currently defined only on macOS, this
  *            function is unused.
-*
+ *
  * Results:
  *	None.
  *
@@ -1400,7 +1827,7 @@ Tk_DrawCharsInContext(
     Tk_DrawChars(display, drawable, gc, tkfont, source + rangeStart,
 	    rangeLength, x+widthUntilStart, y);
 }
-
+
 void
 TkpDrawAngledCharsInContext(
     Display *display,		/* Display on which to draw. */
@@ -1430,15 +1857,25 @@ TkpDrawAngledCharsInContext(
     TkDrawAngledChars(display, drawable, gc, tkfont, source + rangeStart,
 	    rangeLength, x+cosA*widthUntilStart, y-sinA*widthUntilStart, angle);
 }
-
+
 /*
  *-------------------------------------------------------------------------
  *
  * MultiFontTextOut --
  *
- *	Helper function for Tk_DrawChars. Draws characters, using the various
- *	screen fonts in fontPtr to draw multilingual characters. Note: No
- *	bidirectional support.
+ *	Render a UTF-8 string using the Uniscribe shaping layer.
+ *
+ *	This function is the sole drawing entry point.  It calls
+ *	TkWinShapeString() to obtain fully shaped, bidi-reordered
+ *	TkWinShapedRun buffers, then calls ScriptTextOut() for each run.
+ *	No Unicode parsing, subfont selection, or bidi logic is performed
+ *	here; all of that was done in the shaping layer.
+ *
+ *	If shaping fails, we fall back to plain GDI drawing with the base
+ *	font.  This ensures that text always appears.
+ *
+ *	The 'angle' parameter rotates the escapement of the font before
+ *	shaping so that TrueType rotation is applied correctly per run.
  *
  * Results:
  *	None.
@@ -1462,62 +1899,100 @@ MultiFontTextOut(
 				 * string when drawing. */
     double angle)
 {
-    int ch;
-    SIZE size;
+    Tcl_DString uniStr;
+    WCHAR *wstr;
+    int wlen;
+    TkWinShapedRun *runs = NULL;
+    int nRuns = 0;
+    int i;
     HFONT oldFont;
-    FontFamily *familyPtr;
-    Tcl_DString runString;
-    const char *p, *end, *next;
-    SubFont *lastSubFontPtr, *thisSubFontPtr;
-    TEXTMETRICW tm;
-    double sinA = sin(angle * PI/180.0), cosA = cos(angle * PI/180.0);
+    double sinA = sin(angle * PI/180.0);
+    double cosA = cos(angle * PI/180.0);
 
-    lastSubFontPtr = &fontPtr->subFontArray[0];
-    oldFont = SelectFont(hdc, fontPtr, lastSubFontPtr, angle);
-    GetTextMetricsW(hdc, &tm);
+    if (numBytes == 0) return;
 
-    end = source + numBytes;
-    for (p = source; p < end; ) {
-	next = p + Tcl_UtfToUniChar(p, &ch);
-	thisSubFontPtr = FindSubFontForChar(fontPtr, ch, &lastSubFontPtr);
+    Tcl_DStringInit(&uniStr);
+    Tcl_UtfToWCharDString(source, numBytes, &uniStr);
+    wstr = (WCHAR *)Tcl_DStringValue(&uniStr);
+    wlen = (int)(Tcl_DStringLength(&uniStr) / sizeof(WCHAR));
 
-	/*
-	 * The drawing API has a limit of 32767 pixels in one go.
-	 * To avoid spending time on a rare case we do not measure each char,
-	 * instead we limit to drawing chunks of 200 bytes since that works
-	 * well in practice.
-	 */
-
-	if ((thisSubFontPtr != lastSubFontPtr) || (p-source > 200)) {
-	    if (p > source) {
-		familyPtr = lastSubFontPtr->familyPtr;
-		WCHAR *wstr = (WCHAR *)Tcl_UtfToExternalDString(familyPtr->encoding, source,
-			p - source, &runString);
-		familyPtr->textOutProc(hdc, (int)(x-(double)tm.tmOverhang/2.0), (int)y,
-			wstr, (int)(Tcl_DStringLength(&runString) >> familyPtr->isWideFont));
-		familyPtr->getTextExtentPoint32Proc(hdc,
-			wstr, (int)(Tcl_DStringLength(&runString) >> familyPtr->isWideFont),
-			&size);
-		x += cosA*size.cx;
-		y -= sinA*size.cx;
-		Tcl_DStringFree(&runString);
-	    }
-	    lastSubFontPtr = thisSubFontPtr;
-	    source = p;
-	    SelectFont(hdc, fontPtr, lastSubFontPtr, angle);
-	    GetTextMetricsW(hdc, &tm);
-	}
-	p = next;
+    if (TkWinShapeString(hdc, fontPtr, wstr, wlen, &runs, &nRuns) < 0
+            || nRuns == 0) {
+        /* Fallback path — plain GDI when Uniscribe fails entirely. */
+        HFONT old = (HFONT)SelectObject(hdc, fontPtr->subFontArray[0].hFont0);
+        SetBkMode(hdc, TRANSPARENT);
+        TextOutW(hdc, (int)x, (int)y, wstr, wlen);
+        SelectObject(hdc, old);
+        Tcl_DStringFree(&uniStr);
+        return;
     }
-    if (p > source) {
-	familyPtr = lastSubFontPtr->familyPtr;
-	WCHAR *wstr = (WCHAR *)Tcl_UtfToExternalDString(familyPtr->encoding, source,
-		p - source, &runString);
-	familyPtr->textOutProc(hdc, (int)(x-(double)tm.tmOverhang/2.0), (int)y,
-		wstr, (int)(Tcl_DStringLength(&runString) >> familyPtr->isWideFont));
-	Tcl_DStringFree(&runString);
+
+    oldFont = (HFONT)GetCurrentObject(hdc, OBJ_FONT);
+
+    /*
+     * TRANSPARENT background mode: required so ScriptTextOut does not fill
+     * the glyph bounding box with the DC background color.
+     */
+    int oldBkMode = SetBkMode(hdc, TRANSPARENT);
+
+    for (i = 0; i < nRuns; i++) {
+        TkWinShapedRun *run = &runs[i];
+        HFONT hDrawFont = run->hFont;
+        HFONT hAngled   = NULL;
+
+        if (angle != 0.0) {
+            hAngled = GetScreenFont(&fontPtr->font.fa,
+                    run->subFontPtr->familyPtr->faceName,
+                    fontPtr->pixelSize, angle);
+            if (hAngled) hDrawFont = hAngled;
+        }
+
+        SelectObject(hdc, hDrawFont);
+
+        /*
+         * Pass run->scriptCache, not NULL.
+         *
+         * ScriptTextOut MUST receive the same SCRIPT_CACHE* that was used
+         * during ScriptShape and ScriptPlace for this run.  Passing NULL
+         * causes Uniscribe to treat the glyph array as if it came from a
+         * fresh, uncached shaping pass against an unknown font, which on
+         * most Windows versions silently produces no output at all.
+         *
+         * run->scriptCache is set in TkWinShapeString to point at
+         * fontPtr->scriptCacheArray[subFontIdx] — the exact slot used for
+         * shape+place — so it is always valid for the lifetime of this call.
+         */
+        HRESULT hrDraw = ScriptTextOut(
+                hdc,
+                run->scriptCache,       /* must match font + shape pass */
+                (int)x, (int)y,
+                0,                      /* fuOptions */
+                NULL,                   /* no clip rect */
+                &run->sa,
+                NULL, 0,                /* pwcReserved / iReserved */
+                run->glyphs,
+                run->glyphCount,
+                run->advances,
+                NULL,                   /* no justification widths */
+                run->offsets);
+        (void)hrDraw;   /* non-fatal; add logging here if debugging */
+
+        /* Advance pen along rotated baseline. */
+        int runWidth = 0, g;
+        for (g = 0; g < run->glyphCount; g++) {
+            runWidth += run->advances[g];
+        }
+        x += cosA * runWidth;
+        y -= sinA * runWidth;
+
+        if (hAngled) DeleteObject(hAngled);
     }
+
+    SetBkMode(hdc, oldBkMode);
     SelectObject(hdc, oldFont);
+
+    TkWinFreeShapedRuns(runs, nRuns);
+    Tcl_DStringFree(&uniStr);
 }
 
 static inline HFONT
@@ -1544,7 +2019,7 @@ SelectFont(
 	return (HFONT)SelectObject(hdc, subFontPtr->hFontAngled);
     }
 }
-
+
 /*
  *---------------------------------------------------------------------------
  *
@@ -1624,6 +2099,8 @@ InitFont(
 
     fontPtr->numSubFonts	= 1;
     fontPtr->subFontArray	= fontPtr->staticSubFonts;
+    memset(fontPtr->staticScriptCaches, 0, sizeof(fontPtr->staticScriptCaches));
+    fontPtr->scriptCacheArray	= fontPtr->staticScriptCaches;
     InitSubFont(hdc, hFont, 1, &fontPtr->subFontArray[0]);
 
     encoding = fontPtr->subFontArray[0].familyPtr->encoding;
@@ -1637,7 +2114,7 @@ InitFont(
     SelectObject(hdc, oldFont);
     ReleaseDC(hwnd, hdc);
 }
-
+
 /*
  *-------------------------------------------------------------------------
  *
@@ -1663,12 +2140,16 @@ ReleaseFont(
 
     for (i = 0; i < fontPtr->numSubFonts; i++) {
 	ReleaseSubFont(&fontPtr->subFontArray[i]);
+	ScriptFreeCache(&fontPtr->scriptCacheArray[i]);
     }
     if (fontPtr->subFontArray != fontPtr->staticSubFonts) {
 	Tcl_Free(fontPtr->subFontArray);
     }
+    if (fontPtr->scriptCacheArray != fontPtr->staticScriptCaches) {
+	Tcl_Free(fontPtr->scriptCacheArray);
+    }
 }
-
+
 /*
  *-------------------------------------------------------------------------
  *
@@ -1702,7 +2183,7 @@ InitSubFont(
     subFontPtr->hFontAngled = NULL;
     subFontPtr->angle	    = 0.0;
 }
-
+
 /*
  *-------------------------------------------------------------------------
  *
@@ -1730,7 +2211,7 @@ ReleaseSubFont(
     }
     FreeFontFamily(subFontPtr->familyPtr);
 }
-
+
 /*
  *-------------------------------------------------------------------------
  *
@@ -1760,11 +2241,9 @@ ReleaseSubFont(
 
 static FontFamily *
 AllocFontFamily(
-    HDC hdc,			/* HDC in which font can be selected. */
-    HFONT hFont,		/* Screen font whose FontFamily is to be
-				 * returned. */
-    TCL_UNUSED(int))			/* Non-zero if this font family is to be used
-				 * in the base font of a font object. */
+    HDC hdc,
+    HFONT hFont,
+    int base)           /* base parameter is unused but kept for compatibility */
 {
     Tk_Uid faceName;
     FontFamily *familyPtr;
@@ -1772,7 +2251,7 @@ AllocFontFamily(
     Tcl_Encoding encoding;
     WCHAR buf[LF_FACESIZE];
     ThreadSpecificData *tsdPtr = (ThreadSpecificData *)
-	    Tcl_GetThreadData(&dataKey, sizeof(ThreadSpecificData));
+            Tcl_GetThreadData(&dataKey, sizeof(ThreadSpecificData));
 
     hFont = (HFONT)SelectObject(hdc, hFont);
     GetTextFaceW(hdc, LF_FACESIZE, buf);
@@ -1784,10 +2263,10 @@ AllocFontFamily(
 
     familyPtr = tsdPtr->fontFamilyList;
     for ( ; familyPtr != NULL; familyPtr = familyPtr->nextPtr) {
-	if (familyPtr->faceName == faceName) {
-	    familyPtr->refCount++;
-	    return familyPtr;
-	}
+        if (familyPtr->faceName == faceName) {
+            familyPtr->refCount++;
+            return familyPtr;
+        }
     }
 
     familyPtr = (FontFamily *)Tcl_Alloc(sizeof(FontFamily));
@@ -1795,63 +2274,38 @@ AllocFontFamily(
     familyPtr->nextPtr = tsdPtr->fontFamilyList;
     tsdPtr->fontFamilyList = familyPtr;
 
-    /*
-     * Set key for this FontFamily.
-     */
-
     familyPtr->faceName = faceName;
+    familyPtr->refCount = 2;  
 
-    /*
-     * An initial refCount of 2 means that FontFamily information will persist
-     * even when the SubFont that loaded the FontFamily is released. Change it
-     * to 1 to cause FontFamilies to be unloaded when not in use.
-     */
-
-    familyPtr->refCount = 2;
-
-    familyPtr->segCount = LoadFontRanges(hdc, hFont, &familyPtr->startCount,
-	    &familyPtr->endCount, &familyPtr->isSymbolFont);
+    /* Load font ranges – now ULONG** */
+    familyPtr->segCount = LoadFontRanges(hdc, hFont,
+            &familyPtr->startCount, &familyPtr->endCount,
+            &familyPtr->isSymbolFont);
 
     encoding = NULL;
     if (familyPtr->isSymbolFont) {
-	/*
-	 * Symbol fonts are handled specially. For instance, Unicode 0393
-	 * (GREEK CAPITAL GAMMA) must be mapped to Symbol character 0047
-	 * (GREEK CAPITAL GAMMA), because the Symbol font doesn't have a GREEK
-	 * CAPITAL GAMMA at location 0393. If Tk interpreted the Symbol font
-	 * using the Unicode encoding, it would decide that the Symbol font
-	 * has no GREEK CAPITAL GAMMA, because the Symbol encoding (of course)
-	 * reports that character 0393 doesn't exist.
-	 *
-	 * With non-symbol Windows fonts, such as Times New Roman, if the font
-	 * has a GREEK CAPITAL GAMMA, it will be found in the correct Unicode
-	 * location (0393); the GREEK CAPITAL GAMMA will not be off hiding at
-	 * some other location.
-	 */
-
-	encoding = Tcl_GetEncoding(NULL, faceName);
+        encoding = Tcl_GetEncoding(NULL, faceName);
     }
 
     if (encoding == NULL) {
-	encoding = TkWinGetUnicodeEncoding();
-	familyPtr->textOutProc =
-	    (BOOL (WINAPI *)(HDC, int, int, WCHAR *, int)) TextOutW;
-	familyPtr->getTextExtentPoint32Proc =
-	    (BOOL (WINAPI *)(HDC, WCHAR *, int, LPSIZE)) GetTextExtentPoint32W;
-	familyPtr->isWideFont = 1;
+        encoding = TkWinGetUnicodeEncoding();
+        familyPtr->textOutProc =
+            (BOOL (WINAPI *)(HDC, int, int, WCHAR *, int)) TextOutW;
+        familyPtr->getTextExtentPoint32Proc =
+            (BOOL (WINAPI *)(HDC, WCHAR *, int, LPSIZE)) GetTextExtentPoint32W;
+        familyPtr->isWideFont = 1;
     } else {
-	familyPtr->textOutProc =
-	    (BOOL (WINAPI *)(HDC, int, int, WCHAR *, int)) TextOutA;
-	familyPtr->getTextExtentPoint32Proc =
-	    (BOOL (WINAPI *)(HDC, WCHAR *, int, LPSIZE)) GetTextExtentPoint32A;
-	familyPtr->isWideFont = 0;
+        familyPtr->textOutProc =
+            (BOOL (WINAPI *)(HDC, int, int, WCHAR *, int)) TextOutA;
+        familyPtr->getTextExtentPoint32Proc =
+            (BOOL (WINAPI *)(HDC, WCHAR *, int, LPSIZE)) GetTextExtentPoint32A;
+        familyPtr->isWideFont = 0;
     }
 
     familyPtr->encoding = encoding;
-
     return familyPtr;
 }
-
+
 /*
  *-------------------------------------------------------------------------
  *
@@ -1914,7 +2368,7 @@ FreeFontFamily(
 
     Tcl_Free(familyPtr);
 }
-
+
 /*
  *-------------------------------------------------------------------------
  *
@@ -1924,6 +2378,12 @@ FreeFontFamily(
  *	character. If the font object does not have a screen font that can
  *	display the character, another screen font may be loaded into the font
  *	object, following a set of preferred fallback rules.
+ *
+ *	Note: For characters below BASE_CHARS, we now check the base font's
+ *	coverage via FontMapLookup. If the base font cannot display the
+ *	character, we continue to the fallback search. This ensures that even
+ *	basic ASCII can be provided by a fallback font if the base font lacks
+ *	it.
  *
  * Results:
  *	The return value is the SubFont to use to display the given character.
@@ -1937,11 +2397,9 @@ FreeFontFamily(
 
 static SubFont *
 FindSubFontForChar(
-    WinFont *fontPtr,		/* The font object with which the character
-				 * will be displayed. */
-    int ch,			/* The Unicode character to be displayed. */
-    SubFont **subFontPtrPtr)	/* Pointer to var to be fixed up if we
-				 * reallocate the subfont table. */
+    WinFont *fontPtr,
+    int ch,
+    SubFont **subFontPtrPtr)
 {
     HDC hdc;
     int i, j, k;
@@ -1953,20 +2411,37 @@ FindSubFontForChar(
     SubFont *subFontPtr;
     Tcl_DString ds;
 
-    if ((ch < BASE_CHARS) || (ch >= FONTMAP_NUMCHARS)) {
-	return &fontPtr->subFontArray[0];
+    /*
+     * Characters outside the fontmap space cannot be looked up in the
+     * coverage cache. Rather than silently dropping them on the base font,
+     * we still attempt the fallback search — Uniscribe may be able to shape
+     * them if the right subfont is loaded. Only give up if ch is truly out
+     * of the Unicode range we care about (> 0x10FFFF).
+     */
+    if (ch > 0x10FFFF) {
+        return &fontPtr->subFontArray[0];
     }
 
-    for (i = 0; i < fontPtr->numSubFonts; i++) {
-	if (FontMapLookup(&fontPtr->subFontArray[i], ch)) {
-	    return &fontPtr->subFontArray[i];
-	}
+    /* For characters below BASE_CHARS, check if base font can display them. */
+    if (ch < BASE_CHARS) {
+        if (FontMapLookup(&fontPtr->subFontArray[0], ch)) {
+            return &fontPtr->subFontArray[0];
+        }
+        /* Otherwise fall through to fallback search. */
     }
 
     /*
-     * Keep track of all face names that we check, so we don't check some name
-     * multiple times if it can be reached by multiple paths.
+     * For codepoints inside the fontmap range, check already-loaded subfonts
+     * first. For codepoints above FONTMAP_NUMCHARS we skip the cache lookup
+     * (it can't represent them) and go straight to the fallback search.
      */
+    if (ch < FONTMAP_NUMCHARS) {
+        for (i = 0; i < fontPtr->numSubFonts; i++) {
+            if (FontMapLookup(&fontPtr->subFontArray[i], ch)) {
+                return &fontPtr->subFontArray[i];
+            }
+        }
+    }
 
     Tcl_DStringInit(&ds);
     hdc = GetDC(fontPtr->hwnd);
@@ -1975,62 +2450,40 @@ FindSubFontForChar(
 
     fontFallbacks = TkFontGetFallbacks();
     for (i = 0; fontFallbacks[i] != NULL; i++) {
-	for (j = 0; fontFallbacks[i][j] != NULL; j++) {
-	    fallbackName = fontFallbacks[i][j];
-	    if (strcasecmp(fallbackName, fontPtr->font.fa.family) == 0) {
-		/*
-		 * If the base font has a fallback...
-		 */
-
-		goto tryfallbacks;
-	    } else if (aliases != NULL) {
-		/*
-		 * Or if an alias for the base font has a fallback...
-		 */
-
-		for (k = 0; aliases[k] != NULL; k++) {
-		    if (strcasecmp(aliases[k], fallbackName) == 0) {
-			goto tryfallbacks;
-		    }
-		}
-	    }
-	}
-	continue;
-
-	/*
-	 * ...then see if we can use one of the fallbacks, or an alias for one
-	 * of the fallbacks.
-	 */
+        for (j = 0; fontFallbacks[i][j] != NULL; j++) {
+            fallbackName = fontFallbacks[i][j];
+            if (strcasecmp(fallbackName, fontPtr->font.fa.family) == 0) {
+                goto tryfallbacks;
+            } else if (aliases != NULL) {
+                for (k = 0; aliases[k] != NULL; k++) {
+                    if (strcasecmp(aliases[k], fallbackName) == 0) {
+                        goto tryfallbacks;
+                    }
+                }
+            }
+        }
+        continue;
 
     tryfallbacks:
-	for (j = 0; fontFallbacks[i][j] != NULL; j++) {
-	    fallbackName = fontFallbacks[i][j];
-	    subFontPtr = CanUseFallbackWithAliases(hdc, fontPtr, fallbackName,
-		    ch, &ds, subFontPtrPtr);
-	    if (subFontPtr != NULL) {
-		goto end;
-	    }
-	}
+        for (j = 0; fontFallbacks[i][j] != NULL; j++) {
+            fallbackName = fontFallbacks[i][j];
+            subFontPtr = CanUseFallbackWithAliases(hdc, fontPtr, fallbackName,
+                    ch, &ds, subFontPtrPtr);
+            if (subFontPtr != NULL) {
+                goto end;
+            }
+        }
     }
-
-    /*
-     * See if we can use something from the global fallback list.
-     */
 
     anyFallbacks = TkFontGetGlobalClass();
     for (i = 0; anyFallbacks[i] != NULL; i++) {
-	fallbackName = anyFallbacks[i];
-	subFontPtr = CanUseFallbackWithAliases(hdc, fontPtr, fallbackName,
-		ch, &ds, subFontPtrPtr);
-	if (subFontPtr != NULL) {
-	    goto end;
-	}
+        fallbackName = anyFallbacks[i];
+        subFontPtr = CanUseFallbackWithAliases(hdc, fontPtr, fallbackName,
+                ch, &ds, subFontPtrPtr);
+        if (subFontPtr != NULL) {
+            goto end;
+        }
     }
-
-    /*
-     * Try all face names available in the whole system until we find one that
-     * can be used.
-     */
 
     canUse.hdc = hdc;
     canUse.fontPtr = fontPtr;
@@ -2039,25 +2492,20 @@ FindSubFontForChar(
     canUse.subFontPtr = NULL;
     canUse.subFontPtrPtr = subFontPtrPtr;
     EnumFontFamiliesW(hdc, NULL, (FONTENUMPROCW) WinFontCanUseProc,
-	    (LPARAM) &canUse);
+            (LPARAM) &canUse);
     subFontPtr = canUse.subFontPtr;
 
   end:
     Tcl_DStringFree(&ds);
 
     if (subFontPtr == NULL) {
-	/*
-	 * No font can display this character. We will use the base font and
-	 * have it display the "unknown" character.
-	 */
-
-	subFontPtr = &fontPtr->subFontArray[0];
-	FontMapInsert(subFontPtr, ch);
+        subFontPtr = &fontPtr->subFontArray[0];
+        FontMapInsert(subFontPtr, ch);
     }
     ReleaseDC(fontPtr->hwnd, hdc);
     return subFontPtr;
 }
-
+
 static int CALLBACK
 WinFontCanUseProc(
     ENUMLOGFONTW *lfPtr,		/* Logical-font data. */
@@ -2097,7 +2545,7 @@ WinFontCanUseProc(
     Tcl_DStringFree(&faceString);
     return 1;
 }
-
+
 /*
  *-------------------------------------------------------------------------
  *
@@ -2137,7 +2585,7 @@ FontMapLookup(
     bitOffset = ch & (FONTMAP_BITSPERPAGE - 1);
     return (subFontPtr->fontMap[row][bitOffset >> 3] >> (bitOffset & 7)) & 1;
 }
-
+
 /*
  *-------------------------------------------------------------------------
  *
@@ -2179,7 +2627,7 @@ FontMapInsert(
 	subFontPtr->fontMap[row][bitOffset >> 3] |= 1 << (bitOffset & 7);
     }
 }
-
+
 /*
  *-------------------------------------------------------------------------
  *
@@ -2201,15 +2649,14 @@ FontMapInsert(
 
 static void
 FontMapLoadPage(
-    SubFont *subFontPtr,	/* Contains font mapping cache to be
-				 * updated. */
-    int row)			/* Index of the page to be loaded into the
-				 * cache. */
+    SubFont *subFontPtr,
+    int row)
 {
     FontFamily *familyPtr;
     Tcl_Encoding encoding;
-    int i, j, bitOffset, end, segCount;
-    USHORT *startCount, *endCount;
+    ULONG i, j, bitOffset, end;        /* changed from int to ULONG */
+    int segCount;
+    ULONG *startCount, *endCount;
     char buf[16], src[6];
 
     subFontPtr->fontMap[row] = (char *)Tcl_Alloc(FONTMAP_BITSPERPAGE / 8);
@@ -2219,58 +2666,44 @@ FontMapLoadPage(
     encoding = familyPtr->encoding;
 
     if (familyPtr->encoding == TkWinGetUnicodeEncoding()) {
-	/*
-	 * Font is Unicode. Few fonts are going to have all characters, so
-	 * examine the TrueType character existence metrics to determine what
-	 * characters actually exist in this font.
-	 */
+        /*
+         * Font is Unicode. Use the TrueType character existence metrics.
+         */
+        segCount    = familyPtr->segCount;
+        startCount  = familyPtr->startCount;   /* ULONG* */
+        endCount    = familyPtr->endCount;     /* ULONG* */
 
-	segCount    = familyPtr->segCount;
-	startCount  = familyPtr->startCount;
-	endCount    = familyPtr->endCount;
-
-	j = 0;
-	end = (row + 1) << FONTMAP_SHIFT;
-	for (i = row << FONTMAP_SHIFT; i < end; i++) {
-	    for ( ; j < segCount; j++) {
-		if (endCount[j] >= i) {
-		    if (startCount[j] <= i) {
-			bitOffset = i & (FONTMAP_BITSPERPAGE - 1);
-			subFontPtr->fontMap[row][bitOffset >> 3] |=
-				1 << (bitOffset & 7);
-		    }
-		    break;
-		}
-	    }
-	}
+        j = 0;
+        end = ((ULONG)(row + 1)) << FONTMAP_SHIFT;
+        for (i = ((ULONG)row) << FONTMAP_SHIFT; i < end; i++) {
+            for ( ; j < (ULONG)segCount; j++) {
+                if (endCount[j] >= i) {
+                    if (startCount[j] <= i) {
+                        bitOffset = i & (FONTMAP_BITSPERPAGE - 1);
+                        subFontPtr->fontMap[row][bitOffset >> 3] |=
+                                1 << (bitOffset & 7);
+                    }
+                    break;
+                }
+            }
+        }
     } else if (familyPtr->isSymbolFont) {
-	/*
-	 * Assume that a symbol font with a known encoding has all the
-	 * characters that its encoding claims it supports.
-	 *
-	 * The test for "encoding == unicodeEncoding" must occur before this
-	 * case, to catch all symbol fonts (such as {Comic Sans MS} or
-	 * Wingdings) for which we don't have encoding information; those
-	 * symbol fonts are treated as if they were in the Unicode encoding
-	 * and their symbolic character existence metrics are treated as if
-	 * they were Unicode character existence metrics. This way, although
-	 * we don't know the proper Unicode -> symbol font mapping, we can
-	 * install the symbol font as the base font and access its glyphs.
-	 */
-
-	end = (row + 1) << FONTMAP_SHIFT;
-	for (i = row << FONTMAP_SHIFT; i < end; i++) {
-	    if (Tcl_UtfToExternal(NULL, encoding, src,
-		    Tcl_UniCharToUtf(i, src), TCL_ENCODING_PROFILE_STRICT, NULL,
-		    buf, sizeof(buf), NULL, NULL, NULL) != TCL_OK) {
-		continue;
-	    }
-	    bitOffset = i & (FONTMAP_BITSPERPAGE - 1);
-	    subFontPtr->fontMap[row][bitOffset >> 3] |= 1 << (bitOffset & 7);
-	}
+        /*
+         * Symbol font with known encoding: assume all characters in that encoding exist.
+         */
+        end = ((ULONG)(row + 1)) << FONTMAP_SHIFT;
+        for (i = ((ULONG)row) << FONTMAP_SHIFT; i < end; i++) {
+            if (Tcl_UtfToExternal(NULL, encoding, src,
+                    Tcl_UniCharToUtf((int)i, src), TCL_ENCODING_PROFILE_STRICT, NULL,
+                    buf, sizeof(buf), NULL, NULL, NULL) != TCL_OK) {
+                continue;
+            }
+            bitOffset = i & (FONTMAP_BITSPERPAGE - 1);
+            subFontPtr->fontMap[row][bitOffset >> 3] |= 1 << (bitOffset & 7);
+        }
     }
 }
-
+
 /*
  *---------------------------------------------------------------------------
  *
@@ -2329,7 +2762,7 @@ CanUseFallbackWithAliases(
     }
     return NULL;
 }
-
+
 /*
  *---------------------------------------------------------------------------
  *
@@ -2368,7 +2801,7 @@ SeenName(
     Tcl_DStringAppend(dsPtr, name, (int) (strlen(name) + 1));
     return 0;
 }
-
+
 /*
  *-------------------------------------------------------------------------
  *
@@ -2442,13 +2875,24 @@ CanUseFallback(
 
     if (fontPtr->numSubFonts >= SUBFONT_SPACE) {
 	SubFont *newPtr;
+	SCRIPT_CACHE *newCachePtr;
+	int newCount = fontPtr->numSubFonts + 1;
 
-	newPtr = (SubFont *)Tcl_Alloc(sizeof(SubFont) * (fontPtr->numSubFonts + 1));
+	newPtr = (SubFont *)Tcl_Alloc(sizeof(SubFont) * newCount);
 	memcpy(newPtr, fontPtr->subFontArray,
 		fontPtr->numSubFonts * sizeof(SubFont));
 	if (fontPtr->subFontArray != fontPtr->staticSubFonts) {
 	    Tcl_Free(fontPtr->subFontArray);
 	}
+
+	newCachePtr = (SCRIPT_CACHE *)Tcl_Alloc(sizeof(SCRIPT_CACHE) * newCount);
+	memcpy(newCachePtr, fontPtr->scriptCacheArray,
+		fontPtr->numSubFonts * sizeof(SCRIPT_CACHE));
+	if (fontPtr->scriptCacheArray != fontPtr->staticScriptCaches) {
+	    Tcl_Free(fontPtr->scriptCacheArray);
+	}
+	/* Zero the new slot so Uniscribe treats it as uninitialised. */
+	memset(&newCachePtr[fontPtr->numSubFonts], 0, sizeof(SCRIPT_CACHE));
 
 	/*
 	 * Fix up the variable pointed to by subFontPtrPtr so it still points
@@ -2456,13 +2900,18 @@ CanUseFallback(
 	 */
 
 	*subFontPtrPtr = newPtr + (*subFontPtrPtr - fontPtr->subFontArray);
-	fontPtr->subFontArray = newPtr;
+	fontPtr->subFontArray    = newPtr;
+	fontPtr->scriptCacheArray = newCachePtr;
+    } else {
+	/* Still within inline storage; zero the next cache slot. */
+	memset(&fontPtr->scriptCacheArray[fontPtr->numSubFonts], 0,
+		sizeof(SCRIPT_CACHE));
     }
     fontPtr->subFontArray[fontPtr->numSubFonts] = subFont;
     fontPtr->numSubFonts++;
     return &fontPtr->subFontArray[fontPtr->numSubFonts - 1];
 }
-
+
 /*
  *---------------------------------------------------------------------------
  *
@@ -2514,7 +2963,7 @@ GetScreenFont(
     hFont = CreateFontIndirectW(&lf);
     return hFont;
 }
-
+
 /*
  *-------------------------------------------------------------------------
  *
@@ -2557,7 +3006,7 @@ FamilyExists(
     Tcl_DStringFree(&faceString);
     return (result == 0);
 }
-
+
 static const char *
 FamilyOrAliasExists(
     HDC hdc,
@@ -2579,7 +3028,7 @@ FamilyOrAliasExists(
     }
     return NULL;
 }
-
+
 static int CALLBACK
 WinFontExistProc(
     TCL_UNUSED(ENUMLOGFONTW *),		/* Logical-font data. */
@@ -2589,7 +3038,7 @@ WinFontExistProc(
 {
     return 0;
 }
-
+
 /*
  * The following data structures are used when querying a TrueType font file
  * to determine which characters the font supports.
@@ -2693,6 +3142,20 @@ typedef union SUBTABLE {
     TRIMMEDTABLE trimmed;
 } SUBTABLE;
 
+typedef struct FORMAT12GROUP {
+    ULONG startCharCode;
+    ULONG endCharCode;
+    ULONG startGlyphCode;   /* not used; present for correct sizeof */
+} FORMAT12GROUP;
+
+typedef struct FORMAT12TABLE {
+    USHORT format;          /* 12 */
+    USHORT reserved;
+    ULONG  length;
+    ULONG  language;
+    ULONG  nGroups;
+} FORMAT12TABLE;
+
 #pragma pack()
 
 /*
@@ -2719,26 +3182,27 @@ typedef union SUBTABLE {
 
 static int
 LoadFontRanges(
-    HDC hdc,			/* HDC into which font can be selected. */
-    HFONT hFont,		/* HFONT to query. */
-    USHORT **startCountPtr,	/* Filled with malloced pointer to character
-				 * range information. */
-    USHORT **endCountPtr,	/* Filled with malloced pointer to character
-				 * range information. */
+    HDC hdc,
+    HFONT hFont,
+    ULONG **startCountPtr,   /* changed from USHORT** */
+    ULONG **endCountPtr,     /* changed from USHORT** */
     int *symbolPtr)
- {
+{
     int n, i, j, k, swapped, segCount;
     size_t cbData, offset;
     DWORD cmapKey;
-    USHORT *startCount, *endCount;
     CMAPTABLE cmapTable;
     ENCODINGTABLE encTable;
     SUBTABLE subTable;
     char *s;
 
-    segCount = 0;
-    startCount = NULL;
-    endCount = NULL;
+    ULONG *startCount = NULL;
+    ULONG *endCount   = NULL;
+    ULONG *f12Start   = NULL;   /* now ULONG */
+    ULONG *f12End     = NULL;   /* now ULONG */
+    int    f12Count   = 0;
+
+    segCount   = 0;
     *symbolPtr = 0;
 
     hFont = (HFONT)SelectObject(hdc, hFont);
@@ -2747,111 +3211,191 @@ LoadFontRanges(
     s = (char *) &i;
     *s = '\1';
     swapped = 0;
-
     if (i == 1) {
-	swapped = 1;
+        swapped = 1;
     }
 
     cmapKey = CMAPHEX;
     if (swapped) {
-	SwapLong(&cmapKey);
+        SwapLong(&cmapKey);
     }
 
     n = GetFontData(hdc, cmapKey, 0, &cmapTable, sizeof(cmapTable));
     if (n != (int) GDI_ERROR) {
-	if (swapped) {
-	    SwapShort(&cmapTable.numTables);
-	}
-	for (i = 0; i < cmapTable.numTables; i++) {
-	    offset = sizeof(cmapTable) + i * sizeof(encTable);
-	    GetFontData(hdc, cmapKey, (DWORD) offset, &encTable,
-		    sizeof(encTable));
-	    if (swapped) {
-		SwapShort(&encTable.platform);
-		SwapShort(&encTable.encoding);
-		SwapLong(&encTable.offset);
-	    }
-	    if (encTable.platform != 3) {
-		/*
-		 * Not Microsoft encoding.
-		 */
+        if (swapped) {
+            SwapShort(&cmapTable.numTables);
+        }
+        for (i = 0; i < cmapTable.numTables; i++) {
+            offset = sizeof(cmapTable) + i * sizeof(encTable);
+            GetFontData(hdc, cmapKey, (DWORD) offset, &encTable,
+                    sizeof(encTable));
+            if (swapped) {
+                SwapShort(&encTable.platform);
+                SwapShort(&encTable.encoding);
+                SwapLong(&encTable.offset);
+            }
+            if (encTable.platform != 3) {
+                continue;
+            }
 
-		continue;
-	    }
-	    if (encTable.encoding == 0) {
-		*symbolPtr = 1;
-	    } else if (encTable.encoding != 1) {
-		continue;
-	    }
+            if (encTable.encoding == 0) {
+                *symbolPtr = 1;
+            } else if (encTable.encoding == 1) {
+                /*
+                 * Platform 3, encoding 1: BMP Unicode via format-4.
+                 */
+                GetFontData(hdc, cmapKey, (DWORD) encTable.offset, &subTable,
+                        sizeof(subTable));
+                if (swapped) {
+                    SwapShort(&subTable.any.format);
+                }
+                if (subTable.any.format == 4) {
+                    if (swapped) {
+                        SwapShort(&subTable.segment.segCountX2);
+                    }
+                    segCount = subTable.segment.segCountX2 / 2;
+                    cbData = segCount * sizeof(USHORT);
 
-	    GetFontData(hdc, cmapKey, (DWORD) encTable.offset, &subTable,
-		    sizeof(subTable));
-	    if (swapped) {
-		SwapShort(&subTable.any.format);
-	    }
-	    if (subTable.any.format == 4) {
-		if (swapped) {
-		    SwapShort(&subTable.segment.segCountX2);
-		}
-		segCount = subTable.segment.segCountX2 / 2;
-		cbData = segCount * sizeof(USHORT);
+                    /* Temporary USHORT arrays for reading */
+                    USHORT *tmpEnd   = (USHORT *)Tcl_Alloc(cbData);
+                    USHORT *tmpStart = (USHORT *)Tcl_Alloc(cbData);
 
-		startCount = (USHORT *)Tcl_Alloc(cbData);
-		endCount = (USHORT *)Tcl_Alloc(cbData);
+                    offset = encTable.offset + sizeof(subTable.segment);
+                    GetFontData(hdc, cmapKey, (DWORD) offset,
+                            tmpEnd, (DWORD) cbData);
+                    offset += cbData + sizeof(USHORT);
+                    GetFontData(hdc, cmapKey, (DWORD) offset,
+                            tmpStart, (DWORD) cbData);
+                    if (swapped) {
+                        for (j = 0; j < segCount; j++) {
+                            SwapShort(&tmpEnd[j]);
+                            SwapShort(&tmpStart[j]);
+                        }
+                    }
 
-		offset = encTable.offset + sizeof(subTable.segment);
-		GetFontData(hdc, cmapKey, (DWORD) offset, endCount, (DWORD)cbData);
-		offset += cbData + sizeof(USHORT);
-		GetFontData(hdc, cmapKey, (DWORD) offset, startCount, (DWORD)cbData);
-		if (swapped) {
-		    for (j = 0; j < segCount; j++) {
-			SwapShort(&endCount[j]);
-			SwapShort(&startCount[j]);
-		    }
-		}
-		if (*symbolPtr != 0) {
-		    /*
-		     * Empirically determined: When a symbol font is loaded,
-		     * the character existence metrics obtained from the
-		     * system are mildly wrong. If the real range of the
-		     * symbol font is from 0020 to 00FE, then the metrics are
-		     * reported as F020 to F0FE. When we load a symbol font,
-		     * we must fix the character existence metrics.
-		     *
-		     * Symbol fonts should only use the symbol encoding for
-		     * 8-bit characters [note Bug: 2406]
-		     */
+                    /* Convert to ULONG arrays */
+                    startCount = (ULONG *)Tcl_Alloc(segCount * sizeof(ULONG));
+                    endCount   = (ULONG *)Tcl_Alloc(segCount * sizeof(ULONG));
+                    for (j = 0; j < segCount; j++) {
+                        startCount[j] = (ULONG)tmpStart[j];
+                        endCount[j]   = (ULONG)tmpEnd[j];
+                    }
 
-		    for (k = 0; k < segCount; k++) {
-			if (((startCount[k] & 0xff00) == 0xf000)
-				&& ((endCount[k] & 0xff00) == 0xf000)) {
-			    startCount[k] &= 0xff;
-			    endCount[k] &= 0xff;
-			}
-		    }
-		}
-	    }
-	}
+                    Tcl_Free(tmpStart);
+                    Tcl_Free(tmpEnd);
+
+                    if (*symbolPtr != 0) {
+                        for (k = 0; k < segCount; k++) {
+                            if (((startCount[k] & 0xff00) == 0xf000)
+                                    && ((endCount[k] & 0xff00) == 0xf000)) {
+                                startCount[k] &= 0xff;
+                                endCount[k]   &= 0xff;
+                            }
+                        }
+                    }
+                }
+
+            } else if (encTable.encoding == 10) {
+                /*
+                 * Platform 3, encoding 10: full Unicode via format-12.
+                 */
+                FORMAT12TABLE f12hdr;
+                GetFontData(hdc, cmapKey, (DWORD) encTable.offset,
+                        &f12hdr, sizeof(f12hdr));
+                if (swapped) {
+                    SwapShort(&f12hdr.format);
+                }
+                if (f12hdr.format == 12) {
+                    ULONG nGroups;
+                    if (swapped) {
+                        SwapLong(&f12hdr.length);
+                        SwapLong(&f12hdr.language);
+                        SwapLong(&f12hdr.nGroups);
+                    }
+                    nGroups = f12hdr.nGroups;
+
+                    f12Start = (ULONG *)Tcl_Alloc(
+                            sizeof(ULONG) * (size_t) nGroups);
+                    f12End   = (ULONG *)Tcl_Alloc(
+                            sizeof(ULONG) * (size_t) nGroups);
+                    f12Count = 0;
+
+                    offset = encTable.offset + sizeof(FORMAT12TABLE);
+                    for (j = 0; j < (int) nGroups; j++) {
+                        FORMAT12GROUP grp;
+                        GetFontData(hdc, cmapKey, (DWORD) offset,
+                                &grp, sizeof(grp));
+                        offset += sizeof(FORMAT12GROUP);
+                        if (swapped) {
+                            SwapLong(&grp.startCharCode);
+                            SwapLong(&grp.endCharCode);
+                        }
+                        /* Skip pure-BMP groups; format-4 already covers them. */
+                        if (grp.endCharCode <= 0xFFFF) {
+                            continue;
+                        }
+                        /* Clamp to the fontmap ceiling (0x3FFFF currently). */
+                        if (grp.startCharCode >= FONTMAP_NUMCHARS) {
+                            continue;
+                        }
+                        if (grp.endCharCode >= FONTMAP_NUMCHARS) {
+                            grp.endCharCode = FONTMAP_NUMCHARS - 1;
+                        }
+                        /* Store full 32-bit values – no truncation! */
+                        f12Start[f12Count] = grp.startCharCode;
+                        f12End[f12Count]   = grp.endCharCode;
+                        f12Count++;
+                    }
+                }
+            }
+            /* All other encoding values are ignored. */
+        }
     } else if (GetTextCharset(hdc) == ANSI_CHARSET) {
-	/*
-	 * Bitmap font. We should also support ranges for the other *_CHARSET
-	 * values.
-	 */
-
-	segCount = 1;
-	cbData = segCount * sizeof(USHORT);
-	startCount = (USHORT *)Tcl_Alloc(cbData);
-	endCount = (USHORT *)Tcl_Alloc(cbData);
-	startCount[0] = 0x0000;
-	endCount[0] = 0x00ff;
+        /*
+         * Bitmap font: assume single segment covering 0x0000–0x00FF.
+         */
+        segCount = 1;
+        startCount = (ULONG *)Tcl_Alloc(sizeof(ULONG));
+        endCount   = (ULONG *)Tcl_Alloc(sizeof(ULONG));
+        startCount[0] = 0x0000;
+        endCount[0]   = 0x00FF;
     }
+
+    /*
+     * Merge format-12 SMP segments with format-4 BMP segments.
+     */
+    if (f12Count > 0) {
+        int total   = segCount + f12Count;
+        ULONG *mergedStart = (ULONG *)Tcl_Alloc(total * sizeof(ULONG));
+        ULONG *mergedEnd   = (ULONG *)Tcl_Alloc(total * sizeof(ULONG));
+
+        if (segCount > 0 && startCount != NULL) {
+            memcpy(mergedStart, startCount, segCount * sizeof(ULONG));
+            memcpy(mergedEnd,   endCount,   segCount * sizeof(ULONG));
+            Tcl_Free(startCount);
+            Tcl_Free(endCount);
+        }
+        memcpy(mergedStart + segCount, f12Start, f12Count * sizeof(ULONG));
+        memcpy(mergedEnd   + segCount, f12End,   f12Count * sizeof(ULONG));
+        Tcl_Free(f12Start);
+        Tcl_Free(f12End);
+
+        startCount = mergedStart;
+        endCount   = mergedEnd;
+        segCount   = total;
+    } else if (f12Start != NULL) {
+        /* No BMP segments, but we had SMP segments – shouldn't happen, but free. */
+        Tcl_Free(f12Start);
+        Tcl_Free(f12End);
+    }
+
     SelectObject(hdc, hFont);
 
     *startCountPtr = startCount;
-    *endCountPtr = endCount;
+    *endCountPtr   = endCount;
     return segCount;
 }
-
+
 /*
  *-------------------------------------------------------------------------
  *
@@ -2897,7 +3441,7 @@ SwapLong(
     temp += (LONG) ((BYTE) *p);
     *p = temp;
 }
-
+
 /*
  * Local Variables:
  * mode: c

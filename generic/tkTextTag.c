@@ -7,7 +7,6 @@
  *
  * Copyright © 1992-1994 The Regents of the University of California.
  * Copyright © 1994-1997 Sun Microsystems, Inc.
- * Copyright © 2015-2018 Gregor Cramer
  *
  * See the file "license.terms" for information on usage and redistribution of
  * this file, and for a DISCLAIMER OF ALL WARRANTIES.
@@ -15,93 +14,45 @@
 
 #include "tkInt.h"
 #include "tkText.h"
-#include "tkTextUndo.h"
-#include "tkTextTagSet.h"
-#include "tkBitField.h"
 #include "default.h"
-#include <assert.h>
-#include <stdlib.h>
-
-#ifndef MAX
-# define MAX(a,b) (((int) a) < ((int) b) ? b : a)
-#endif
-
-#ifdef NDEBUG
-# define DEBUG(expr)
-#else
-# define DEBUG(expr) expr
-#endif
-
-/*
- * The 'TkTextJustify' enum in tkText.h is used to define a type for the -justify option of
- * the Text widget. These values are used as indices into the string table below.
- */
-
-static const char *const justifyStrings[] = {
-    "left", "right", "center", "full", NULL
-};
-
-#ifndef TK_OPTION_NEG_OK
-#   define TK_OPTION_NEG_OK		(1 << 6)
-#endif /* TK_OPTION_NEG_OK */
 
 static const Tk_OptionSpec tagOptionSpecs[] = {
     {TK_OPTION_BORDER, "-background", NULL, NULL,
-	NULL, TCL_INDEX_NONE, offsetof(TkTextTag, attrs.border), TK_OPTION_NULL_OK, 0, 0},
+	NULL, TCL_INDEX_NONE, offsetof(TkTextTag, border), TK_OPTION_NULL_OK, 0, 0},
     {TK_OPTION_BITMAP, "-bgstipple", NULL, NULL,
 	NULL, TCL_INDEX_NONE, offsetof(TkTextTag, bgStipple), TK_OPTION_NULL_OK, 0, 0},
     {TK_OPTION_PIXELS, "-borderwidth", NULL, NULL,
-	NULL, offsetof(TkTextTag, attrs.borderWidthObj), offsetof(TkTextTag, attrs.borderWidth),
+	NULL, offsetof(TkTextTag, borderWidthObj), TCL_INDEX_NONE,
 	TK_OPTION_NULL_OK, 0, 0},
     {TK_OPTION_BOOLEAN, "-elide", NULL, NULL,
 	NULL, TCL_INDEX_NONE, offsetof(TkTextTag, elide),
 	TK_OPTION_NULL_OK, 0, 0},
-    {TK_OPTION_COLOR, "-eolcolor", NULL, NULL,
-	NULL, TCL_INDEX_NONE, offsetof(TkTextTag, eolColor), TK_OPTION_NULL_OK, 0, 0},
     {TK_OPTION_BITMAP, "-fgstipple", NULL, NULL,
 	NULL, TCL_INDEX_NONE, offsetof(TkTextTag, fgStipple), TK_OPTION_NULL_OK, 0, 0},
     {TK_OPTION_FONT, "-font", NULL, NULL,
 	NULL, TCL_INDEX_NONE, offsetof(TkTextTag, tkfont), TK_OPTION_NULL_OK, 0, 0},
     {TK_OPTION_COLOR, "-foreground", NULL, NULL,
-	NULL, TCL_INDEX_NONE, offsetof(TkTextTag, attrs.fgColor), TK_OPTION_NULL_OK, 0, 0},
-    {TK_OPTION_COLOR, "-hyphencolor", NULL, NULL,
-	NULL, TCL_INDEX_NONE, offsetof(TkTextTag, hyphenColor), TK_OPTION_NULL_OK, 0, 0},
-    {TK_OPTION_STRING, "-hyphenrules", NULL, NULL,
-	NULL, offsetof(TkTextTag, hyphenRulesObj), TCL_INDEX_NONE, TK_OPTION_NULL_OK, 0, 0},
-    {TK_OPTION_BORDER, "-inactivebackground", NULL, NULL,
-	NULL, TCL_INDEX_NONE, offsetof(TkTextTag, attrs.inactiveBorder), TK_OPTION_NULL_OK, 0, 0},
-    {TK_OPTION_COLOR, "-inactiveforeground", NULL, NULL,
-	NULL, TCL_INDEX_NONE, offsetof(TkTextTag, attrs.inactiveFgColor), TK_OPTION_NULL_OK, 0, 0},
-    {TK_OPTION_BORDER, "-inactiveselectbackground", NULL, NULL,
-	NULL, TCL_INDEX_NONE, offsetof(TkTextTag, inactiveSelBorder), TK_OPTION_NULL_OK, 0, 0},
-    {TK_OPTION_COLOR, "-inactiveselectforeground", NULL, NULL,
-	NULL, TCL_INDEX_NONE, offsetof(TkTextTag, inactiveSelFgColor), TK_OPTION_NULL_OK, 0, 0},
-    {TK_OPTION_BOOLEAN, "-indentbackground", NULL, NULL, NULL,
-	TCL_INDEX_NONE, offsetof(TkTextTag, indentBg), TK_OPTION_NULL_OK, 0, 0},
-    {TK_OPTION_STRING_TABLE, "-justify", NULL, NULL,
-	NULL, TCL_INDEX_NONE, offsetof(TkTextTag, justify), TK_OPTION_NULL_OK|TK_OPTION_ENUM_VAR, justifyStrings, 0},
-    {TK_OPTION_STRING, "-lang", NULL, NULL,
-	NULL, offsetof(TkTextTag, langObj), TCL_INDEX_NONE, TK_OPTION_NULL_OK, 0, 0},
+	NULL, TCL_INDEX_NONE, offsetof(TkTextTag, fgColor), TK_OPTION_NULL_OK, 0, 0},
+    {TK_OPTION_JUSTIFY, "-justify", NULL, NULL,
+	NULL, TCL_INDEX_NONE, offsetof(TkTextTag, justify), TK_OPTION_NULL_OK, 0,0},
     {TK_OPTION_PIXELS, "-lmargin1", NULL, NULL,
-	NULL, offsetof(TkTextTag, lMargin1Obj), offsetof(TkTextTag, lMargin1), TK_OPTION_NULL_OK, 0, 0},
+	NULL, offsetof(TkTextTag, lMargin1Obj), TCL_INDEX_NONE, TK_OPTION_NULL_OK,0,0},
     {TK_OPTION_PIXELS, "-lmargin2", NULL, NULL,
-	NULL, offsetof(TkTextTag, lMargin2Obj), offsetof(TkTextTag, lMargin2), TK_OPTION_NULL_OK, 0, 0},
+	NULL, offsetof(TkTextTag, lMargin2Obj), TCL_INDEX_NONE, TK_OPTION_NULL_OK,0,0},
     {TK_OPTION_BORDER, "-lmargincolor", NULL, NULL,
 	NULL, TCL_INDEX_NONE, offsetof(TkTextTag, lMarginColor), TK_OPTION_NULL_OK, 0, 0},
     {TK_OPTION_PIXELS, "-offset", NULL, NULL,
-	NULL, offsetof(TkTextTag, offsetObj), offsetof(TkTextTag, offset), TK_OPTION_NULL_OK|TK_OPTION_NEG_OK, 0, 0},
+	NULL, offsetof(TkTextTag, offsetObj), TCL_INDEX_NONE, TK_OPTION_NULL_OK|TK_OPTION_NEG_OK, 0, 0},
     {TK_OPTION_BOOLEAN, "-overstrike", NULL, NULL,
-	NULL, TCL_INDEX_NONE, offsetof(TkTextTag, overstrike), TK_OPTION_NULL_OK, 0, 0},
-    {TK_OPTION_COLOR, "-overstrikecolor", NULL, NULL,
-	NULL, TCL_INDEX_NONE, offsetof(TkTextTag, overstrikeColor), TK_OPTION_NULL_OK, 0, 0},
-#if SUPPORT_DEPRECATED_TAG_OPTIONS
-    {TK_OPTION_SYNONYM, "-overstrikefg", NULL, NULL,
-	NULL, 0, TCL_INDEX_NONE, TK_OPTION_NULL_OK, "-overstrikecolor", TK_TEXT_DEPRECATED_OVERSTRIKE_FG},
-#endif /* SUPPORT_DEPRECATED_TAG_OPTIONS */
+	NULL, TCL_INDEX_NONE, offsetof(TkTextTag, overstrike),
+	TK_OPTION_NULL_OK, 0, 0},
+    {TK_OPTION_COLOR, "-overstrikefg", NULL, NULL,
+	NULL, TCL_INDEX_NONE, offsetof(TkTextTag, overstrikeColor),
+	TK_OPTION_NULL_OK, 0, 0},
     {TK_OPTION_RELIEF, "-relief", NULL, NULL,
 	NULL, TCL_INDEX_NONE, offsetof(TkTextTag, relief), TK_OPTION_NULL_OK, 0, 0},
     {TK_OPTION_PIXELS, "-rmargin", NULL, NULL,
-	NULL, offsetof(TkTextTag, rMarginObj), offsetof(TkTextTag, rMargin), TK_OPTION_NULL_OK, 0, 0},
+	NULL, offsetof(TkTextTag, rMarginObj), TCL_INDEX_NONE, TK_OPTION_NULL_OK, 0,0},
     {TK_OPTION_BORDER, "-rmargincolor", NULL, NULL,
 	NULL, TCL_INDEX_NONE, offsetof(TkTextTag, rMarginColor), TK_OPTION_NULL_OK, 0, 0},
     {TK_OPTION_BORDER, "-selectbackground", NULL, NULL,
@@ -109,139 +60,40 @@ static const Tk_OptionSpec tagOptionSpecs[] = {
     {TK_OPTION_COLOR, "-selectforeground", NULL, NULL,
 	NULL, TCL_INDEX_NONE, offsetof(TkTextTag, selFgColor), TK_OPTION_NULL_OK, 0, 0},
     {TK_OPTION_PIXELS, "-spacing1", NULL, NULL,
-	NULL, offsetof(TkTextTag, spacing1Obj), TCL_INDEX_NONE, TK_OPTION_NULL_OK, 0, 0},
+	NULL, offsetof(TkTextTag, spacing1Obj), TCL_INDEX_NONE, TK_OPTION_NULL_OK,0,0},
     {TK_OPTION_PIXELS, "-spacing2", NULL, NULL,
-	NULL, offsetof(TkTextTag, spacing2Obj), TCL_INDEX_NONE, TK_OPTION_NULL_OK, 0, 0},
+	NULL, offsetof(TkTextTag, spacing2Obj), TCL_INDEX_NONE, TK_OPTION_NULL_OK,0,0},
     {TK_OPTION_PIXELS, "-spacing3", NULL, NULL,
-	NULL, offsetof(TkTextTag, spacing3Obj), TCL_INDEX_NONE, TK_OPTION_NULL_OK, 0, 0},
+	NULL, offsetof(TkTextTag, spacing3Obj), TCL_INDEX_NONE, TK_OPTION_NULL_OK,0,0},
     {TK_OPTION_STRING, "-tabs", NULL, NULL,
-	NULL, offsetof(TkTextTag, tabStringObj), TCL_INDEX_NONE, TK_OPTION_NULL_OK, 0, 0},
+	NULL, offsetof(TkTextTag, tabStringPtr), TCL_INDEX_NONE, TK_OPTION_NULL_OK, 0, 0},
     {TK_OPTION_STRING_TABLE, "-tabstyle", NULL, NULL,
-	NULL, TCL_INDEX_NONE, offsetof(TkTextTag, tabStyle), TK_OPTION_NULL_OK, tkTextTabStyleStrings, 0},
+	NULL, TCL_INDEX_NONE, offsetof(TkTextTag, tabStyle),
+	TK_OPTION_NULL_OK|TK_OPTION_ENUM_VAR, tkTextTabStyleStrings, 0},
     {TK_OPTION_BOOLEAN, "-underline", NULL, NULL,
-	NULL, TCL_INDEX_NONE, offsetof(TkTextTag, underline), TK_OPTION_NULL_OK, 0, 0},
-    {TK_OPTION_COLOR, "-underlinecolor", NULL, NULL,
-	NULL, TCL_INDEX_NONE, offsetof(TkTextTag, underlineColor), TK_OPTION_NULL_OK, 0, 0},
-#if SUPPORT_DEPRECATED_TAG_OPTIONS
-    {TK_OPTION_SYNONYM, "-underlinefg", NULL, NULL,
-	NULL, 0, TCL_INDEX_NONE, TK_OPTION_NULL_OK, "-underlinecolor", 0},
-#endif /* SUPPORT_DEPRECATED_TAG_OPTIONS */
-    {TK_OPTION_BOOLEAN, "-undo", NULL, NULL,
-	"1", TCL_INDEX_NONE, offsetof(TkTextTag, undo), TK_OPTION_VAR(bool), 0, 0},
+	NULL, TCL_INDEX_NONE, offsetof(TkTextTag, underline),
+	TK_OPTION_NULL_OK, 0, 0},
+    {TK_OPTION_COLOR, "-underlinefg", NULL, NULL,
+	NULL, TCL_INDEX_NONE, offsetof(TkTextTag, underlineColor),
+	TK_OPTION_NULL_OK, 0, 0},
     {TK_OPTION_STRING_TABLE, "-wrap", NULL, NULL,
-	NULL, TCL_INDEX_NONE, offsetof(TkTextTag, wrapMode), TK_OPTION_NULL_OK|TK_OPTION_ENUM_VAR, tkTextWrapStrings, 0},
+	NULL, TCL_INDEX_NONE, offsetof(TkTextTag, wrapMode),
+	TK_OPTION_NULL_OK|TK_OPTION_ENUM_VAR, tkTextWrapStrings, 0},
     {TK_OPTION_END, NULL, NULL, NULL, NULL, 0, 0, 0, 0, 0}
 };
-
-DEBUG_ALLOC(extern unsigned tkTextCountNewTag);
-DEBUG_ALLOC(extern unsigned tkTextCountDestroyTag);
-DEBUG_ALLOC(extern unsigned tkTextCountNewUndoToken);
-DEBUG_ALLOC(extern unsigned tkTextCountDestroyUndoToken);
 
 /*
  * Forward declarations for functions defined later in this file:
  */
 
-static int		ChangeTagPriority(TkSharedText *sharedTextPtr, TkTextTag *tagPtr,
-			    unsigned newPriority, bool undo);
-static bool		TagAddRemove(TkText *textPtr, const TkTextIndex *index1Ptr,
-			    const TkTextIndex *index2Ptr, TkTextTag *tagPtr, bool add);
-static void		TagBindEvent(TkText *textPtr, XEvent *eventPtr, TkTextTagSet *tagInfoPtr,
-			    unsigned epoch);
-static void		AppendTags(Tcl_Interp *interp, unsigned numTags, TkTextTag **tagArray);
-static TkTextTag *	FindTag(Tcl_Interp *interp, const TkText *textPtr, Tcl_Obj *tagName);
-static int		EnumerateTags(Tcl_Interp *interp, TkText *textPtr, int objc,
-			    Tcl_Obj *const *objv);
-static void		GrabSelection(TkText *textPtr, const TkTextTag *tagPtr, bool add, bool changed);
-
-/*
- * We need some private undo/redo stuff.
- */
-
-static void UndoChangeTagPriorityPerform(TkSharedText *, TkTextUndoInfo *, TkTextUndoInfo *, int);
-static void UndoChangeTagPriorityDestroy(TkSharedText *, TkTextUndoToken *, int);
-static Tcl_Obj *UndoChangeTagPriorityGetCommand(const TkSharedText *, const TkTextUndoToken *);
-static Tcl_Obj *UndoChangeTagPriorityInspect(const TkSharedText *, const TkTextUndoToken *);
-
-static const Tk_UndoType undoTokenTagPriorityType = {
-    TK_TEXT_UNDO_TAG_PRIORITY,		/* action */
-    UndoChangeTagPriorityGetCommand,	/* commandProc */
-    UndoChangeTagPriorityPerform,	/* undoProc */
-    UndoChangeTagPriorityDestroy,	/* destroyProc */
-    NULL,				/* rangeProc */
-    UndoChangeTagPriorityInspect	/* inspectProc */
-};
-
-static const Tk_UndoType redoTokenTagPriorityType = {
-    TK_TEXT_REDO_TAG_PRIORITY,		/* action */
-    UndoChangeTagPriorityGetCommand,	/* commandProc */
-    UndoChangeTagPriorityPerform,	/* undoProc */
-    UndoChangeTagPriorityDestroy,	/* destroyProc */
-    NULL,				/* rangeProc */
-    UndoChangeTagPriorityInspect	/* inspectProc */
-};
-
-typedef struct UndoTokenTagPriority {
-    const Tk_UndoType *undoType;
-    TkTextTag *tagPtr;
-    uint32_t priority;
-} UndoTokenTagPriority;
-
-static Tcl_Obj *
-UndoChangeTagPriorityGetCommand(
-    TCL_UNUSED(const TkSharedText *),
-    const TkTextUndoToken *item)
-{
-    const UndoTokenTagPriority *token = (const UndoTokenTagPriority *) item;
-    Tcl_Obj *objPtr = Tcl_NewObj();
-
-    Tcl_ListObjAppendElement(NULL, objPtr, Tcl_NewStringObj("tag", TCL_INDEX_NONE));
-    Tcl_ListObjAppendElement(NULL, objPtr, Tcl_NewStringObj("priority", TCL_INDEX_NONE));
-    Tcl_ListObjAppendElement(NULL, objPtr, Tcl_NewStringObj(token->tagPtr->name, TCL_INDEX_NONE));
-    return objPtr;
-}
-
-static Tcl_Obj *
-UndoChangeTagPriorityInspect(
-    const TkSharedText *sharedTextPtr,
-    const TkTextUndoToken *item)
-{
-    const UndoTokenTagPriority *token = (const UndoTokenTagPriority *) item;
-    Tcl_Obj *objPtr = UndoChangeTagPriorityGetCommand(sharedTextPtr, item);
-
-    Tcl_ListObjAppendElement(NULL, objPtr, Tcl_NewIntObj(token->priority));
-    return objPtr;
-}
-
-static void
-UndoChangeTagPriorityPerform(
-    TkSharedText *sharedTextPtr,
-    TkTextUndoInfo *undoInfo,
-    TkTextUndoInfo *redoInfo,
-    TCL_UNUSED(int))
-{
-    UndoTokenTagPriority *token = (UndoTokenTagPriority *) undoInfo->token;
-    unsigned oldPriority = token->tagPtr->priority;
-
-    ChangeTagPriority(sharedTextPtr, token->tagPtr, token->priority, 1);
-
-    if (redoInfo) {
-	redoInfo->token = undoInfo->token;
-	redoInfo->token->undoType = &redoTokenTagPriorityType;
-	token->priority = oldPriority;
-    }
-}
-
-static void
-UndoChangeTagPriorityDestroy(
-    TkSharedText *sharedTextPtr,
-    TkTextUndoToken *item,
-    TCL_UNUSED(int))
-{
-    UndoTokenTagPriority *token = (UndoTokenTagPriority *) item;
-
-    TkTextReleaseTag(sharedTextPtr, token->tagPtr, NULL);
-}
+static void		ChangeTagPriority(TkText *textPtr, TkTextTag *tagPtr,
+			    int prio);
+static TkTextTag *	FindTag(Tcl_Interp *interp, TkText *textPtr,
+			    Tcl_Obj *tagName);
+static void		SortTags(int numTags, TkTextTag **tagArrayPtr);
+static int		TagSortProc(const void *first, const void *second);
+static void		TagBindEvent(TkText *textPtr, XEvent *eventPtr,
+			    int numTags, TkTextTag **tagArrayPtr);
 
 /*
  *--------------------------------------------------------------
@@ -263,97 +115,196 @@ UndoChangeTagPriorityDestroy(
 
 int
 TkTextTagCmd(
-    TkText *textPtr,		/* Information about text widget. */
+    TkText *textPtr,	/* Information about text widget. */
     Tcl_Interp *interp,		/* Current interpreter. */
     Tcl_Size objc,			/* Number of arguments. */
-    Tcl_Obj *const objv[])	/* Argument objects. Someone else has already parsed this command
-				 * enough to know that objv[1] is "tag". */
+    Tcl_Obj *const objv[])	/* Argument objects. Someone else has already
+				 * parsed this command enough to know that
+				 * objv[1] is "tag". */
 {
     static const char *const tagOptionStrings[] = {
-	"add", "bind", "cget", "clear", "configure", "delete", "findnext", "findprev",
-	"getrange", "lower", "names", "nextrange", "prevrange", "priority", "raise",
-	"ranges", "remove", NULL
+	"add", "bind", "cget", "configure", "delete", "lower", "names",
+	"nextrange", "prevrange", "raise", "ranges", "remove", NULL
     };
     enum tagOptions {
-	TAG_ADD, TAG_BIND, TAG_CGET, TAG_CLEAR, TAG_CONFIGURE, TAG_DELETE, TAG_FINDNEXT, TAG_FINDPREV,
-	TAG_GETRANGE, TAG_LOWER, TAG_NAMES, TAG_NEXTRANGE, TAG_PREVRANGE, TAG_PRIORITY, TAG_RAISE,
-	TAG_RANGES, TAG_REMOVE
-    };
-    int optionIndex;
+	TAG_ADD, TAG_BIND, TAG_CGET, TAG_CONFIGURE, TAG_DELETE, TAG_LOWER,
+	TAG_NAMES, TAG_NEXTRANGE, TAG_PREVRANGE, TAG_RAISE, TAG_RANGES,
+	TAG_REMOVE
+    } optionIndex;
     Tcl_Size i;
     TkTextTag *tagPtr;
     TkTextIndex index1, index2;
-    TkSharedText *sharedTextPtr;
 
     if (objc < 3) {
 	Tcl_WrongNumArgs(interp, 2, objv, "option ?arg ...?");
 	return TCL_ERROR;
     }
-    if (Tcl_GetIndexFromObjStruct(interp, objv[2], tagOptionStrings, sizeof(char *),
-	    "tag option", 0, &optionIndex) != TCL_OK) {
+
+    if (Tcl_GetIndexFromObjStruct(interp, objv[2], tagOptionStrings,
+	    sizeof(char *), "tag option", 0, &optionIndex) != TCL_OK) {
 	return TCL_ERROR;
     }
 
-    sharedTextPtr = textPtr->sharedTextPtr;
-
-    switch ((enum tagOptions)optionIndex) {
+    switch (optionIndex) {
     case TAG_ADD:
     case TAG_REMOVE: {
-	bool addTag;
-	bool anyChanges = false;
+	bool addTag = optionIndex == TAG_ADD;
 
-	addTag = ((enum tagOptions) optionIndex) == TAG_ADD;
 	if (objc < 5) {
-	    Tcl_WrongNumArgs(interp, 3, objv, "tagName index1 ?index2 index1 index2 ...?");
+	    Tcl_WrongNumArgs(interp, 3, objv,
+		    "tagName index1 ?index2 index1 index2 ...?");
 	    return TCL_ERROR;
 	}
 	tagPtr = TkTextCreateTag(textPtr, Tcl_GetString(objv[3]), NULL);
-	if (tagPtr->elide >= 0) {
-	    /*
-	     * Indices are potentially obsolete after adding or removing
-	     * elided character ranges, especially indices having "display"
-	     * or "any" submodifier, therefore increase the epoch.
-	     */
-	    TkBTreeIncrEpoch(sharedTextPtr->tree);
+	if (tagPtr->elide > 0) {
+		/*
+		* Indices are potentially obsolete after adding or removing
+		* elided character ranges, especially indices having "display"
+		* or "any" submodifier, therefore increase the epoch.
+		*/
+		textPtr->sharedTextPtr->stateEpoch++;
 	}
 	for (i = 4; i < objc; i += 2) {
-	    if (!TkTextGetIndexFromObj(interp, textPtr, objv[i], &index1)) {
+	    if (TkTextGetObjIndex(interp, textPtr, objv[i],
+		    &index1) != TCL_OK) {
 		return TCL_ERROR;
 	    }
-	    if (objc > i + 1) {
-		if (!TkTextGetIndexFromObj(interp, textPtr, objv[i + 1], &index2)) {
+	    if (objc > (i+1)) {
+		if (TkTextGetObjIndex(interp, textPtr, objv[i+1],
+			&index2) != TCL_OK) {
 		    return TCL_ERROR;
 		}
-		if (TkTextIndexCompare(&index1, &index2) >= 0) {
-		    continue;
+		if (TkTextIndexCmp(&index1, &index2) >= 0) {
+		    return TCL_OK;
 		}
 	    } else {
-		TkTextIndexForwChars(textPtr, &index1, 1, &index2, COUNT_INDICES);
+		index2 = index1;
+		TkTextIndexForwChars(NULL,&index2, 1, &index2, COUNT_INDICES);
 	    }
-	    if (TagAddRemove(textPtr, &index1, &index2, tagPtr, addTag)) {
-		anyChanges = true;
+
+	    if (tagPtr->affectsDisplay) {
+		TkTextRedrawTag(textPtr->sharedTextPtr, NULL, &index1, &index2,
+			tagPtr, !addTag);
+	    } else {
+		/*
+		 * Still need to trigger enter/leave events on tags that have
+		 * changed.
+		 */
+
+		TkTextEventuallyRepick(textPtr);
 	    }
-	}
-	if (tagPtr->isSelTag) {
-	    GrabSelection(textPtr, tagPtr, addTag, anyChanges);
-	}
-	if (anyChanges) {
-	    if (tagPtr->undo) {
-		TkTextUpdateAlteredFlag(sharedTextPtr);
+	    if (TkBTreeTag(&index1, &index2, tagPtr, addTag)) {
+		/*
+		 * If the tag is "sel", and we actually adjusted something
+		 * then grab the selection if we're supposed to export it and
+		 * don't already have it.
+		 *
+		 * Also, invalidate partially-completed selection retrievals.
+		 * We only need to check whether the tag is "sel" for this
+		 * textPtr (not for other peer widget's "sel" tags) because we
+		 * cannot reach this code path with a different widget's "sel"
+		 * tag.
+		 */
+
+		if (tagPtr == textPtr->selTagPtr) {
+		    /*
+		     * Send an event that the selection changed. This is
+		     * equivalent to:
+		     *	   event generate $textWidget <<Selection>>
+		     */
+
+		    TkTextSelectionEvent(textPtr);
+
+		    if (addTag && textPtr->exportSelection
+			    && (!Tcl_IsSafe(textPtr->interp))
+			    && !(textPtr->flags & GOT_SELECTION)) {
+			Tk_OwnSelection(textPtr->tkwin, XA_PRIMARY,
+				TkTextLostSelection, textPtr);
+			textPtr->flags |= GOT_SELECTION;
+		    }
+		    textPtr->abortSelections = true;
+		}
 	    }
-	    /* still need to trigger enter/leave events on tags that have changed */
-	    TkTextEventuallyRepick(textPtr);
 	}
 	break;
     }
     case TAG_BIND:
-	if (objc < 4 || objc > 6) {
+	if ((objc < 4) || (objc > 6)) {
 	    Tcl_WrongNumArgs(interp, 3, objv, "tagName ?sequence? ?command?");
 	    return TCL_ERROR;
 	}
 	tagPtr = TkTextCreateTag(textPtr, Tcl_GetString(objv[3]), NULL);
-	return TkTextBindEvent(interp, objc - 4, objv + 4, sharedTextPtr,
-		&sharedTextPtr->tagBindingTable, tagPtr->name);
+
+	/*
+	 * Make a binding table if the widget doesn't already have one.
+	 */
+
+	if (textPtr->sharedTextPtr->bindingTable == NULL) {
+	    textPtr->sharedTextPtr->bindingTable =
+		    Tk_CreateBindingTable(interp);
+	}
+
+	if (objc == 6) {
+	    int append = 0;
+	    unsigned long mask;
+	    const char *fifth = Tcl_GetString(objv[5]);
+
+	    if (fifth[0] == 0) {
+		return Tk_DeleteBinding(interp,
+			textPtr->sharedTextPtr->bindingTable,
+			(void *) tagPtr->name, Tcl_GetString(objv[4]));
+	    }
+	    if (fifth[0] == '+') {
+		fifth++;
+		append = 1;
+	    }
+	    mask = Tk_CreateBinding(interp,
+		    textPtr->sharedTextPtr->bindingTable,
+		    (void *) tagPtr->name, Tcl_GetString(objv[4]), fifth,
+		    append);
+	    if (mask == 0) {
+		return TCL_ERROR;
+	    }
+	    if (mask & ~(unsigned long)(ButtonMotionMask|Button1MotionMask
+		    |Button2MotionMask|Button3MotionMask|Button4MotionMask
+		    |Button5MotionMask|ButtonPressMask|ButtonReleaseMask
+		    |EnterWindowMask|LeaveWindowMask|KeyPressMask
+		    |KeyReleaseMask|PointerMotionMask|VirtualEventMask)) {
+		Tk_DeleteBinding(interp, textPtr->sharedTextPtr->bindingTable,
+			(void *) tagPtr->name, Tcl_GetString(objv[4]));
+		Tcl_SetObjResult(interp, Tcl_NewStringObj(
+			"requested illegal events; only key, button, motion,"
+			" enter, leave, and virtual events may be used", TCL_INDEX_NONE));
+		Tcl_SetErrorCode(interp, "TK", "TEXT", "TAG_BIND_EVENT", (char *)NULL);
+		return TCL_ERROR;
+	    }
+	} else if (objc == 5) {
+	    const char *command;
+
+	    command = Tk_GetBinding(interp,
+		    textPtr->sharedTextPtr->bindingTable,
+		    (void *) tagPtr->name, Tcl_GetString(objv[4]));
+	    if (command == NULL) {
+		const char *string = Tcl_GetString(Tcl_GetObjResult(interp));
+
+		/*
+		 * Ignore missing binding errors. This is a special hack that
+		 * relies on the error message returned by FindSequence in
+		 * tkBind.c.
+		 */
+
+		if (string[0] != '\0') {
+		    return TCL_ERROR;
+		}
+		Tcl_ResetResult(interp);
+	    } else {
+		Tcl_SetObjResult(interp, Tcl_NewStringObj(command, TCL_INDEX_NONE));
+	    }
+	} else {
+	    Tk_GetAllBindings(interp, textPtr->sharedTextPtr->bindingTable,
+		    (void *) tagPtr->name);
+	}
+	break;
     case TAG_CGET:
 	if (objc != 5) {
 	    Tcl_WrongNumArgs(interp, 1, objv, "tag cget tagName option");
@@ -361,1427 +312,542 @@ TkTextTagCmd(
 	} else {
 	    Tcl_Obj *objPtr;
 
-	    if (!(tagPtr = FindTag(interp, textPtr, objv[3]))) {
+	    tagPtr = FindTag(interp, textPtr, objv[3]);
+	    if (tagPtr == NULL) {
 		return TCL_ERROR;
 	    }
 	    objPtr = Tk_GetOptionValue(interp, tagPtr,
 		    tagPtr->optionTable, objv[4], textPtr->tkwin);
-	    if (!objPtr) {
+	    if (objPtr == NULL) {
 		return TCL_ERROR;
 	    }
 	    Tcl_SetObjResult(interp, objPtr);
 	    return TCL_OK;
 	}
 	break;
-    case TAG_CLEAR: {
-	int discardSelection;
-	Tcl_Size epoch, countTags;
-	TkTextTag **arrayPtr;
-	int anyChanges;
-	int arg;
+    case TAG_CONFIGURE: {
+	int newTag;
 
 	if (objc < 4) {
-	    Tcl_WrongNumArgs(interp, 3, objv, "?-discardselection? index1 ?index2 index1 index2 ...?");
+	    Tcl_WrongNumArgs(interp, 3, objv,
+		    "tagName ?-option value ...?");
 	    return TCL_ERROR;
 	}
+	tagPtr = TkTextCreateTag(textPtr, Tcl_GetString(objv[3]), &newTag);
+	if (objc <= 5) {
+	    Tcl_Obj *objPtr = Tk_GetOptionInfo(interp, tagPtr,
+		    tagPtr->optionTable,
+		    (objc == 5) ? objv[4] : NULL, textPtr->tkwin);
 
-	arg = 3;
-
-	if (objc > 4 && *Tcl_GetString(objv[arg]) == '-') {
-	    if (strcmp(Tcl_GetString(objv[arg++]), "-discardselection") == 0) {
-		discardSelection = 1;
-	    } else {
-		Tcl_SetObjResult(interp, Tcl_ObjPrintf(
-			"bad option \"%s\": must be -discardselection", Tcl_GetString(objv[3])));
-		Tcl_SetErrorCode(interp, "TK", "TEXT", "BAD_OPTION", (char *)NULL);
+	    if (objPtr == NULL) {
 		return TCL_ERROR;
 	    }
-	}
-
-	discardSelection = 0;
-	epoch = TkBTreeEpoch(sharedTextPtr->tree);
-	arrayPtr = (TkTextTag **)Tcl_Alloc(sharedTextPtr->numEnabledTags * sizeof(TkTextTag *));
-	countTags = 0;
-	anyChanges = 0;
-
-	for (i = arg; i < objc; i += 2) {
-	    if (!TkTextGetIndexFromObj(interp, textPtr, objv[i], &index1)) {
+	    Tcl_SetObjResult(interp, objPtr);
+	    return TCL_OK;
+	} else {
+	    if (Tk_SetOptions(interp, tagPtr, tagPtr->optionTable,
+		    objc-4, objv+4, textPtr->tkwin, NULL, NULL) != TCL_OK) {
 		return TCL_ERROR;
 	    }
 
-	    if (objc > i + 1) {
-		if (!TkTextGetIndexFromObj(interp, textPtr, objv[i + 1], &index2)) {
+	    /*
+	     * Some of the configuration options, like -underline and
+	     * -justify, require additional translation (this is needed
+	     * because we need to distinguish a particular value of an option
+	     * from "unspecified").
+	     */
+
+	    if (tagPtr->tabArrayPtr != NULL) {
+		Tcl_Free(tagPtr->tabArrayPtr);
+		tagPtr->tabArrayPtr = NULL;
+	    }
+	    if (tagPtr->tabStringPtr != NULL) {
+		tagPtr->tabArrayPtr =
+			TkTextGetTabs(interp, textPtr->tkwin, tagPtr->tabStringPtr);
+		if (tagPtr->tabArrayPtr == NULL) {
 		    return TCL_ERROR;
 		}
-		if (TkTextIndexCompare(&index1, &index2) >= 0) {
-		    continue;
+	    }
+	    if (tagPtr->elide >= 0) {
+		/*
+		 * Indices are potentially obsolete after changing -elide,
+		 * especially those computed with "display" or "any"
+		 * submodifier, therefore increase the epoch.
+		 */
+
+		textPtr->sharedTextPtr->stateEpoch++;
+	    }
+
+	    /*
+	     * If the "sel" tag was changed, be sure to mirror information
+	     * from the tag back into the text widget record. NOTE: we don't
+	     * have to free up information in the widget record before
+	     * overwriting it, because it was mirrored in the tag and hence
+	     * freed when the tag field was overwritten.
+	     */
+
+	    if (tagPtr == textPtr->selTagPtr) {
+		if (tagPtr->selBorder == NULL) {
+		    textPtr->selBorder = tagPtr->border;
+		} else {
+		    textPtr->selBorder = tagPtr->selBorder;
 		}
-	    } else {
-		TkTextIndexForwChars(textPtr, &index1, 1, &index2, COUNT_INDICES);
-	    }
-
-	    if (!discardSelection) {
-		TkTextClearSelection(sharedTextPtr, &index1, &index2);
-	    }
-
-	    if ((tagPtr = TkTextClearTags(sharedTextPtr, textPtr, &index1, &index2, discardSelection))) {
-		for ( ; tagPtr; tagPtr = tagPtr->nextPtr) {
-		    if (tagPtr->epoch != epoch) {
-			tagPtr->epoch = epoch;
-			arrayPtr[countTags++] = tagPtr;
-
-			if (tagPtr->isSelTag) {
-			    GrabSelection(textPtr, tagPtr, false, true);
-			}
-			if (tagPtr->undo) {
-			    anyChanges = 1;
-			}
-		    }
+		textPtr->selBorderWidthObj = tagPtr->borderWidthObj;
+		if (tagPtr->selFgColor == NULL) {
+		    textPtr->selFgColorPtr = tagPtr->fgColor;
+		} else {
+		    textPtr->selFgColorPtr = tagPtr->selFgColor;
 		}
 	    }
-	}
 
-	if (anyChanges) {
-	    TkTextUpdateAlteredFlag(sharedTextPtr);
+	    tagPtr->affectsDisplay = false;
+	    tagPtr->affectsDisplayGeometry = false;
+	    if ((tagPtr->elide >= 0)
+		    || (tagPtr->tkfont != NULL)
+		    || (tagPtr->justify != TK_JUSTIFY_NULL)
+		    || (tagPtr->lMargin1Obj != NULL)
+		    || (tagPtr->lMargin2Obj != NULL)
+		    || (tagPtr->offsetObj != NULL)
+		    || (tagPtr->rMarginObj != NULL)
+		    || (tagPtr->spacing1Obj != NULL)
+		    || (tagPtr->spacing2Obj != NULL)
+		    || (tagPtr->spacing3Obj != NULL)
+		    || (tagPtr->tabStringPtr != NULL)
+		    || (tagPtr->tabStyle == TK_TEXT_TABSTYLE_TABULAR)
+		    || (tagPtr->tabStyle == TK_TEXT_TABSTYLE_WORDPROCESSOR)
+		    || (tagPtr->wrapMode == TEXT_WRAPMODE_CHAR)
+		    || (tagPtr->wrapMode == TEXT_WRAPMODE_NONE)
+		    || (tagPtr->wrapMode == TEXT_WRAPMODE_WORD)) {
+		tagPtr->affectsDisplay = true;
+		tagPtr->affectsDisplayGeometry = true;
+	    }
+	    if ((tagPtr->border != NULL)
+		    || (tagPtr->selBorder != NULL)
+		    || (tagPtr->relief != TK_RELIEF_NULL)
+		    || (tagPtr->bgStipple != None)
+		    || (tagPtr->fgColor != NULL)
+		    || (tagPtr->selFgColor != NULL)
+		    || (tagPtr->fgStipple != None)
+		    || (tagPtr->overstrike >= 0)
+		    || (tagPtr->overstrikeColor != NULL)
+		    || (tagPtr->underline >= 0)
+		    || (tagPtr->underlineColor != NULL)
+		    || (tagPtr->lMarginColor != NULL)
+		    || (tagPtr->rMarginColor != NULL)) {
+		tagPtr->affectsDisplay = true;
+	    }
+	    if (!newTag) {
+		/*
+		 * This line is not necessary if this is a new tag, since it
+		 * can't possibly have been applied to anything yet.
+		 */
+
+		/*
+		 * VMD: If this is the 'sel' tag, then we don't need to call
+		 * this for all peers, unless we actually want to synchronize
+		 * sel-style changes across the peers.
+		 */
+
+		TkTextRedrawTag(textPtr->sharedTextPtr, NULL,
+			NULL, NULL, tagPtr, true);
+	    }
+	    return TCL_OK;
 	}
-	AppendTags(interp, countTags, arrayPtr);
-	Tcl_Free(arrayPtr);
 	break;
     }
-    case TAG_CONFIGURE:
-	if (objc < 4) {
-	    Tcl_WrongNumArgs(interp, 3, objv, "tagName ?-option value ...?");
-	    return TCL_ERROR;
-	}
-	return TkConfigureTag(interp, textPtr, Tcl_GetString(objv[3]), 1, objc - 4, objv + 4);
     case TAG_DELETE: {
 	Tcl_HashEntry *hPtr;
-	int anyChanges = 0;
 
 	if (objc < 4) {
 	    Tcl_WrongNumArgs(interp, 3, objv, "tagName ?tagName ...?");
 	    return TCL_ERROR;
 	}
 	for (i = 3; i < objc; i++) {
-	    bool undo;
-
-	    if (!(hPtr = Tcl_FindHashEntry(&sharedTextPtr->tagTable, Tcl_GetString(objv[i])))) {
+	    hPtr = Tcl_FindHashEntry(&textPtr->sharedTextPtr->tagTable,
+		    Tcl_GetString(objv[i]));
+	    if (hPtr == NULL) {
 		/*
-		 * Either this tag doesn't exist or it's the 'sel' tag (which is not in
-		 * the hash table). Either way we don't want to delete it.
+		 * Either this tag doesn't exist or it's the 'sel' tag (which
+		 * is not in the hash table). Either way we don't want to
+		 * delete it.
 		 */
 
 		continue;
 	    }
 	    tagPtr = (TkTextTag *)Tcl_GetHashValue(hPtr);
-	    undo = tagPtr->undo;
-	    assert(!tagPtr->isSelTag);
-	    if (TkTextDeleteTag(textPtr, tagPtr, hPtr) && undo) {
-		anyChanges = 1;
+	    if (tagPtr == textPtr->selTagPtr) {
+		continue;
 	    }
-	}
-	if (anyChanges) {
-	    TkTextUpdateAlteredFlag(sharedTextPtr);
-	}
-	break;
-    }
-    case TAG_FINDNEXT: {
-	TkTextSegment *segPtr;
-	const TkBitField *selTags = NULL;
-
-	if (objc != 4 && objc != 5) {
-	    Tcl_WrongNumArgs(interp, 3, objv, "?-discardselection? index");
-	    return TCL_ERROR;
-	}
-	if (objc == 5) {
-	    if (strcmp(Tcl_GetString(objv[3]), "-discardselection") == 0) {
-		selTags = sharedTextPtr->selectionTags;
-	    } else {
-		Tcl_SetObjResult(interp, Tcl_ObjPrintf(
-			"bad option \"%s\": must be -discardselection", Tcl_GetString(objv[3])));
-		Tcl_SetErrorCode(interp, "TK", "TEXT", "BAD_OPTION", (char *)NULL);
-		return TCL_ERROR;
+	    if (tagPtr->affectsDisplay) {
+		TkTextRedrawTag(textPtr->sharedTextPtr, NULL,
+			NULL, NULL, tagPtr, true);
 	    }
-	}
-	if (!TkTextGetIndexFromObj(interp, textPtr, objv[objc - 1], &index1)) {
-	    return TCL_ERROR;
-	}
-	TkTextIndexSetupToEndOfText(&index2, textPtr, sharedTextPtr->tree);
-	if ((segPtr = TkBTreeFindNextTagged(&index1, &index2, selTags))) {
-	    TkTextIndex index;
-	    char buf[TK_POS_CHARS];
-
-	    TkTextIndexClear(&index, textPtr);
-	    TkTextIndexSetSegment(&index, segPtr);
-	    TkrTextPrintIndex(textPtr, &index, buf);
-	    Tcl_AppendElement(interp, buf);
-	}
-	break;
-    }
-    case TAG_FINDPREV: {
-	int discardSelection = 0;
-	TkTextSegment *segPtr;
-
-	if (objc != 4 && objc != 5) {
-	    Tcl_WrongNumArgs(interp, 3, objv, "?-discardselection? index");
-	    return TCL_ERROR;
-	}
-	if (objc == 5) {
-	    if (strcmp(Tcl_GetString(objv[3]), "-discardselection") == 0) {
-		discardSelection = 1;
-	    } else {
-		Tcl_SetObjResult(interp, Tcl_ObjPrintf(
-			"bad option \"%s\": must be -discardselection", Tcl_GetString(objv[3])));
-		Tcl_SetErrorCode(interp, "TK", "TEXT", "BAD_OPTION", (char *)NULL);
-		return TCL_ERROR;
-	    }
-	}
-	if (!TkTextGetIndexFromObj(interp, textPtr, objv[objc - 1], &index1)) {
-	    return TCL_ERROR;
-	}
-	TkTextIndexSetupToStartOfText(&index2, textPtr, sharedTextPtr->tree);
-	if ((segPtr = TkBTreeFindPrevTagged(&index1, &index2, discardSelection))) {
-	    TkTextIndex index;
-	    char buf[TK_POS_CHARS];
-
-	    TkTextIndexClear(&index, textPtr);
-	    TkTextIndexSetSegment(&index, segPtr);
-	    TkrTextPrintIndex(textPtr, &index, buf);
-	    Tcl_AppendElement(interp, buf);
-	}
-	break;
-    }
-    case TAG_GETRANGE: {
-	TkTextIndex index;
-
-	if (objc != 5) {
-	    Tcl_WrongNumArgs(interp, 3, objv, "tagName index");
-	    return TCL_ERROR;
-	}
-	if (!TkTextGetIndexFromObj(interp, textPtr, objv[4], &index)) {
-	    return TCL_ERROR;
-	}
-	if (!(tagPtr = FindTag(interp, textPtr, objv[3]))) {
-	    return TCL_ERROR;
-	}
-	if (tagPtr->rootPtr && TkBTreeCharTagged(&index, tagPtr)) {
-	    TkTextIndex result;
-	    char buf[TK_POS_CHARS];
-
-	    /* point to position after index */
-	    TkTextIndexForwChars(textPtr, &index, 1, &index, COUNT_INDICES);
-
-	    TkTextTagFindStartOfRange(textPtr, tagPtr, &index, &result);
-	    TkrTextPrintIndex(textPtr, &result, buf);
-	    Tcl_AppendElement(interp, buf);
-
-	    TkTextTagFindEndOfRange(textPtr, tagPtr, &index, &result);
-	    TkrTextPrintIndex(textPtr, &result, buf);
-	    Tcl_AppendElement(interp, buf);
+	    TkTextDeleteTag(textPtr, tagPtr);
+	    Tcl_DeleteHashEntry(hPtr);
 	}
 	break;
     }
     case TAG_LOWER: {
 	TkTextTag *tagPtr2;
-	unsigned newPriority;
+	int prio;
 
-	if (objc != 4 && objc != 5) {
+	if ((objc != 4) && (objc != 5)) {
 	    Tcl_WrongNumArgs(interp, 3, objv, "tagName ?belowThis?");
 	    return TCL_ERROR;
 	}
-	if (!(tagPtr = FindTag(interp, textPtr, objv[3]))) {
+	tagPtr = FindTag(interp, textPtr, objv[3]);
+	if (tagPtr == NULL) {
 	    return TCL_ERROR;
 	}
 	if (objc == 5) {
-	    if (!(tagPtr2 = FindTag(interp, textPtr, objv[4]))) {
+	    tagPtr2 = FindTag(interp, textPtr, objv[4]);
+	    if (tagPtr2 == NULL) {
 		return TCL_ERROR;
 	    }
-	    newPriority = tagPtr2->priority;
 	    if (tagPtr->priority < tagPtr2->priority) {
-		newPriority -= 1;
+		prio = tagPtr2->priority - 1;
+	    } else {
+		prio = tagPtr2->priority;
 	    }
 	} else {
-	    newPriority = 0;
+	    prio = 0;
 	}
-	if (ChangeTagPriority(sharedTextPtr, tagPtr, newPriority, 1) && tagPtr->rootPtr) {
-	    if (tagPtr->undo) {
-		TkTextUpdateAlteredFlag(sharedTextPtr);
+	ChangeTagPriority(textPtr, tagPtr, prio);
+
+	/*
+	 * If this is the 'sel' tag, then we don't actually need to call this
+	 * for all peers.
+	 */
+
+	TkTextRedrawTag(textPtr->sharedTextPtr, NULL, NULL, NULL, tagPtr, true);
+	break;
+    }
+    case TAG_NAMES: {
+	TkTextTag **arrayPtr;
+	Tcl_Size arraySize;
+	Tcl_Obj *listObj;
+
+	if ((objc != 3) && (objc != 4)) {
+	    Tcl_WrongNumArgs(interp, 3, objv, "?index?");
+	    return TCL_ERROR;
+	}
+	if (objc == 3) {
+	    Tcl_HashSearch search;
+	    Tcl_HashEntry *hPtr;
+
+	    arrayPtr = (TkTextTag **)Tcl_Alloc(textPtr->sharedTextPtr->numTags
+		    * sizeof(TkTextTag *));
+	    for (i=0, hPtr = Tcl_FirstHashEntry(
+		    &textPtr->sharedTextPtr->tagTable, &search);
+		    hPtr != NULL; i++, hPtr = Tcl_NextHashEntry(&search)) {
+		arrayPtr[i] = (TkTextTag *)Tcl_GetHashValue(hPtr);
 	    }
 
 	    /*
-	     * If this is the 'sel' tag, then we don't actually need to call this for all peers.
-	     *
-	     * TODO: The current implementation is sloppy, we need only to refresh the ranges
-	     * with actual changes, and not all the ranges of this tag.
+	     * The 'sel' tag is not in the hash table.
 	     */
 
-	    TkTextRedrawTag(tagPtr->isSelTag ? NULL : sharedTextPtr,
-		    textPtr, NULL, NULL, tagPtr, 0);
+	    arrayPtr[i] = textPtr->selTagPtr;
+	    arraySize = ++i;
+	} else {
+	    if (TkTextGetObjIndex(interp, textPtr, objv[3],
+		    &index1) != TCL_OK) {
+		return TCL_ERROR;
+	    }
+	    arrayPtr = TkBTreeGetTags(&index1, textPtr, &arraySize);
+	    if (arrayPtr == NULL) {
+		return TCL_OK;
+	    }
 	}
+
+	SortTags(arraySize, arrayPtr);
+	listObj = Tcl_NewListObj(0, NULL);
+
+	for (i = 0; i < arraySize; i++) {
+	    tagPtr = arrayPtr[i];
+	    Tcl_ListObjAppendElement(interp, listObj,
+		    Tcl_NewStringObj(tagPtr->name,-1));
+	}
+	Tcl_SetObjResult(interp, listObj);
+	Tcl_Free(arrayPtr);
 	break;
     }
-    case TAG_NAMES:
-	return EnumerateTags(interp, textPtr, objc, objv);
-	/* not reached */
     case TAG_NEXTRANGE: {
+	TkTextIndex last;
 	TkTextSearch tSearch;
 	char position[TK_POS_CHARS];
 	Tcl_Obj *resultObj;
 
-	if (objc != 5 && objc != 6) {
+	if ((objc != 5) && (objc != 6)) {
 	    Tcl_WrongNumArgs(interp, 3, objv, "tagName index1 ?index2?");
 	    return TCL_ERROR;
 	}
-	if (!(tagPtr = FindTag(NULL, textPtr, objv[3])) || !tagPtr->rootPtr) {
+	tagPtr = FindTag(NULL, textPtr, objv[3]);
+	if (tagPtr == NULL) {
 	    return TCL_OK;
 	}
-	if (!TkTextGetIndexFromObj(interp, textPtr, objv[4], &index1)) {
+	if (TkTextGetObjIndex(interp, textPtr, objv[4], &index1) != TCL_OK) {
 	    return TCL_ERROR;
 	}
+	TkTextMakeByteIndex(textPtr->sharedTextPtr->tree, textPtr,
+		TkBTreeNumLines(textPtr->sharedTextPtr->tree, textPtr),
+		0, &last);
 	if (objc == 5) {
-	    TkTextIndexSetupToEndOfText(&index2, textPtr, sharedTextPtr->tree);
-	} else if (!TkTextGetIndexFromObj(interp, textPtr, objv[5], &index2)) {
+	    index2 = last;
+	} else if (TkTextGetObjIndex(interp, textPtr, objv[5],
+		&index2) != TCL_OK) {
 	    return TCL_ERROR;
 	}
 
-	TkBTreeStartSearch(&index1, &index2, tagPtr, &tSearch, SEARCH_NEXT_TAGON);
-	if (TkBTreeNextTag(&tSearch)) {
-	    assert(TkTextIndexCompare(&tSearch.curIndex, &index1) >= 0);
-	    assert(TkTextIndexCompare(&tSearch.curIndex, &index2) < 0);
-	    if (TkTextIndexIsEqual(&index1, &tSearch.curIndex)) {
-		TkTextIndex oneBack;
+	/*
+	 * The search below is a bit tricky. Rather than use the B-tree
+	 * facilities to stop the search at index2, let it search up until the
+	 * end of the file but check for a position past index2 ourselves.
+	 * The reason for doing it this way is that we only care whether the
+	 * *start* of the range is before index2; once we find the start, we
+	 * don't want TkBTreeNextTag to abort the search because the end of
+	 * the range is after index2.
+	 */
 
-		/*
-		 * The first character is tagged. See if there is an on-toggle just
-		 * before the character. If not, then skip to the end of this tagged range.
-		 */
+	TkBTreeStartSearch(&index1, &last, tagPtr, &tSearch);
+	if (TkBTreeCharTagged(&index1, tagPtr)) {
+	    TkTextSegment *segPtr;
+	    int offset;
 
-		if (TkTextIndexBackChars(textPtr, &index1, 1, &oneBack, COUNT_DISPLAY_INDICES)
-			&& TkBTreeCharTagged(&oneBack, tagPtr)
-			&& (!TkBTreeNextTag(&tSearch) || !TkBTreeNextTag(&tSearch))) {
-		    return TCL_OK;
+	    /*
+	     * The first character is tagged. See if there is an on-toggle
+	     * just before the character. If not, then skip to the end of this
+	     * tagged range.
+	     */
+
+	    for (segPtr = index1.linePtr->segPtr, offset = index1.byteIndex;
+		    offset >= 0;
+		    offset -= segPtr->size, segPtr = segPtr->nextPtr) {
+		if ((offset == 0) && (segPtr->typePtr == &tkTextToggleOnType)
+			&& (segPtr->body.toggle.tagPtr == tagPtr)) {
+		    goto gotStart;
 		}
-		assert(TkTextIndexCompare(&tSearch.curIndex, &index2) < 0);
 	    }
-	    resultObj = Tcl_NewObj();
-	    TkrTextPrintIndex(textPtr, &tSearch.curIndex, position);
-	    Tcl_ListObjAppendElement(NULL, resultObj, Tcl_NewStringObj(position, TCL_INDEX_NONE));
-	    TkBTreeLiftSearch(&tSearch); /* we need tagoff even if outside of the range */
-	    TkBTreeNextTag(&tSearch);    /* cannot fail */
-	    assert(tSearch.segPtr);      /* proof last assumption */
-	    TkrTextPrintIndex(textPtr, &tSearch.curIndex, position);
-	    Tcl_ListObjAppendElement(NULL, resultObj, Tcl_NewStringObj(position, TCL_INDEX_NONE));
-	    Tcl_SetObjResult(interp, resultObj);
+	    if (!TkBTreeNextTag(&tSearch)) {
+		return TCL_OK;
+	    }
 	}
+
+	/*
+	 * Find the start of the tagged range.
+	 */
+
+	if (!TkBTreeNextTag(&tSearch)) {
+	    return TCL_OK;
+	}
+
+    gotStart:
+	if (TkTextIndexCmp(&tSearch.curIndex, &index2) >= 0) {
+	    return TCL_OK;
+	}
+	resultObj = Tcl_NewObj();
+	TkTextPrintIndex(textPtr, &tSearch.curIndex, position);
+	Tcl_ListObjAppendElement(NULL, resultObj,
+		Tcl_NewStringObj(position, TCL_INDEX_NONE));
+	TkBTreeNextTag(&tSearch);
+	TkTextPrintIndex(textPtr, &tSearch.curIndex, position);
+	Tcl_ListObjAppendElement(NULL, resultObj,
+		Tcl_NewStringObj(position, TCL_INDEX_NONE));
+	Tcl_SetObjResult(interp, resultObj);
 	break;
     }
     case TAG_PREVRANGE: {
+	TkTextIndex last;
 	TkTextSearch tSearch;
 	char position1[TK_POS_CHARS];
 	char position2[TK_POS_CHARS];
 	Tcl_Obj *resultObj;
 
-	if (objc != 5 && objc != 6) {
+	if ((objc != 5) && (objc != 6)) {
 	    Tcl_WrongNumArgs(interp, 3, objv, "tagName index1 ?index2?");
 	    return TCL_ERROR;
 	}
-	if (!(tagPtr = FindTag(NULL, textPtr, objv[3])) || !tagPtr->rootPtr) {
+	tagPtr = FindTag(NULL, textPtr, objv[3]);
+	if (tagPtr == NULL) {
 	    return TCL_OK;
 	}
-	if (!TkTextGetIndexFromObj(interp, textPtr, objv[4], &index1)) {
+	if (TkTextGetObjIndex(interp, textPtr, objv[4], &index1) != TCL_OK) {
 	    return TCL_ERROR;
 	}
 	if (objc == 5) {
-	    TkTextIndexSetupToStartOfText(&index2, textPtr, sharedTextPtr->tree);
-	} else if (!TkTextGetIndexFromObj(interp, textPtr, objv[5], &index2)) {
+	    TkTextMakeByteIndex(textPtr->sharedTextPtr->tree, textPtr, 0, 0,
+		    &index2);
+	} else if (TkTextGetObjIndex(interp, textPtr, objv[5],
+		&index2) != TCL_OK) {
 	    return TCL_ERROR;
 	}
 
-	TkBTreeStartSearchBack(&index1, &index2, tagPtr, &tSearch, SEARCH_EITHER_TAGON_TAGOFF);
+	/*
+	 * The search below is a bit weird. The previous toggle can be either
+	 * an on or off toggle. If it is an on toggle, then we need to turn
+	 * around and search forward for the end toggle. Otherwise we keep
+	 * searching backwards.
+	 */
 
-	if (TkBTreePrevTag(&tSearch)) {
-	    assert(TkTextIndexCompare(&tSearch.curIndex, &index1) <= 0);
-	    assert(TkTextIndexCompare(&tSearch.curIndex, &index2) >= 0);
-	    index1 = tSearch.curIndex;
-	    if (tSearch.tagon) {
-		TkTextIndex end;
+	TkBTreeStartSearchBack(&index1, &index2, tagPtr, &tSearch);
 
+	if (!TkBTreePrevTag(&tSearch)) {
+	    /*
+	     * Special case, there may be a tag off toggle at index1, and a
+	     * tag on toggle before the start of a partial peer widget. In
+	     * this case we missed it.
+	     */
+
+	    if (textPtr->start != NULL && (textPtr->start == index2.linePtr)
+		    && (index2.byteIndex == 0)
+		    && TkBTreeCharTagged(&index2, tagPtr)
+		    && (TkTextIndexCmp(&index2, &index1) < 0)) {
 		/*
-		 * We've found tagon. Now search forward for tagoff.
+		 * The first character is tagged, so just add the range from
+		 * the first char to the start of the range.
 		 */
 
-		TkrTextPrintIndex(textPtr, &index1, position1);
-		TkTextIndexSetupToEndOfText(&end, textPtr, sharedTextPtr->tree);
-		TkTextIndexForwChars(textPtr, &index1, 1, &index1, COUNT_INDICES);
-		TkBTreeStartSearch(&index1, &end, tagPtr, &tSearch, SEARCH_EITHER_TAGON_TAGOFF);
-		TkBTreeNextTag(&tSearch); /* cannot fail */
-		assert(tSearch.segPtr);   /* proof last assumption */
-		assert(!tSearch.tagon);   /* must be tagoff */
-		TkrTextPrintIndex(textPtr, &tSearch.curIndex, position2);
-	    } else {
+		TkTextPrintIndex(textPtr, &index2, position1);
+		TkTextPrintIndex(textPtr, &index1, position2);
+		goto gotPrevIndexPair;
+	    }
+	    return TCL_OK;
+	}
+
+	if (tSearch.segPtr->typePtr == &tkTextToggleOnType) {
+	    TkTextPrintIndex(textPtr, &tSearch.curIndex, position1);
+	    if (textPtr->start != NULL) {
 		/*
-		 * We've found tagoff. Now search backwards for tagon.
+		 * Make sure the first index is not before the first allowed
+		 * text index in this widget.
 		 */
 
-		if (!TkBTreePrevTag(&tSearch)) {
+		TkTextIndex firstIndex;
+
+		firstIndex.linePtr = textPtr->start;
+		firstIndex.byteIndex = 0;
+		firstIndex.textPtr = NULL;
+		if (TkTextIndexCmp(&tSearch.curIndex, &firstIndex) < 0) {
+		    if (TkTextIndexCmp(&firstIndex, &index1) >= 0) {
+			/*
+			 * But now the new first index is actually too far
+			 * along in the text, so nothing is returned.
+			 */
+
+			return TCL_OK;
+		    }
+		    TkTextPrintIndex(textPtr, &firstIndex, position1);
+		}
+	    }
+	    TkTextMakeByteIndex(textPtr->sharedTextPtr->tree, textPtr,
+		    TkBTreeNumLines(textPtr->sharedTextPtr->tree, textPtr),
+		    0, &last);
+	    TkBTreeStartSearch(&tSearch.curIndex, &last, tagPtr, &tSearch);
+	    TkBTreeNextTag(&tSearch);
+	    TkTextPrintIndex(textPtr, &tSearch.curIndex, position2);
+	} else {
+	    TkTextPrintIndex(textPtr, &tSearch.curIndex, position2);
+	    TkBTreePrevTag(&tSearch);
+	    TkTextPrintIndex(textPtr, &tSearch.curIndex, position1);
+	    if (TkTextIndexCmp(&tSearch.curIndex, &index2) < 0) {
+		if (textPtr->start != NULL && index2.linePtr == textPtr->start
+			&& index2.byteIndex == 0) {
+		    /* It's ok */
+		    TkTextPrintIndex(textPtr, &index2, position1);
+		} else {
 		    return TCL_OK;
 		}
-		assert(TkTextIndexCompare(&tSearch.curIndex, &index2) >= 0);
-		TkrTextPrintIndex(textPtr, &tSearch.curIndex, position1);
-		TkrTextPrintIndex(textPtr, &index1, position2);
 	    }
-	    resultObj = Tcl_NewObj();
-	    Tcl_ListObjAppendElement(NULL, resultObj, Tcl_NewStringObj(position1, TCL_INDEX_NONE));
-	    Tcl_ListObjAppendElement(NULL, resultObj, Tcl_NewStringObj(position2, TCL_INDEX_NONE));
-	    Tcl_SetObjResult(interp, resultObj);
 	}
+
+    gotPrevIndexPair:
+	resultObj = Tcl_NewObj();
+	Tcl_ListObjAppendElement(NULL, resultObj,
+		Tcl_NewStringObj(position1, TCL_INDEX_NONE));
+	Tcl_ListObjAppendElement(NULL, resultObj,
+		Tcl_NewStringObj(position2, TCL_INDEX_NONE));
+	Tcl_SetObjResult(interp, resultObj);
 	break;
     }
-    case TAG_PRIORITY:
-	if (objc != 4) {
-	    Tcl_WrongNumArgs(interp, 3, objv, "tagName");
-	    return TCL_ERROR;
-	}
-	if (!(tagPtr = FindTag(interp, textPtr, objv[3]))) {
-	    return TCL_ERROR;
-	}
-	Tcl_SetObjResult(interp, Tcl_NewIntObj(tagPtr->priority));
-	break;
     case TAG_RAISE: {
 	TkTextTag *tagPtr2;
-	unsigned newPriority;
+	int prio;
 
-	if (objc != 4 && objc != 5) {
+	if ((objc != 4) && (objc != 5)) {
 	    Tcl_WrongNumArgs(interp, 3, objv, "tagName ?aboveThis?");
 	    return TCL_ERROR;
 	}
-	if (!(tagPtr = FindTag(interp, textPtr, objv[3]))) {
+	tagPtr = FindTag(interp, textPtr, objv[3]);
+	if (tagPtr == NULL) {
 	    return TCL_ERROR;
 	}
 	if (objc == 5) {
-	    if (!(tagPtr2 = FindTag(interp, textPtr, objv[4]))) {
+	    tagPtr2 = FindTag(interp, textPtr, objv[4]);
+	    if (tagPtr2 == NULL) {
 		return TCL_ERROR;
 	    }
-	    newPriority = tagPtr2->priority;
-	    if (tagPtr->priority > tagPtr2->priority) {
-		newPriority += 1;
+	    if (tagPtr->priority <= tagPtr2->priority) {
+		prio = tagPtr2->priority;
+	    } else {
+		prio = tagPtr2->priority + 1;
 	    }
 	} else {
-	    newPriority = sharedTextPtr->numEnabledTags - 1;
+	    prio = textPtr->sharedTextPtr->numTags-1;
 	}
-	if (ChangeTagPriority(sharedTextPtr, tagPtr, newPriority, 1) && tagPtr->rootPtr) {
-	    if (tagPtr->undo) {
-		TkTextUpdateAlteredFlag(sharedTextPtr);
-	    }
+	ChangeTagPriority(textPtr, tagPtr, prio);
 
-	    /*
-	     * If this is the 'sel' tag, then we don't actually need to call this for all peers.
-	     *
-	     * TODO: The current implementation is sloppy, we need only to refresh the ranges
-	     * with actual changes, and not all the ranges of this tag.
-	     */
+	/*
+	 * If this is the 'sel' tag, then we don't actually need to call this
+	 * for all peers.
+	 */
 
-	    TkTextRedrawTag(tagPtr->isSelTag ? NULL : sharedTextPtr,
-		    textPtr, NULL, NULL, tagPtr, 0);
-	}
+	TkTextRedrawTag(textPtr->sharedTextPtr, NULL, NULL, NULL, tagPtr, true);
 	break;
     }
     case TAG_RANGES: {
 	TkTextIndex first, last;
 	TkTextSearch tSearch;
-	Tcl_Obj *listObj = Tcl_NewObj();
-	DEBUG(int found = 0);
+	Tcl_Obj *listObj = Tcl_NewListObj(0, NULL);
+	int count = 0;
 
 	if (objc != 4) {
 	    Tcl_WrongNumArgs(interp, 3, objv, "tagName");
 	    return TCL_ERROR;
 	}
-	if ((tagPtr = FindTag(NULL, textPtr, objv[3])) && tagPtr->rootPtr) {
-	    TkTextIndexSetupToStartOfText(&first, textPtr, sharedTextPtr->tree);
-	    TkTextIndexSetupToEndOfText(&last, textPtr, sharedTextPtr->tree);
-	    TkBTreeStartSearch(&first, &last, tagPtr, &tSearch, SEARCH_NEXT_TAGON);
-	    while (TkBTreeNextTag(&tSearch)) {
-		Tcl_ListObjAppendElement(NULL, listObj, TkTextNewIndexObj(&tSearch.curIndex));
-		DEBUG(found = 1);
-	    }
-	    assert(!found || !tSearch.tagon); /* search must find end of text */
-	    Tcl_SetObjResult(interp, listObj);
+	tagPtr = FindTag(NULL, textPtr, objv[3]);
+	if (tagPtr == NULL) {
+	    return TCL_OK;
 	}
+	TkTextMakeByteIndex(textPtr->sharedTextPtr->tree, textPtr, 0, 0,
+		&first);
+	TkTextMakeByteIndex(textPtr->sharedTextPtr->tree, textPtr,
+		TkBTreeNumLines(textPtr->sharedTextPtr->tree, textPtr),
+		0, &last);
+	TkBTreeStartSearch(&first, &last, tagPtr, &tSearch);
+	if (TkBTreeCharTagged(&first, tagPtr)) {
+	    Tcl_ListObjAppendElement(NULL, listObj,
+		    TkTextNewIndexObj(textPtr, &first));
+	    count++;
+	}
+	while (TkBTreeNextTag(&tSearch)) {
+	    Tcl_ListObjAppendElement(NULL, listObj,
+		    TkTextNewIndexObj(textPtr, &tSearch.curIndex));
+	    count++;
+	}
+	if (count % 2 == 1) {
+	    /*
+	     * If a text widget uses '-end', it won't necessarily run to the
+	     * end of the B-tree, and therefore the tag range might not be
+	     * closed. In this case we add the end of the range.
+	     */
+
+	    Tcl_ListObjAppendElement(NULL, listObj,
+		    TkTextNewIndexObj(textPtr, &last));
+	}
+	Tcl_SetObjResult(interp, listObj);
 	break;
     }
     }
-    return TCL_OK;
-}
-
-/*
- *----------------------------------------------------------------------
- *
- * TkTextTagFindStartOfRange --
- *
- *	Find the start of the range which is marked by given tag. This
- *	functions requires that the given start index for the search
- *	is marked by this tag.
- *
- * Results:
- *	Returns the end index in '*resultPtr'.
- *
- * Side effects:
- *	None.
- *
- *----------------------------------------------------------------------
- */
-
-void
-TkTextTagFindStartOfRange(
-    TkText *textPtr,			/* Info about overall widget. */
-    const TkTextTag *tagPtr,		/* Search for this tag. */
-    const TkTextIndex *currentPtr,	/* Start search after this position. */
-    TkTextIndex *resultPtr)		/* Returns end of tagged range. */
-{
-    TkTextSearch tSearch;
-    TkTextIndex stopIndex;
-
-    assert(textPtr);
-    assert(currentPtr);
-    assert(resultPtr);
-
-    TkTextIndexSetupToStartOfText(&stopIndex, textPtr, textPtr->sharedTextPtr->tree);
-    TkBTreeStartSearchBack(currentPtr, &stopIndex, tagPtr, &tSearch, SEARCH_NEXT_TAGON);
-    TkBTreePrevTag(&tSearch);
-    assert(tSearch.segPtr); /* last search must not fail */
-    *resultPtr = tSearch.curIndex;
-}
-
-/*
- *----------------------------------------------------------------------
- *
- * TkTextTagFindEndOfRange --
- *
- *	Find the end of the range which is marked by given tag. This
- *	functions requires that the given start index for the search
- *	is marked by this tag.
- *
- * Results:
- *	Returns the end index in '*resultPtr'.
- *
- * Side effects:
- *	None.
- *
- *----------------------------------------------------------------------
- */
-
-void
-TkTextTagFindEndOfRange(
-    TkText *textPtr,			/* Info about overall widget. */
-    const TkTextTag *tagPtr,		/* Search for this tag. */
-    const TkTextIndex *currentPtr,	/* Start search at this position. */
-    TkTextIndex *resultPtr)		/* Returns end of tagged range. */
-{
-    TkTextSearch tSearch;
-    TkTextIndex stopIndex;
-
-    assert(textPtr);
-    assert(currentPtr);
-    assert(resultPtr);
-
-    TkTextIndexSetupToEndOfText(&stopIndex, textPtr, textPtr->sharedTextPtr->tree);
-    TkBTreeStartSearch(currentPtr, &stopIndex, tagPtr, &tSearch, SEARCH_EITHER_TAGON_TAGOFF);
-    TkBTreeNextTag(&tSearch);
-    assert(tSearch.segPtr); /* last search must not fail */
-    assert(!tSearch.tagon); /* must be tagoff */
-    *resultPtr = tSearch.curIndex;
-}
-
-/*
- *----------------------------------------------------------------------
- *
- * TkTextClearSelection --
- *
- *	Clear the selection in specified range.
- *
- * Results:
- *	None.
- *
- * Side effects:
- *	See TkBTreeTag and TkTextSelectionEvent for side effects.
- *
- *----------------------------------------------------------------------
- */
-
-void
-TkTextClearSelection(
-    TkSharedText *sharedTextPtr,
-    const TkTextIndex *indexPtr1,
-    const TkTextIndex *indexPtr2)
-{
-    TkText *textPtr;
-
-    for (textPtr = sharedTextPtr->peers; textPtr; textPtr = textPtr->next) {
-	if (TkBTreeTag(sharedTextPtr, textPtr, indexPtr1, indexPtr2, textPtr->selTagPtr,
-		0, NULL, TkTextRedrawTag)) {
-	    /*
-	     * Send an event that the selection changed. This is equivalent to:
-	     *	 event generate $textWidget <<Selection>>
-	     */
-
-	    TkTextSelectionEvent(textPtr); /* <<Selection>> will be received after deletion */
-	    textPtr->abortSelections = 1;
-	}
-    }
-}
-
-/*
- *----------------------------------------------------------------------
- *
- * TkTextClearTags --
- *
- *	Turn all tags off inside a given range.
- *
- * Results:
- *	Whether any tag has been removed.
- *
- * Side effects:
- *	See TkBTreeClearTags and TkTextPushUndoToken for side effects.
- *
- *----------------------------------------------------------------------
- */
-
-TkTextTag *
-TkTextClearTags(
-    TkSharedText *sharedTextPtr,
-    TkText *textPtr,			/* can be NULL */
-    const TkTextIndex *indexPtr1,
-    const TkTextIndex *indexPtr2,
-    int discardSelection)
-{
-    TkTextTag *tagPtr;
-    TkTextUndoInfo undoInfo;
-    TkTextUndoInfo *undoInfoPtr;
-
-    undoInfoPtr = TkTextUndoStackIsFull(sharedTextPtr->undoStack) ? NULL : &undoInfo;
-    tagPtr = TkBTreeClearTags(sharedTextPtr, textPtr, indexPtr1, indexPtr2, undoInfoPtr,
-	    discardSelection, TkTextRedrawTag);
-    if (tagPtr && undoInfoPtr && undoInfo.token) {
-	TkTextPushUndoToken(sharedTextPtr, undoInfo.token, undoInfo.byteSize);
-    }
-    return tagPtr;
-}
-
-/*
- *----------------------------------------------------------------------
- *
- * TkTextUpdateTagDisplayFlags --
- *
- *	Update the display flags 'affectsDisplay' and 'affectsDisplayGeometry',
- *	according to the current attributes of the given tag.
- *
- * Results:
- *	None.
- *
- * Side effects:
- *	The flags 'affectsDisplay' and 'affectsDisplayGeometry' may change.
- *
- *----------------------------------------------------------------------
- */
-
-void
-TkTextUpdateTagDisplayFlags(
-    TkTextTag *tagPtr)
-{
-    tagPtr->affectsDisplay = false;
-    tagPtr->affectsDisplayGeometry = false;
-
-    if ((tagPtr->elide >= 0)
-	    || tagPtr->tkfont
-	    || tagPtr->justify != TK_TEXT_JUSTIFY_NULL
-	    || tagPtr->lMargin1Obj
-	    || tagPtr->lMargin2Obj
-	    || tagPtr->offsetObj
-	    || tagPtr->rMarginObj
-	    || tagPtr->spacing1Obj
-	    || tagPtr->spacing2Obj
-	    || tagPtr->spacing3Obj
-	    || tagPtr->tabStringObj
-	    || tagPtr->tabStyle == TK_TEXT_TABSTYLE_TABULAR
-	    || tagPtr->tabStyle == TK_TEXT_TABSTYLE_WORDPROCESSOR
-		|| tagPtr->wrapMode == TEXT_WRAPMODE_CHAR
-		|| tagPtr->wrapMode == TEXT_WRAPMODE_NONE
-		|| tagPtr->wrapMode == TEXT_WRAPMODE_WORD
-		|| tagPtr->wrapMode == TEXT_WRAPMODE_CODEPOINT) {
-	tagPtr->affectsDisplay = true;
-	tagPtr->affectsDisplayGeometry = true;
-    } else if (tagPtr->attrs.border
-	    || tagPtr->attrs.inactiveBorder
-	    || tagPtr->selBorder
-	    || tagPtr->inactiveSelBorder
-	    || tagPtr->relief != TK_RELIEF_NULL
-	    || tagPtr->bgStipple != None
-	    || tagPtr->indentBg >= 0
-	    || tagPtr->attrs.fgColor
-	    || tagPtr->attrs.inactiveFgColor
-	    || tagPtr->selFgColor
-	    || tagPtr->inactiveSelFgColor
-	    || tagPtr->fgStipple != None
-	    || tagPtr->eolColor
-	    || tagPtr->hyphenColor
-	    || tagPtr->overstrike >= 0
-	    || tagPtr->overstrikeColor
-	    || tagPtr->underline >= 0
-	    || tagPtr->underlineColor
-	    || tagPtr->lMarginColor
-	    || tagPtr->rMarginColor) {
-	tagPtr->affectsDisplay = true;
-    }
-}
-
-/*
- *----------------------------------------------------------------------
- *
- * TkConfigureTag --
- *
- *	This function is called to process an objv/objc list, plus the Tk
- *	option database, in order to configure (or reconfigure) a text tag.
- *
- * Results:
- *	Any of the standard Tcl return values.
- *
- * Side effects:
- *	A new tag will be created if required, otherwise an existing tag
- *	will be modified.
- *
- *----------------------------------------------------------------------
- */
-
-static void
-SetupDefaultRelief(
-    TkText *textPtr,
-    TkTextTag *tagPtr)
-{
-    if (tagPtr->isSelTag) {
-	Tk_GetRelief(textPtr->interp, DEF_TEXT_SELECT_RELIEF, &tagPtr->relief);
-    } else {
-	tagPtr->relief = TK_RELIEF_FLAT;
-    }
-}
-
-int
-TkConfigureTag(
-    Tcl_Interp *interp,		/* Current interpreter. */
-    TkText *textPtr,		/* Info about overall widget. */
-    char const *tagName,	/* Name of affected tag. */
-    int redraw,		/* Redraw the affected text if required? */
-    int objc,			/* Number of arguments. */
-    Tcl_Obj *const objv[])	/* Remaining argument objects. */
-{
-    int newTag;
-    int mask = 0;
-    TkSharedText *sharedTextPtr = textPtr->sharedTextPtr;
-    TkTextTag *tagPtr = TkTextCreateTag(textPtr, tagName, &newTag);
-    int relief = tagPtr->relief;
-    int elide = tagPtr->elide;
-    bool undo = tagPtr->undo;
-    bool affectsDisplay = tagPtr->affectsDisplay;
-    int affectsLineHeight = 0;
-    int rc = TCL_OK;
-
-    if (objc <= 1) {
-	Tcl_Obj *objPtr = Tk_GetOptionInfo(interp, (char *) tagPtr, tagPtr->optionTable,
-		objc == 1 ? objv[0] : NULL, textPtr->tkwin);
-
-	if (!objPtr) {
-	    return TCL_ERROR;
-	}
-	Tcl_SetObjResult(interp, objPtr);
-	return TCL_OK;
-    }
-
-    if (tagPtr->isSelTag) {
-	tagPtr->attrs = textPtr->selTagConfigAttrs;
-    }
-    if (Tk_SetOptions(interp, (char *) tagPtr, tagPtr->optionTable,
-	    objc, objv, textPtr->tkwin, NULL, &mask) != TCL_OK) {
-	if (tagPtr->isSelTag) {
-	    tagPtr->attrs = textPtr->selAttrs;
-	}
-	return TCL_ERROR;
-    }
-
-#if SUPPORT_DEPRECATED_TAG_OPTIONS
-
-    if (mask & (TK_TEXT_DEPRECATED_OVERSTRIKE_FG|TK_TEXT_DEPRECATED_UNDERLINE_FG)) {
-	static int warnAboutOverstrikeFg = 1;
-	static int warnAboutUnderlineFg = 1;
-
-	if (mask & TK_TEXT_DEPRECATED_OVERSTRIKE_FG) {
-	    if (warnAboutOverstrikeFg) {
-		fprintf(stderr, "tk::text: Tag option \"-overstrikefg\" is deprecated, "
-			"please use option \"-overstrikecolor\".\n");
-		warnAboutOverstrikeFg = 0;
-	    }
-	}
-	if (mask & TK_TEXT_DEPRECATED_UNDERLINE_FG) {
-	    if (warnAboutUnderlineFg) {
-		fprintf(stderr, "tk::text: Tag option \"-underlinefg\" is deprecated, "
-			"please use option \"-underlinecolor\".\n");
-		warnAboutUnderlineFg = 0;
-	    }
-	}
-    }
-
-#endif /* SUPPORT_DEPRECATED_TAG_OPTIONS */
-
-    /*
-      Some of the configuration options, like -underline and -justify, require
-     * additional translation (this is needed because we need to distinguish a
-     * particular value of an option from "unspecified").
-     */
-
-    tagPtr->attrs.borderWidth = MAX(0, tagPtr->attrs.borderWidth);
-
-    if (tagPtr->langObj) {
-	if (!TkTextTestLangCode(interp, tagPtr->langObj)) {
-	    rc = TCL_ERROR;
-	} else {
-	    memcpy(tagPtr->lang, Tcl_GetString(tagPtr->langObj), 3);
-	}
-    } else {
-	memset(tagPtr->lang, 0, 3);
-    }
-    if (tagPtr->relief != TK_RELIEF_NULL) {
-    } else if (relief != TK_RELIEF_NULL) {
-	SetupDefaultRelief(textPtr, tagPtr);
-    }
-    if (tagPtr->tabArrayPtr) {
-	Tcl_Free(tagPtr->tabArrayPtr);
-	tagPtr->tabArrayPtr = NULL;
-    }
-    if (tagPtr->tabStringObj) {
-	if (!(tagPtr->tabArrayPtr = TkTextGetTabs(interp, textPtr->tkwin, tagPtr->tabStringObj))) {
-	    rc = TCL_ERROR;
-	}
-    }
-    if (tagPtr->hyphenRulesObj) {
-	int oldHyphenRules = tagPtr->hyphenRules;
-
-	if (TkTextParseHyphenRules(textPtr, tagPtr->hyphenRulesObj, &tagPtr->hyphenRules) != TCL_OK) {
-	    rc = TCL_ERROR;
-	}
-	if (oldHyphenRules != tagPtr->hyphenRules && textPtr->hyphenate) {
-	    affectsDisplay = true;
-	}
-    }
-    if (tagPtr->elide >= 0) {
-	if (elide < 0) {
-	    sharedTextPtr->numElisionTags += 1;
-	}
-
-	if (TkBitTest(sharedTextPtr->selectionTags, tagPtr->index)) {
-	    /*
-	     * It's not allowed to set the elide attribute of the special selection tag
-	     * to 'true' (this would cause errors, because this case is not implemented).
-	     */
-
-	    tagPtr->elide = -1;
-	    Tcl_SetObjResult(interp, Tcl_ObjPrintf(
-		    "not allowed to set elide option of selection tag \"%s\"", tagPtr->name));
-	    Tcl_SetErrorCode(interp, "TK", "VALUE", "ELIDE", (char *)NULL);
-	    rc = TCL_ERROR;
-	}
-
-	/*
-	 * Indices are potentially obsolete after changing -elide,
-	 * especially those computed with "display" or "any"
-	 * submodifier, therefore increase the epoch.
-	 */
-
-	TkBTreeIncrEpoch(sharedTextPtr->tree);
-    } else {
-	if (elide >= 0) {
-	    sharedTextPtr->numElisionTags -= 1;
-	}
-	tagPtr->elide = -1;
-    }
-    if (tagPtr->undo != undo) {
-	TkBitPut(sharedTextPtr->dontUndoTags, tagPtr->index, !tagPtr->undo);
-    }
-
-    /*
-     * If the "sel" tag was changed, be sure to mirror information
-     * from the tag back into the text widget record.
-     */
-
-    if (tagPtr->isSelTag) {
-	if (tagPtr->attrs.border != textPtr->selTagConfigAttrs.border) {
-	    textPtr->selAttrs.border = tagPtr->attrs.border;
-	}
-	if (tagPtr->attrs.inactiveBorder != textPtr->selTagConfigAttrs.inactiveBorder) {
-	    textPtr->selAttrs.inactiveBorder = tagPtr->attrs.inactiveBorder;
-	}
-	if (tagPtr->attrs.fgColor != textPtr->selTagConfigAttrs.fgColor) {
-	    textPtr->selAttrs.fgColor = tagPtr->attrs.fgColor;
-	}
-	if (tagPtr->attrs.inactiveFgColor != textPtr->selTagConfigAttrs.inactiveFgColor) {
-	    textPtr->selAttrs.inactiveFgColor = tagPtr->attrs.inactiveFgColor;
-	}
-	if (tagPtr->attrs.borderWidthObj != textPtr->selTagConfigAttrs.borderWidthObj) {
-	    textPtr->selAttrs.borderWidthObj = tagPtr->attrs.borderWidthObj;
-	    textPtr->selAttrs.borderWidth = tagPtr->attrs.borderWidth;
-	}
-	textPtr->selTagConfigAttrs = tagPtr->attrs;
-	tagPtr->attrs = textPtr->selAttrs;
-    }
-
-    TkTextUpdateTagDisplayFlags(tagPtr);
-    if (tagPtr->affectsDisplay) {
-	affectsDisplay = true;
-    }
-    if (tagPtr->tkfont != NULL && tagPtr->tkfont != textPtr->tkfont) {
-	Tk_FontMetrics fm;
-
-	Tk_GetFontMetrics(tagPtr->tkfont, &fm);
-	if (MAX(1, fm.linespace) != textPtr->lineHeight) {
-	    affectsLineHeight = 1;
-	}
-    }
-
-    TkBitPut(sharedTextPtr->elisionTags, tagPtr->index, tagPtr->elide >= 0);
-    TkBitPut(sharedTextPtr->affectDisplayTags, tagPtr->index, tagPtr->affectsDisplay);
-    TkBitPut(sharedTextPtr->notAffectDisplayTags, tagPtr->index, !tagPtr->affectsDisplay);
-    TkBitPut(sharedTextPtr->affectGeometryTags, tagPtr->index, tagPtr->affectsDisplayGeometry);
-    TkBitPut(sharedTextPtr->affectLineHeightTags, tagPtr->index, affectsLineHeight);
-
-    if (!TkBitTest(sharedTextPtr->selectionTags, tagPtr->index)) {
-	TkBitPut(sharedTextPtr->affectDisplayNonSelTags, tagPtr->index, tagPtr->affectsDisplay);
-	TkBitPut(sharedTextPtr->affectGeometryNonSelTags, tagPtr->index,
-		tagPtr->affectsDisplayGeometry);
-    }
-
-    if ((tagPtr->elide >= 0)!= (elide >= 0) || ((tagPtr->elide >= 0) && elide != tagPtr->elide)) {
-	/*
-	 * Eventually we have to insert/remove branches and links according to
-	 * the elide information of this tag.
-	 */
-
-	TkBTreeUpdateElideInfo(textPtr, tagPtr);
-    }
-
-    if (redraw && !newTag && affectsDisplay) {
-	/*
-	 * This action is not necessary if this is a new tag, since it can't have been
-	 * applied to anything yet.
-	 *
-	 * If this is the 'sel' tag, then we don't need to call this for all peers, unless
-	 * we actually want to synchronize sel-style changes across the peers.
-	 */
-
-	TkTextRedrawTag(sharedTextPtr, NULL, NULL, NULL, tagPtr, 0);
-    }
-
-    return rc;
-}
-
-/*
- *----------------------------------------------------------------------
- *
- * TkTextFontHeightChanged --
- *
- *	The font height of the text widget has changed, so we have to update
- *	textPtr->affectLineHeightTags accordingly.
- *
- * Results:
- *	None.
- *
- * Side effects:
- *	textPtr->affectLineHeightTags will be updated.
- *
- *----------------------------------------------------------------------
- */
-
-void
-TkTextFontHeightChanged(
-    TkText *textPtr)		/* Info about overall widget. */
-{
-    Tcl_HashSearch search;
-    Tcl_HashEntry *hPtr = NULL;
-    TkBitField *affectLineHeightTags = textPtr->sharedTextPtr->affectLineHeightTags;
-
-    TkBitClear(affectLineHeightTags);
-
-    for (hPtr = Tcl_FirstHashEntry(&textPtr->sharedTextPtr->tagTable, &search);
-	    hPtr;
-	    hPtr = Tcl_NextHashEntry(&search)) {
-	const TkTextTag *tagPtr = (const TkTextTag *)Tcl_GetHashValue(hPtr);
-
-	if (tagPtr->tkfont != NULL && tagPtr->tkfont != textPtr->tkfont) {
-	    Tk_FontMetrics fm;
-
-	    Tk_GetFontMetrics(tagPtr->tkfont, &fm);
-	    if (MAX(1, fm.linespace) != textPtr->lineHeight) {
-		TkBitSet(affectLineHeightTags, tagPtr->index);
-	    }
-	}
-    }
-}
-
-/*
- *----------------------------------------------------------------------
- *
- * AppendTags --
- *
- *	This function is appending the given array of tags to the interpreter.
- *
- * Results:
- *	None.
- *
- * Side effects:
- *	Results will be appended to the interpreter.
- *
- *----------------------------------------------------------------------
- */
-
-static void
-AppendTags(
-    Tcl_Interp *interp,		/* Current interpreter. */
-    unsigned numTags,		/* Size of array. */
-    TkTextTag **tagArray)	/* Array of tag pointer, some pointer may be NULL. */
-{
-    unsigned i;
-    Tcl_Obj *listObj;
-
-    if (numTags == 0) {
-	return;
-    }
-
-    TkTextSortTags(numTags, tagArray);
-    listObj = Tcl_NewObj();
-
-    for (i = 0; i < numTags; ++i) {
-	if (tagArray[i]) {
-	    Tcl_ListObjAppendElement(interp, listObj, Tcl_NewStringObj(tagArray[i]->name, TCL_INDEX_NONE));
-	}
-    }
-    Tcl_SetObjResult(interp, listObj);
-}
-
-/*
- *----------------------------------------------------------------------
- *
- * TkTextReplaceTags --
- *
- *	This function is replacing the tag information of given segment
- *	with provided list of tags.
- *
- * Results:
- *	None.
- *
- * Side effects:
- *	None.
- *
- *----------------------------------------------------------------------
- */
-
-# define TK_TEXT_SET_MAX_BIT_SIZE (((512 + TK_BIT_NBITS - 1)/TK_BIT_NBITS)*TK_BIT_NBITS)
-
-void
-TkTextReplaceTags(
-    TkText *textPtr,		/* Info about overall window. */
-    TkTextSegment *segPtr,	/* Setup tag info of this segment. */
-    int undoable,		/* Replacement of tags is undoable? */
-    Tcl_Obj *tagListPtr)	/* List of tags. */
-{
-    TkTextTagSet *newTagInfoPtr;
-    TkTextTagSet *oldTagInfoPtr;
-    TkSharedText *sharedTextPtr;
-    TkTextTag *tagArrBuf[TK_TEXT_SET_MAX_BIT_SIZE];
-    TkTextTag **tagArrPtr = tagArrBuf;
-    TkTextTag *tagPtr;
-    TkTextUndoStack undoStack;
-    TkTextIndex index[2];
-    int altered = 0;
-    int anyChanges = 0;
-    Tcl_Obj **objs;
-    Tcl_Size objn = 0, k;
-    unsigned j;
-
-    assert(textPtr);
-    assert(segPtr);
-    assert(segPtr->tagInfoPtr);
-    assert(tagListPtr);
-
-    Tcl_ListObjGetElements(NULL, tagListPtr, &objn, &objs);
-    TkTextIndexClear(&index[0], textPtr);
-    TkTextIndexSetSegment(&index[0], segPtr);
-    TkrTextIndexForwBytes(textPtr, &index[0], 1, &index[1]);
-    TkTextTagSetIncrRefCount(oldTagInfoPtr = segPtr->tagInfoPtr);
-
-    if ((size_t)objn > sizeof(tagArrBuf)/sizeof(tagArrBuf[0])) {
-	tagArrPtr = (TkTextTag**)Tcl_Alloc(objn*sizeof(tagArrPtr[0]));
-    }
-
-    for (k = 0; k < objn; ++k) {
-	tagArrPtr[k] = TkTextCreateTag(textPtr, Tcl_GetString(objs[k]), NULL);
-    }
-
-    sharedTextPtr = textPtr->sharedTextPtr;
-    newTagInfoPtr = TkTextTagSetResize(NULL, sharedTextPtr->tagInfoSize);
-
-    for (k = 0; k < objn; ++k) {
-	newTagInfoPtr = TkTextTagSetAddToThis(newTagInfoPtr, tagArrPtr[k]->index);
-    }
-
-    undoStack = sharedTextPtr->undoStack;
-    if (!undoable) {
-	sharedTextPtr->undoStack = NULL; /* disable undo temporarily */
-    }
-
-    /*
-     * Remove the deleted tags, but ignore the "sel" tag.
-     */
-
-    for (j = TkTextTagSetFindFirst(oldTagInfoPtr);
-	    j != TK_TEXT_TAG_SET_NPOS;
-	    j = TkTextTagSetFindNext(oldTagInfoPtr, j)) {
-	if (!TkTextTagSetTest(newTagInfoPtr, j)) {
-	    tagPtr = sharedTextPtr->tagLookup[j];
-	    if (!tagPtr->isSelTag && TagAddRemove(textPtr, &index[0], &index[1], tagPtr, false)) {
-		anyChanges = 1;
-		if (tagPtr->undo) {
-		    altered = 1;
-		}
-	    }
-	}
-    }
-
-    /*
-     * Add new tags, but ignore the "sel" tag.
-     */
-
-    for (j = TkTextTagSetFindFirst(newTagInfoPtr);
-	    j != TK_TEXT_TAG_SET_NPOS;
-	    j = TkTextTagSetFindNext(newTagInfoPtr, j)) {
-	if (!TkTextTagSetTest(segPtr->tagInfoPtr, j)) {
-	    tagPtr = sharedTextPtr->tagLookup[j];
-	    if (!tagPtr->isSelTag && TagAddRemove(textPtr, &index[0], &index[1], tagPtr, true)) {
-		anyChanges = 1;
-		if (tagPtr->undo) {
-		    altered = 1;
-		}
-	    }
-	}
-    }
-
-    TkTextTagSetDecrRefCount(oldTagInfoPtr);
-    TkTextTagSetDecrRefCount(newTagInfoPtr);
-    sharedTextPtr->undoStack = undoStack;
-
-    if (anyChanges) {
-	/* still need to trigger enter/leave events on tags that have changed */
-	TkTextEventuallyRepick(textPtr);
-    }
-    if (altered) {
-	TkTextUpdateAlteredFlag(sharedTextPtr);
-    }
-    if (tagArrPtr != tagArrBuf) {
-	Tcl_Free(tagArrPtr);
-    }
-}
-
-/*
- *----------------------------------------------------------------------
- *
- * TkTextFindTags --
- *
- *	This function is appending the tags from given char segment to the
- *	interpreter.
- *
- * Results:
- *	None.
- *
- * Side effects:
- *	Results will be appended to the interpreter.
- *
- *----------------------------------------------------------------------
- */
-
-void
-TkTextFindTags(
-    Tcl_Interp *interp,		/* Current interpreter. */
-    TkText *textPtr,		/* Info about overall widget. */
-    const TkTextSegment *segPtr,/* Tags from this segment. */
-    int discardSelection)	/* "sel" tag will be discarded? */
-{
-    TkTextTag *tagPtr;
-    Tcl_Obj *listObj;
-
-    assert(segPtr);
-
-    tagPtr = TkBTreeGetSegmentTags(textPtr->sharedTextPtr, segPtr, textPtr,
-	    TK_TEXT_SORT_ASCENDING, NULL);
-    listObj = Tcl_NewObj();
-
-    for ( ; tagPtr; tagPtr = tagPtr->nextPtr) {
-	if (!discardSelection || tagPtr != textPtr->selTagPtr) {
-	    Tcl_ListObjAppendElement(interp, listObj, Tcl_NewStringObj(tagPtr->name, TCL_INDEX_NONE));
-	}
-    }
-
-    Tcl_SetObjResult(interp, listObj);
-}
-
-/*
- *----------------------------------------------------------------------
- *
- * TkTextTagChangedUndoRedo --
- *
- *	This function is called when any tag range has been changed during
- *	an undo/redo operation.
- *
- * Results:
- *	None.
- *
- * Side effects:
- *	See TkTextRedrawTag, and GrabSelection.
- *
- *----------------------------------------------------------------------
- */
-
-bool
-TkTextTagChangedUndoRedo(
-    const TkSharedText *sharedTextPtr,
-    TkText *textPtr,
-    const TkTextIndex *indexPtr1,
-    const TkTextIndex *indexPtr2,
-    const TkTextTag *tagPtr,
-    bool affectsDisplayGeometry)
-{
-    if (!TkTextRedrawTag(sharedTextPtr, textPtr, indexPtr1, indexPtr2, tagPtr, affectsDisplayGeometry)) {
-	return false;
-    }
-    if (textPtr && tagPtr == textPtr->selTagPtr) {
-	GrabSelection(tagPtr->textPtr, tagPtr, TkTextTestTag(indexPtr1, tagPtr), true);
-    }
-    return true;
-}
-
-/*
- *----------------------------------------------------------------------
- *
- * GrabSelection --
- *	Grab the selection if we're supposed to export it and don't already
- *	have it.
- *
- *	Also, invalidate partially-completed selection retrievals. We only
- *	need to check whether the tag is "sel" for this textPtr (not for
- *	other peer widget's "sel" tags) because we cannot reach this code
- *	path with a different widget's "sel" tag.
- *
- * Results:
- *	None.
- *
- * Side effects:
- *	Some text segments may be modified.
- *
- *----------------------------------------------------------------------
- */
-
-static void
-GrabSelection(
-    TkText *textPtr,		/* Info about overall widget. */
-    TCL_UNUSED(const TkTextTag *),	/* Tag which has been modified. */
-    bool add,			/* 'true' means that we have added the "sel" tag;
-				 * 'false' means we have removed the "sel" tag. */
-    bool changed)		/* 'false' means that the selection has not changed, nevertheless
-				 * the text widget should become the owner again. */
-{
-    bool ownSelection = add && textPtr->exportSelection && !(textPtr->flags & GOT_SELECTION);
-
-    assert(textPtr);
-
-    if (changed || ownSelection) {
-	/*
-	 * Send an event that the selection changed. This is
-	 * equivalent to:
-	 *	   event generate $textWidget <<Selection>>
-	 */
-
-	TkTextSelectionEvent(textPtr);
-    }
-    if (ownSelection && (!Tcl_IsSafe(textPtr->interp))) {
-	Tk_OwnSelection(textPtr->tkwin, XA_PRIMARY, TkTextLostSelection, textPtr);
-	textPtr->flags |= GOT_SELECTION;
-    }
-    if (changed) {
-	textPtr->abortSelections = 1;
-    }
-}
-
-/*
- *----------------------------------------------------------------------
- *
- * TagAddRemove --
- *	This functions adds or removes a tag (or all tags) from the characters
- *	between given index range.
- *
- * Results:
- *	None.
- *
- * Side effects:
- *	Some text segments may be modified.
- *
- *----------------------------------------------------------------------
- */
-
-static bool
-UndoTagOperation(
-    const TkSharedText *sharedTextPtr,
-    const TkTextTag *tagPtr)
-{
-    return sharedTextPtr->undoStack && (!tagPtr || tagPtr->undo);
-}
-
-static bool
-TagAddRemove(
-    TkText *textPtr,		/* Info about overall widget. */
-    const TkTextIndex *index1Ptr,
-				/* Indicates first character in range. */
-    const TkTextIndex *index2Ptr,
-				/* Indicates character just after the last one in range. */
-    TkTextTag *tagPtr,		/* Tag to add or remove. */
-    bool add)			/* 'true' means add tag to the given range of characters;
-				 * 'false' means remove the tag from the range. */
-{
-    TkSharedText *sharedTextPtr = textPtr->sharedTextPtr;
-    TkTextUndoInfo *undoInfoPtr;
-    TkTextUndoInfo undoInfo;
-
-    assert(!sharedTextPtr->undoStack || !TkTextUndoIsPerformingUndo(sharedTextPtr->undoStack));
-    assert(!sharedTextPtr->undoStack || !TkTextUndoIsPerformingRedo(sharedTextPtr->undoStack));
-
-    if (!add && !tagPtr->rootPtr) {
-	return 0; /* no change possible */
-    }
-
-    undoInfoPtr = UndoTagOperation(sharedTextPtr, tagPtr) ? &undoInfo : NULL;
-
-    if (!TkBTreeTag(sharedTextPtr, textPtr, index1Ptr, index2Ptr, tagPtr, add,
-	    undoInfoPtr, TkTextRedrawTag)) {
-	return 0;
-    }
-
-    if (undoInfoPtr) {
-	if (undoInfo.token) {
-	    tagPtr->refCount += 1;
-	    TkTextUndoPushItem(sharedTextPtr->undoStack, undoInfo.token, undoInfo.byteSize);
-	}
-	sharedTextPtr->undoStackEvent = 1;
-    }
-
-    return 1;
-}
-
-/*
- *----------------------------------------------------------------------
- *
- * TkTextBindEvent --
- *
- *	Bind events to the specified resource name.
- *
- * Results:
- *	Any of the standard Tcl return values.
- *
- * Side effects:
- *	A new entry in the binding table will be inserted, or an exisiting
- *	entry will be deleted.
- *
- *----------------------------------------------------------------------
- */
-
-int
-TkTextBindEvent(
-    Tcl_Interp *interp,		/* Current interpreter. */
-    int objc,			/* Number of arguments. */
-    Tcl_Obj *const objv[],	/* Remaining argument objects. */
-    TkSharedText *sharedTextPtr,/* Shared text resource. */
-    Tk_BindingTable *bindingTablePtr,
-				/* Pointer to binding table. */
-    const char *name)		/* Bind event to this resource (tag or image). */
-{
-    static const unsigned motionMask = ButtonMotionMask|Button1MotionMask
-		|Button2MotionMask|Button3MotionMask|Button4MotionMask
-		|Button5MotionMask|PointerMotionMask;
-
-    /*
-     * Make a binding table if the widget doesn't already have one.
-     */
-
-    if (!*bindingTablePtr) {
-	*bindingTablePtr = Tk_CreateBindingTable(interp);
-    }
-
-    if (objc == 2) {
-	int append = 0;
-	unsigned long mask;
-	const char *eventString = Tcl_GetString(objv[0]);
-	const char *fifth = Tcl_GetString(objv[1]);
-
-	if (fifth[0] == '\0') {
-	    return Tk_DeleteBinding(interp, *bindingTablePtr, (void *)name, eventString);
-	}
-	if (fifth[0] == '+') {
-	    fifth += 1;
-	    append = 1;
-	}
-	mask = Tk_CreateBinding(interp, *bindingTablePtr, (void *)name, eventString, fifth, append);
-	if (mask == 0) {
-	    return TCL_ERROR;
-	}
-	if (mask & (unsigned) ~(motionMask|ButtonPressMask|ButtonReleaseMask|EnterWindowMask
-		|LeaveWindowMask|KeyPressMask|KeyReleaseMask|VirtualEventMask)) {
-	    Tk_DeleteBinding(interp, *bindingTablePtr, (void *)name, eventString);
-	    Tcl_ResetResult(interp);
-	    Tcl_SetObjResult(interp, Tcl_NewStringObj(
-		    "requested illegal events; only key, button, motion,"
-		    " enter, leave, and virtual events may be used", TCL_INDEX_NONE));
-	    Tcl_SetErrorCode(interp, "TK", "TEXT", "TAG_BIND_EVENT", (char *)NULL);
-	    return TCL_ERROR;
-	}
-	if (mask & motionMask) {
-	    /*
-	     * TODO: It would be better to count tags with motion mask, but this silly
-	     * binding protocol does not provide any function which helps to detect when
-	     * bindings with motion masks will be deleted. So we cannot do more than
-	     * to detect whether any motion mask has ever been set. This has an effect
-	     * on TkTextPickCurrent, this function will be considerably faster if
-	     * 'numMotionEventBindings' is zero, because in latter case only traversals
-	     * between display chunks will be considered. We assume that the use of a
-	     * motion mask is rather seldom, normally only the Enter/Leave events are
-	     * of interest.
-	     */
-	    sharedTextPtr->numMotionEventBindings = 1;
-	}
-    } else if (objc == 1) {
-	const char *command;
-
-	command = Tk_GetBinding(interp, *bindingTablePtr, (void *)name, Tcl_GetString(objv[0]));
-	if (!command) {
-	    const char *string = Tcl_GetString(Tcl_GetObjResult(interp));
-
-	    /*
-	     * Ignore missing binding errors. This is a special hack that relies on the
-	     * error message returned by FindSequence in tkBind.c.
-	     */
-
-	    if (string[0] != '\0') {
-		return TCL_ERROR;
-	    }
-	    Tcl_ResetResult(interp);
-	} else {
-	    Tcl_SetObjResult(interp, Tcl_NewStringObj(command, TCL_INDEX_NONE));
-	}
-    } else {
-	Tk_GetAllBindings(interp, *bindingTablePtr, (void *)name);
-    }
-
     return TCL_OK;
 }
 
@@ -1803,80 +869,39 @@ TkTextBindEvent(
  *----------------------------------------------------------------------
  */
 
-static void
-MarkIndex(
-    TkSharedText *sharedTextPtr,
-    TkTextTag *tagPtr,
-    int set)
-{
-    if (set && tagPtr->index >= TkBitSize(sharedTextPtr->usedTags)) {
-	sharedTextPtr->tagInfoSize = TkBitAdjustSize(tagPtr->index + 1);
-    }
-
-    TkBitPut(sharedTextPtr->usedTags, tagPtr->index, set);
-    assert((!sharedTextPtr->tagLookup[tagPtr->index]) == set);
-    sharedTextPtr->tagLookup[tagPtr->index] = set ? tagPtr : NULL;
-}
-
 TkTextTag *
 TkTextCreateTag(
     TkText *textPtr,		/* Widget in which tag is being used. */
     const char *tagName,	/* Name of desired tag. */
-    int *newTag)		/* If non-NULL, then return true if new, or false if already exists. */
+    int *newTag)		/* If non-NULL, then return 1 if new, or 0 if
+				 * already exists. */
 {
-    TkSharedText *sharedTextPtr = textPtr->sharedTextPtr;
     TkTextTag *tagPtr;
     Tcl_HashEntry *hPtr = NULL;
     int isNew;
     const char *name;
-    unsigned index;
 
-    bool isSelTag = (strcmp(tagName, "sel") == 0);
-
-    if (isSelTag) {
-	if (textPtr->selTagPtr) {
-	    if (newTag) {
+    if (!strcmp(tagName, "sel")) {
+	if (textPtr->selTagPtr != NULL) {
+	    if (newTag != NULL) {
 		*newTag = 0;
 	    }
 	    return textPtr->selTagPtr;
 	}
-	if (newTag) {
+	if (newTag != NULL) {
 	    *newTag = 1;
 	}
 	name = "sel";
     } else {
-	hPtr = Tcl_CreateHashEntry(&sharedTextPtr->tagTable, tagName, &isNew);
-	if (newTag) {
+	hPtr = Tcl_CreateHashEntry(&textPtr->sharedTextPtr->tagTable,
+		tagName, &isNew);
+	if (newTag != NULL) {
 	    *newTag = isNew;
 	}
 	if (!isNew) {
-	    return (TkTextTag*)Tcl_GetHashValue(hPtr);
+	    return (TkTextTag *)Tcl_GetHashValue(hPtr);
 	}
-	name = (const char *)Tcl_GetHashKey(&sharedTextPtr->tagTable, hPtr);
-    }
-
-    if ((index = TkBitFindFirstNot(sharedTextPtr->usedTags)) == TK_BIT_NPOS) {
-	unsigned oldSize = TkBitSize(sharedTextPtr->usedTags);
-	unsigned newSize = TkBitAdjustSize((index = oldSize) + 1);
-
-	sharedTextPtr->usedTags = TkBitResize(sharedTextPtr->usedTags, newSize);
-	sharedTextPtr->elisionTags = TkBitResize(sharedTextPtr->elisionTags, newSize);
-	sharedTextPtr->selectionTags = TkBitResize(sharedTextPtr->selectionTags, newSize);
-	sharedTextPtr->dontUndoTags = TkBitResize(sharedTextPtr->dontUndoTags, newSize);
-	sharedTextPtr->affectDisplayTags = TkBitResize(sharedTextPtr->affectDisplayTags, newSize);
-	sharedTextPtr->notAffectDisplayTags = TkBitResize(sharedTextPtr->notAffectDisplayTags, newSize);
-	sharedTextPtr->affectDisplayNonSelTags = TkBitResize(
-		sharedTextPtr->affectDisplayNonSelTags, newSize);
-	sharedTextPtr->affectGeometryTags = TkBitResize( sharedTextPtr->affectGeometryTags, newSize);
-	sharedTextPtr->affectGeometryNonSelTags = TkBitResize(
-		sharedTextPtr->affectGeometryNonSelTags, newSize);
-	sharedTextPtr->affectLineHeightTags = TkBitResize(sharedTextPtr->affectLineHeightTags, newSize);
-	sharedTextPtr->tagLookup = (TkTextTag **)Tcl_Realloc(sharedTextPtr->tagLookup, newSize * sizeof(TkTextTag *));
-	DEBUG(memset(sharedTextPtr->tagLookup + oldSize, 0, (newSize - oldSize) * sizeof(TkTextTag *)));
-    }
-
-    if (sharedTextPtr->tagInfoSize <= index) {
-	sharedTextPtr->tagInfoSize = TkBitAdjustSize(index + 1);
+	name = (const char *)Tcl_GetHashKey(&textPtr->sharedTextPtr->tagTable, hPtr);
     }
 
     /*
@@ -1885,80 +910,56 @@ TkTextCreateTag(
      */
 
     tagPtr = (TkTextTag *)Tcl_Alloc(sizeof(TkTextTag));
-    memset(tagPtr, 0, sizeof(TkTextTag));
     tagPtr->name = name;
-    tagPtr->index = index;
-    tagPtr->priority = sharedTextPtr->numEnabledTags;
-    tagPtr->isSelTag = isSelTag;
-    tagPtr->bgStipple = None;
-    tagPtr->fgStipple = None;
-    tagPtr->elide = -1;
-    tagPtr->justify = TK_TEXT_JUSTIFY_NULL;
+    tagPtr->textPtr = NULL;
+    tagPtr->toggleCount = 0;
+    tagPtr->tagRootPtr = NULL;
+    tagPtr->priority = textPtr->sharedTextPtr->numTags;
+    tagPtr->border = NULL;
+    tagPtr->borderWidthObj = NULL;
     tagPtr->relief = TK_RELIEF_NULL;
+    tagPtr->bgStipple = None;
+    tagPtr->fgColor = NULL;
+    tagPtr->tkfont = NULL;
+    tagPtr->fgStipple = None;
+    tagPtr->justify = TK_JUSTIFY_NULL;
+    tagPtr->lMargin1Obj = NULL;
+    tagPtr->lMargin1 = 0;
+    tagPtr->lMargin2Obj = NULL;
+    tagPtr->lMargin2 = 0;
+    tagPtr->lMarginColor = NULL;
+    tagPtr->offsetObj = NULL;
+    tagPtr->offset = 0;
+    tagPtr->overstrike = -1;
+    tagPtr->overstrikeColor = NULL;
+    tagPtr->rMarginObj = NULL;
+    tagPtr->rMargin = 0;
+    tagPtr->rMarginColor = NULL;
+    tagPtr->selBorder = NULL;
+    tagPtr->selFgColor = NULL;
+    tagPtr->spacing1Obj = NULL;
+    tagPtr->spacing2Obj = NULL;
+    tagPtr->spacing3Obj = NULL;
+    tagPtr->tabStringPtr = NULL;
+    tagPtr->tabArrayPtr = NULL;
     tagPtr->tabStyle = TK_TEXT_TABSTYLE_NULL;
+    tagPtr->underline = -1;
+    tagPtr->underlineColor = NULL;
+    tagPtr->elide = -1;
     tagPtr->wrapMode = TEXT_WRAPMODE_NULL;
-    tagPtr->undo = sharedTextPtr->undoTagging && !isSelTag;
-    tagPtr->sharedTextPtr = sharedTextPtr;
-    tagPtr->undoTagListIndex = -1;
-    tagPtr->refCount = 1;
-    tagPtr->tagEpoch = ++sharedTextPtr->tagEpoch;
-    DEBUG_ALLOC(tkTextCountNewTag++);
-
-    tagPtr->optionTable = Tk_CreateOptionTable(textPtr->interp, tagOptionSpecs);
-
-    sharedTextPtr->numTags += 1;
-    sharedTextPtr->numEnabledTags += 1;
-
-    if (isSelTag) {
+    tagPtr->affectsDisplay = false;
+    tagPtr->affectsDisplayGeometry = false;
+    textPtr->sharedTextPtr->numTags++;
+    if (!strcmp(tagName, "sel")) {
 	tagPtr->textPtr = textPtr;
-	textPtr->refCount += 1;
-	TkBitSet(sharedTextPtr->selectionTags, index);
-	TkBitSet(sharedTextPtr->dontUndoTags, index);
+	textPtr->refCount++;
     } else {
-	assert(hPtr);
+	CLANG_ASSERT(hPtr);
 	Tcl_SetHashValue(hPtr, tagPtr);
     }
-
-    SetupDefaultRelief(textPtr, tagPtr);
-    MarkIndex(sharedTextPtr, tagPtr, 1);
+    tagPtr->optionTable =
+	    Tk_CreateOptionTable(textPtr->interp, tagOptionSpecs);
     return tagPtr;
-}
-
-/*
- *----------------------------------------------------------------------
- *
- * TkTextFindTag --
- *
- *	See if tag is defined for a given widget.
- *
- * Results:
- *	If tagName is defined in textPtr, a pointer to its TkTextTag structure
- *	is returned. Otherwise NULL is returned.
- *
- * Side effects:
- *	None.
- *
- *----------------------------------------------------------------------
- */
-
-TkTextTag *
-TkTextFindTag(
-    const TkText *textPtr,	/* Widget in which tag is being used. */
-    const char *tagName)	/* Name of desired tag. */
-{
-    Tcl_HashEntry *hPtr;
-
-    assert(textPtr);
-    assert(tagName);
-
-    if (strcmp(tagName, "sel") == 0) {
-	return textPtr->selTagPtr;
-    }
-    hPtr = Tcl_FindHashEntry(&textPtr->sharedTextPtr->tagTable, tagName);
-    if (hPtr) {
-	return (TkTextTag *)Tcl_GetHashValue(hPtr);
-    }
-    return NULL;
 }
 
 /*
@@ -1981,137 +982,35 @@ TkTextFindTag(
 
 static TkTextTag *
 FindTag(
-    Tcl_Interp *interp,		/* Interpreter to use for error message; if NULL, then don't record
-				 * an error message. */
-    const TkText *textPtr,	/* Widget in which tag is being used. */
+    Tcl_Interp *interp,		/* Interpreter to use for error message; if
+				 * NULL, then don't record an error
+				 * message. */
+    TkText *textPtr,		/* Widget in which tag is being used. */
     Tcl_Obj *tagName)		/* Name of desired tag. */
 {
-    const char *name = Tcl_GetString(tagName);
-    TkTextTag *tagPtr = TkTextFindTag(textPtr, name);
+    Tcl_HashEntry *hPtr;
+    Tcl_Size len;
+    const char *str;
 
-    if (!tagPtr && interp) {
+    str = Tcl_GetStringFromObj(tagName, &len);
+    if (len == 3 && !strcmp(str, "sel")) {
+	return textPtr->selTagPtr;
+    }
+    hPtr = Tcl_FindHashEntry(&textPtr->sharedTextPtr->tagTable,
+	    Tcl_GetString(tagName));
+    if (hPtr != NULL) {
+	return (TkTextTag *)Tcl_GetHashValue(hPtr);
+    }
+    if (interp != NULL) {
 	Tcl_SetObjResult(interp, Tcl_ObjPrintf(
-		"tag \"%s\" isn't defined in text widget", name));
-	Tcl_SetErrorCode(interp, "TK", "LOOKUP", "TEXT_TAG", name, (char *)NULL);
+		"tag \"%s\" isn't defined in text widget",
+		Tcl_GetString(tagName)));
+	Tcl_SetErrorCode(interp, "TK", "LOOKUP", "TEXT_TAG",
+		Tcl_GetString(tagName), NULL);
     }
-
-    return tagPtr;
+    return NULL;
 }
 
-/*
- *----------------------------------------------------------------------
- *
- * TkTextEnableTag --
- *
- *	If this tag is disabled, then re-enable it.
- *
- * Results:
- *	None.
- *
- * Side effects:
- *	None.
- *
- *----------------------------------------------------------------------
- */
-
-void
-TkTextEnableTag(
-    TkSharedText *sharedTextPtr,/* Shared text resource. */
-    TkTextTag *tagPtr)		/* Tag being deleted. */
-{
-    if (tagPtr->isDisabled) {
-	tagPtr->isDisabled = false;
-	MarkIndex(sharedTextPtr, tagPtr, 1);
-	sharedTextPtr->numEnabledTags += 1;
-	ChangeTagPriority(sharedTextPtr, tagPtr, tagPtr->savedPriority, 0);
-    }
-}
-
-/*
- *----------------------------------------------------------------------
- *
- * TkTextReleaseTag --
- *
- *	Delete this tag if the reference counter is going to zero, in this
- *	case clean up the tag structure itself. This requires that the given
- *	tag is not in use.
- *
- * Results:
- *	None.
- *
- * Side effects:
- *	Memory and other resources are freed.
- *
- *----------------------------------------------------------------------
- */
-
-void
-TkTextReleaseTag(
-    TkSharedText *sharedTextPtr,/* Shared text resource. */
-    TkTextTag *tagPtr,		/* Tag being deleted. */
-    Tcl_HashEntry *hPtr)	/* Pointer into hash table, can be NULL. */
-{
-    assert(tagPtr->refCount > 1 || !tagPtr->rootPtr);
-
-    if (--tagPtr->refCount > 0) {
-	return;
-    }
-
-    assert(!tagPtr->recentTagAddRemoveToken);
-    assert(!tagPtr->recentChangePriorityToken);
-
-    MarkIndex(sharedTextPtr, tagPtr, 0);
-    sharedTextPtr->numTags -= 1;
-
-    if (!hPtr) {
-	hPtr = Tcl_FindHashEntry(&sharedTextPtr->tagTable, tagPtr->name);
-    }
-    if (hPtr) {
-	Tcl_DeleteHashEntry(hPtr);
-    } else {
-	assert(tagPtr->isSelTag);
-    }
-
-    /*
-     * Let Tk do most of the hard work for us.
-     */
-
-    if (tagPtr->isSelTag) {
-	assert(tagPtr->textPtr);
-	/* Restore the original values. */
-	tagPtr->attrs = tagPtr->textPtr->selTagConfigAttrs;
-    }
-    Tk_FreeConfigOptions(tagPtr, tagPtr->optionTable, sharedTextPtr->peers->tkwin);
-
-    /*
-     * This associated information is managed by us.
-     */
-
-    if (tagPtr->tabArrayPtr) {
-	Tcl_Free(tagPtr->tabArrayPtr);
-    }
-
-    if (sharedTextPtr->tagBindingTable) {
-	Tk_DeleteAllBindings(sharedTextPtr->tagBindingTable, (void *)tagPtr->name);
-    }
-
-    /*
-     * If this tag is widget-specific (peer widgets) then clean up the
-     * refCount it holds.
-     */
-
-    if (tagPtr->textPtr) {
-	TkTextDecrRefCountAndTestIfDestroyed((TkText *) tagPtr->textPtr);
-	tagPtr->textPtr = NULL;
-    }
-
-    /*
-     * Finally free the tag's memory.
-     */
-
-    Tcl_Free(tagPtr);
-    DEBUG_ALLOC(tkTextCountDestroyTag++);
-}
 /*
  *----------------------------------------------------------------------
  *
@@ -2119,7 +1018,8 @@ TkTextReleaseTag(
  *
  *	This function is called to carry out most actions associated with the
  *	'tag delete' sub-command. It will remove all evidence of the tag from
- *	the B-tree, and then clean up the tag structure itself.
+ *	the B-tree, and then call TkTextFreeTag to clean up the tag structure
+ *	itself.
  *
  *	The only actions this doesn't carry out it to check if the deletion of
  *	the tag requires something to be re-displayed, and to remove the tag
@@ -2128,7 +1028,7 @@ TkTextReleaseTag(
  *	actions.
  *
  * Results:
- *	Returns whether this tag was used in current text content.
+ *	None.
  *
  * Side effects:
  *	Memory and other resources are freed, the B-tree is manipulated.
@@ -2136,108 +1036,54 @@ TkTextReleaseTag(
  *----------------------------------------------------------------------
  */
 
-int
+void
 TkTextDeleteTag(
     TkText *textPtr,		/* Info about overall widget. */
-    TkTextTag *tagPtr,		/* Tag being deleted. */
-    Tcl_HashEntry *hPtr)	/* Pointer into hash table, can be NULL (but only for "sel"). */
+    TkTextTag *tagPtr)	/* Tag being deleted. */
 {
-    TkSharedText *sharedTextPtr = textPtr->sharedTextPtr;
-    int used;
+    TkTextIndex first, last;
 
-    assert(!sharedTextPtr->undoStack || !TkTextUndoIsPerformingUndo(sharedTextPtr->undoStack));
-    assert(!sharedTextPtr->undoStack || !TkTextUndoIsPerformingRedo(sharedTextPtr->undoStack));
-    assert(hPtr || tagPtr->isSelTag);
+    TkTextMakeByteIndex(textPtr->sharedTextPtr->tree, textPtr, 0, 0, &first);
+    TkTextMakeByteIndex(textPtr->sharedTextPtr->tree, textPtr,
+	    TkBTreeNumLines(textPtr->sharedTextPtr->tree, textPtr), 0, &last),
+    TkBTreeTag(&first, &last, tagPtr, 0);
 
-    used = !!tagPtr->rootPtr;
-
-    if (used) {
-	TkTextUndoInfo undoInfo;
-	TkTextUndoInfo *undoInfoPtr;
-	TkTextIndex startIndex;
-	TkTextIndex index[2];
-	TkTextSearch tSearch;
-	int useUndo = !!(textPtr->flags & DESTROYED) && UndoTagOperation(sharedTextPtr, tagPtr);
-
-	undoInfoPtr = useUndo ? &undoInfo : NULL;
-
-	TkTextIndexSetupToStartOfText(&index[0], NULL, sharedTextPtr->tree);
-	TkTextIndexSetupToEndOfText(&index[1], NULL, sharedTextPtr->tree);
-
-	TkBTreeStartSearch(&index[0], &index[1], tagPtr, &tSearch, SEARCH_NEXT_TAGON);
-	TkBTreeNextTag(&tSearch);
-	assert(tSearch.segPtr); /* last search must not fail */
-	startIndex = tSearch.curIndex;
-
-	TkBTreeStartSearchBack(&index[1], &index[0], tagPtr, &tSearch, SEARCH_EITHER_TAGON_TAGOFF);
-	TkBTreePrevTag(&tSearch);
-	assert(tSearch.segPtr); /* last search must not fail */
-	assert(!tSearch.tagon); /* we must find tagoff */
-
-	TkBTreeTag(textPtr->sharedTextPtr, textPtr, &startIndex, &tSearch.curIndex,
-		tagPtr, 0, undoInfoPtr, TkTextRedrawTag);
-
-	if (undoInfoPtr && undoInfoPtr->token) {
-	    tagPtr->refCount += 1;
-	    TkTextUndoPushItem(sharedTextPtr->undoStack, undoInfo.token, undoInfo.byteSize);
-	}
-    }
-
-    assert(!tagPtr->rootPtr);
-
-    if (!(textPtr->flags & DESTROYED) && tagPtr->isSelTag) {
+    if (tagPtr == textPtr->selTagPtr) {
 	/*
 	 * Send an event that the selection changed. This is equivalent to:
 	 *	event generate $textWidget <<Selection>>
 	 */
 
 	TkTextSelectionEvent(textPtr);
+    } else {
+	/*
+	 * Since all peer widgets have an independent "sel" tag, we
+	 * don't want removal of one sel tag to remove bindings which
+	 * are still valid in other peer widgets.
+	 */
+
+	if (textPtr->sharedTextPtr->bindingTable != NULL) {
+	    Tk_DeleteAllBindings(textPtr->sharedTextPtr->bindingTable,
+		    (void *) tagPtr->name);
+	}
     }
 
     /*
      * Update the tag priorities to reflect the deletion of this tag.
      */
 
-    tagPtr->savedPriority = tagPtr->priority;
-    ChangeTagPriority(sharedTextPtr, tagPtr, sharedTextPtr->numEnabledTags - 1, 0);
-    sharedTextPtr->numEnabledTags -= 1;
-
-    /*
-     * Make sure this tag isn't referenced from the 'current' tag array.
-     */
-
-    if (tagPtr->index < TkTextTagSetSize(textPtr->curTagInfoPtr)) {
-	textPtr->curTagInfoPtr = TkTextTagSetErase(textPtr->curTagInfoPtr, tagPtr->index);
-    }
-
-    /*
-     * Handle the retained undo tokens.
-     */
-
-    if (tagPtr->undoTagListIndex >= 0) {
-	if (sharedTextPtr->undoStack) {
-	    TkTextPushUndoTagTokens(sharedTextPtr, tagPtr);
-	} else {
-	    TkTextReleaseUndoTagToken(sharedTextPtr, tagPtr);
-	}
-    }
-
-    tagPtr->isDisabled = true;
-    TkTextReleaseTag(sharedTextPtr, tagPtr, hPtr);
-    return used;
+    ChangeTagPriority(textPtr, tagPtr, textPtr->sharedTextPtr->numTags-1);
+    textPtr->sharedTextPtr->numTags -= 1;
+    TkTextFreeTag(textPtr, tagPtr);
 }
 
 /*
  *----------------------------------------------------------------------
  *
- * TkTextFreeAllTags --
+ * TkTextFreeTag --
  *
- *	This function is called when all tags are deleted to free up the memory
- *	and other resources associated with tags.
- *
- *	Note that this function is not freeing the indices
- *	('sharedTextPtr->usedTags', 'sharedTextPtr->elisionTags'), but both
- *	sets will be cleared.
+ *	This function is called when a tag is deleted to free up the memory
+ *	and other resources associated with the tag.
  *
  * Results:
  *	None.
@@ -2249,83 +1095,68 @@ TkTextDeleteTag(
  */
 
 void
-TkTextFreeAllTags(
-    TkText *textPtr)		/* Info about overall widget. */
+TkTextFreeTag(
+    TkText *textPtr,		/* Info about overall widget. */
+    TkTextTag *tagPtr)	/* Tag being deleted. */
 {
-    TkSharedText *sharedTextPtr = textPtr->sharedTextPtr;
-    Tcl_HashSearch search;
-    Tcl_HashEntry *hPtr;
+    int i;
 
-    DEBUG(textPtr->refCount += 1);
+    /*
+     * Let Tk do most of the hard work for us.
+     */
 
-    for (hPtr = Tcl_FirstHashEntry(&sharedTextPtr->tagTable, &search);
-	    hPtr;
-	    hPtr = Tcl_NextHashEntry(&search)) {
-	TkTextTag *tagPtr = (TkTextTag *)Tcl_GetHashValue(hPtr);
+    Tk_FreeConfigOptions(tagPtr, tagPtr->optionTable,
+	    textPtr->tkwin);
 
-	assert(tagPtr->refCount == 1);
+    /*
+     * This associated information is managed by us.
+     */
 
-	/*
-	 * Let Tk do most of the hard work for us.
-	 */
-
-	if (tagPtr->isSelTag) {
-	    assert(tagPtr->textPtr);
-	    tagPtr->attrs = tagPtr->textPtr->selTagConfigAttrs;
-	}
-	Tk_FreeConfigOptions(tagPtr, tagPtr->optionTable, textPtr->tkwin);
-
-	/*
-	 * This associated information is managed by us.
-	 */
-
-	if (tagPtr->tabArrayPtr) {
-	    Tcl_Free(tagPtr->tabArrayPtr);
-	}
-
-	if (tagPtr->undoTagListIndex >= 0) {
-	    TkTextReleaseUndoTagToken(sharedTextPtr, tagPtr);
-	}
-
-	/*
-	 * If this tag is widget-specific (peer widgets) then clean up the
-	 * refCount it holds.
-	 */
-
-	if (tagPtr->textPtr) {
-	    assert(textPtr == tagPtr->textPtr);
-	    textPtr->refCount -= 1;
-	    tagPtr->textPtr = NULL;
-	}
-
-	/*
-	 * Finally free the tag's memory.
-	 */
-
-	Tcl_Free(tagPtr);
-	DEBUG_ALLOC(tkTextCountDestroyTag++);
+    if (tagPtr->tabArrayPtr != NULL) {
+	Tcl_Free(tagPtr->tabArrayPtr);
     }
 
-    TkTextTagSetDecrRefCount(textPtr->curTagInfoPtr);
-    TkTextTagSetIncrRefCount(textPtr->curTagInfoPtr = sharedTextPtr->emptyTagInfoPtr);
+    /*
+     * Make sure this tag isn't referenced from the 'current' tag array.
+     */
 
-    TkBitClear(sharedTextPtr->usedTags);
-    TkBitClear(sharedTextPtr->elisionTags);
-    TkBitClear(sharedTextPtr->affectDisplayTags);
-    TkBitClear(sharedTextPtr->notAffectDisplayTags);
-    TkBitClear(sharedTextPtr->affectDisplayNonSelTags);
-    TkBitClear(sharedTextPtr->affectGeometryTags);
-    TkBitClear(sharedTextPtr->affectGeometryNonSelTags);
-    TkBitClear(sharedTextPtr->affectLineHeightTags);
+    for (i = 0; i < textPtr->numCurTags; i++) {
+	if (textPtr->curTagArrayPtr[i] == tagPtr) {
+	    for (; i < textPtr->numCurTags-1; i++) {
+		textPtr->curTagArrayPtr[i] = textPtr->curTagArrayPtr[i+1];
+	    }
+	    textPtr->curTagArrayPtr[textPtr->numCurTags-1] = NULL;
+	    textPtr->numCurTags--;
+	    break;
+	}
+    }
 
-    DEBUG(textPtr->refCount -= 1);
-    assert(textPtr->refCount > 0);
+    /*
+     * If this tag is widget-specific (peer widgets) then clean up the
+     * refCount it holds.
+     */
+
+    if (tagPtr->textPtr != NULL) {
+	if (textPtr != tagPtr->textPtr) {
+	    Tcl_Panic("Tag being deleted from wrong widget");
+	}
+	if (textPtr->refCount-- <= 1) {
+	    Tcl_Free(textPtr);
+	}
+	tagPtr->textPtr = NULL;
+    }
+
+    /*
+     * Finally free the tag's memory.
+     */
+
+    Tcl_Free(tagPtr);
 }
 
 /*
  *----------------------------------------------------------------------
  *
- * TkTextSortTags --
+ * SortTags --
  *
  *	This function sorts an array of tag pointers in increasing order of
  *	priority, optimizing for the common case where the array is small.
@@ -2339,32 +1170,23 @@ TkTextFreeAllTags(
  *----------------------------------------------------------------------
  */
 
-static int
-TagSortProc(
-    const void *first,
-    const void *second)		/* Elements to be compared. */
-{
-    return (int) (*(TkTextTag **) first)->priority - (int) (*(TkTextTag **) second)->priority;
-}
-
-void
-TkTextSortTags(
-    unsigned numTags,		/* Number of tag pointers at *tagArrayPtr. */
+static void
+SortTags(
+    int numTags,		/* Number of tag pointers at *tagArrayPtr. */
     TkTextTag **tagArrayPtr)	/* Pointer to array of pointers. */
 {
-    unsigned i, j, prio;
+    int i, j, prio;
     TkTextTag **tagPtrPtr;
-    TkTextTag **maxPtrPtr;
-    TkTextTag *tmp;
+    TkTextTag **maxPtrPtr, *tmp;
 
-    if (numTags <= 1) {
+    if (numTags < 2) {
 	return;
     }
-    if (numTags <= 20) {
-	for (i = numTags - 1; i > 0; i--, tagArrayPtr++) {
+    if (numTags < 20) {
+	for (i = numTags-1; i > 0; i--, tagArrayPtr++) {
 	    maxPtrPtr = tagPtrPtr = tagArrayPtr;
 	    prio = tagPtrPtr[0]->priority;
-	    for (j = i, tagPtrPtr += 1; j > 0; --j, ++tagPtrPtr) {
+	    for (j = i, tagPtrPtr++; j > 0; j--, tagPtrPtr++) {
 		if (tagPtrPtr[0]->priority < prio) {
 		    prio = tagPtrPtr[0]->priority;
 		    maxPtrPtr = tagPtrPtr;
@@ -2375,256 +1197,40 @@ TkTextSortTags(
 	    *tagArrayPtr = tmp;
 	}
     } else {
-	qsort(tagArrayPtr, numTags, sizeof(TkTextTag *), TagSortProc);
+	qsort(tagArrayPtr,(unsigned)numTags,sizeof(TkTextTag *),TagSortProc);
     }
 }
 
 /*
  *----------------------------------------------------------------------
  *
- * TkTextReleaseUndoTagToken --
+ * TagSortProc --
  *
- *	Release retained undo tokens for tag operations.
+ *	This function is called by qsort() when sorting an array of tags in
+ *	priority order.
  *
  * Results:
- *	None.
+ *	The return value is -1 if the first argument should be before the
+ *	second element (i.e. it has lower priority), 0 if it's equivalent
+ *	(this should never happen!), and 1 if it should be after the second
+ *	element.
  *
  * Side effects:
- *	Free some memory.
+ *	None.
  *
  *----------------------------------------------------------------------
  */
 
-void
-TkTextReleaseUndoTagToken(
-    TkSharedText *sharedTextPtr,
-    TkTextTag *tagPtr)
+static int
+TagSortProc(
+    const void *first,
+    const void *second)		/* Elements to be compared. */
 {
-    assert(sharedTextPtr);
+    TkTextTag *tagPtr1, *tagPtr2;
 
-    if (!tagPtr) {
-	return;
-    }
-
-    assert(tagPtr->undoTagListIndex >= 0);
-    assert(tagPtr->undoTagListIndex < (int) sharedTextPtr->undoTagListCount);
-
-    if (tagPtr->recentTagAddRemoveToken) {
-	Tcl_Free(tagPtr->recentTagAddRemoveToken);
-	DEBUG_ALLOC(tkTextCountDestroyUndoToken++);
-	tagPtr->recentTagAddRemoveToken = NULL;
-    }
-    if (tagPtr->recentChangePriorityToken) {
-	Tcl_Free(tagPtr->recentChangePriorityToken);
-	DEBUG_ALLOC(tkTextCountDestroyUndoToken++);
-	tagPtr->recentChangePriorityToken = NULL;
-    }
-
-    sharedTextPtr->undoTagList[tagPtr->undoTagListIndex] = NULL;
-    tagPtr->undoTagListIndex = -1;
-    assert(tagPtr->refCount > 1);
-    tagPtr->refCount -= 1;
-}
-
-/*
- *----------------------------------------------------------------------
- *
- * TkTextInspectUndoTagItem --
- *
- *	Inspect retained undo token.
- *
- * Results:
- *	None.
- *
- * Side effects:
- *	Memory is allocated for the result.
- *
- *----------------------------------------------------------------------
- */
-
-void
-TkTextInspectUndoTagItem(
-    const TkSharedText *sharedTextPtr,
-    const TkTextTag *tagPtr,
-    Tcl_Obj* objPtr)
-{
-    if (tagPtr) {
-	if (tagPtr->recentTagAddRemoveToken && !tagPtr->recentTagAddRemoveTokenIsNull) {
-	    Tcl_ListObjAppendElement(NULL, objPtr,
-		    TkBTreeUndoTagInspect(sharedTextPtr, tagPtr->recentTagAddRemoveToken));
-	}
-	if (tagPtr->recentChangePriorityToken) {
-	    Tcl_ListObjAppendElement(NULL, objPtr,
-		    UndoChangeTagPriorityInspect(sharedTextPtr, tagPtr->recentChangePriorityToken));
-	}
-    }
-}
-
-/*
- *----------------------------------------------------------------------
- *
- * TkTextPushUndoTagTokens --
- *
- *	Push retained undo tokens for tag operations onto the undo stack.
- *
- * Results:
- *	None.
- *
- * Side effects:
- *	Same as TkTextUndoPushItem.
- *
- *----------------------------------------------------------------------
- */
-
-void
-TkTextPushUndoTagTokens(
-    TkSharedText *sharedTextPtr,
-    TkTextTag *tagPtr)
-{
-    assert(sharedTextPtr);
-    assert(sharedTextPtr->undoStack);
-
-    if (!tagPtr) {
-	return;
-    }
-
-    assert(tagPtr->undoTagListIndex >= 0);
-    assert(tagPtr->undoTagListIndex < (int) sharedTextPtr->undoTagListCount);
-
-    if (tagPtr->recentTagAddRemoveToken) {
-	if (tagPtr->recentTagAddRemoveTokenIsNull) {
-	    Tcl_Free(tagPtr->recentTagAddRemoveToken);
-	    DEBUG_ALLOC(tkTextCountDestroyUndoToken++);
-	} else {
-	    TkTextUndoPushItem(sharedTextPtr->undoStack, tagPtr->recentTagAddRemoveToken, 0);
-	    tagPtr->refCount += 1;
-	}
-	tagPtr->recentTagAddRemoveToken = NULL;
-    }
-    if (tagPtr->recentChangePriorityToken) {
-	if (tagPtr->savedPriority != tagPtr->priority) {
-	    TkTextUndoPushItem(sharedTextPtr->undoStack, tagPtr->recentChangePriorityToken, 0);
-	    tagPtr->refCount += 1;
-	} else {
-	    Tcl_Free(tagPtr->recentChangePriorityToken);
-	    DEBUG_ALLOC(tkTextCountDestroyUndoToken++);
-	}
-	tagPtr->recentChangePriorityToken = NULL;
-    }
-
-    sharedTextPtr->undoTagList[tagPtr->undoTagListIndex] = NULL;
-    tagPtr->undoTagListIndex = -1;
-    assert(tagPtr->refCount > 1);
-    tagPtr->refCount -= 1;
-}
-
-/*
- *----------------------------------------------------------------------
- *
- * TkTextTagAddRetainedUndo --
- *
- *	Add given tag to undo list, because this tag has retained undo
- *	tokens.
- *
- * Results:
- *	None.
- *
- * Side effects:
- *	The reference counter of the tag will be incremented.
- *
- *----------------------------------------------------------------------
- */
-
-void
-TkTextTagAddRetainedUndo(
-    TkSharedText *sharedTextPtr,	/* Shared text resource. */
-    TkTextTag *tagPtr)			/* Add this tag to undo list. */
-{
-    assert(sharedTextPtr);
-    assert(tagPtr);
-
-    if (tagPtr->undoTagListIndex >= 0) {
-	return;
-    }
-
-    if (sharedTextPtr->undoTagListCount == sharedTextPtr->undoTagListSize) {
-	sharedTextPtr->undoTagListSize = 2*sharedTextPtr->numEnabledTags;
-	sharedTextPtr->undoTagList = (TkTextTag**)Tcl_Realloc(sharedTextPtr->undoTagList,
-		sharedTextPtr->undoTagListSize * sizeof(sharedTextPtr->undoTagList[0]));
-    }
-    sharedTextPtr->undoTagList[sharedTextPtr->undoTagListCount] = tagPtr;
-    sharedTextPtr->undoStackEvent = 1;
-    sharedTextPtr->lastUndoTokenType = -1;
-    tagPtr->undoTagListIndex = sharedTextPtr->undoTagListCount++;
-    tagPtr->refCount += 1;
-}
-
-/*
- *----------------------------------------------------------------------
- *
- * TkTextPushTagPriorityUndo --
- *
- *	This function is pushing an undo item for setting the priority
- *	of a mark (raise/lower command).
- *
- * Results:
- *	None.
- *
- * Side effects:
- *	Some memory will be allocated, and see TkTextPushUndoToken.
- *
- *----------------------------------------------------------------------
- */
-
-void
-TkTextPushTagPriorityUndo(
-    TkSharedText *sharedTextPtr,
-    TkTextTag *tagPtr,
-    unsigned priority)
-{
-    UndoTokenTagPriority *token;
-
-    token = (UndoTokenTagPriority *)Tcl_Alloc(sizeof(UndoTokenTagPriority));
-    token->undoType = &undoTokenTagPriorityType;
-    (token->tagPtr = tagPtr)->refCount += 1;
-    token->priority = priority;
-    DEBUG_ALLOC(tkTextCountNewUndoToken++);
-
-    TkTextPushUndoToken(sharedTextPtr, token, 0);
-}
-
-/*
- *----------------------------------------------------------------------
- *
- * TkTextPushTagPriorityRedo --
- *
- *	This function is pushing a redo item for setting the priority
- *	of a mark (raise/lower command).
- *
- * Results:
- *	None.
- *
- * Side effects:
- *	Some memory will be allocated, and see TkTextPushRedoToken.
- *
- *----------------------------------------------------------------------
- */
-
-void
-TkTextPushTagPriorityRedo(
-    TkSharedText *sharedTextPtr,
-    TkTextTag *tagPtr,
-    unsigned priority)
-{
-    UndoTokenTagPriority *token;
-
-    token = (UndoTokenTagPriority *)Tcl_Alloc(sizeof(UndoTokenTagPriority));
-    token->undoType = &redoTokenTagPriorityType;
-    (token->tagPtr = tagPtr)->refCount += 1;
-    token->priority = priority;
-    DEBUG_ALLOC(tkTextCountNewUndoToken++);
-
-    TkTextPushRedoToken(sharedTextPtr, token, 0);
+    tagPtr1 = * (TkTextTag **) first;
+    tagPtr2 = * (TkTextTag **) second;
+    return tagPtr1->priority - tagPtr2->priority;
 }
 
 /*
@@ -2641,62 +1247,39 @@ TkTextPushTagPriorityRedo(
  * Side effects:
  *	Priorities may be changed for some or all of the tags in textPtr. The
  *	tags will be arranged so that there is exactly one tag at each
- *	priority level between 0 and textPtr->sharedTextPtr->numEnabledTags-1,
- *	with tagPtr at priority "newPriority".
+ *	priority level between 0 and textPtr->sharedTextPtr->numTags-1, with
+ *	tagPtr at priority "prio".
  *
  *----------------------------------------------------------------------
  */
 
-static int
+static void
 ChangeTagPriority(
-    TkSharedText *sharedTextPtr,/* Shared text resource. */
+    TkText *textPtr,		/* Information about text widget. */
     TkTextTag *tagPtr,		/* Tag whose priority is to be changed. */
-    unsigned newPriority,	/* New priority for tag. */
-    bool undo)			/* Push undo item for this action? */
+    int prio)			/* New priority for tag. */
 {
-    int delta;
-    unsigned low, high;
+    int low, high, delta;
     TkTextTag *tagPtr2;
     Tcl_HashEntry *hPtr;
     Tcl_HashSearch search;
-    TkText *peer;
 
-    assert(newPriority < sharedTextPtr->numEnabledTags);
-
-    if (newPriority == tagPtr->priority) {
-	return 0;
+    if (prio < 0) {
+	prio = 0;
     }
-
-    if (undo && tagPtr->undo && !TkTextUndoStackIsFull(sharedTextPtr->undoStack)) {
-	UndoTokenTagPriority *token = (UndoTokenTagPriority *) tagPtr->recentChangePriorityToken;
-
-	/*
-	 * Don't push changes of tag priorities immediately onto the undo stack, this
-	 * may blow up the stack. We save this undo token inside the tag, in this way
-	 * only the relevant changes will be pushed as soon as a separator will be
-	 * pushed.
-	 */
-
-	if (!tagPtr->recentChangePriorityToken) {
-	    tagPtr->savedPriority = tagPtr->priority;
-	    token = (UndoTokenTagPriority *)Tcl_Alloc(sizeof(UndoTokenTagPriority));
-	    DEBUG_ALLOC(tkTextCountNewUndoToken++);
-	    tagPtr->recentChangePriorityToken = (TkTextUndoToken *) token;
-	    TkTextTagAddRetainedUndo(sharedTextPtr, tagPtr);
-	}
-
-	token->undoType = &undoTokenTagPriorityType;
-	token->tagPtr = tagPtr;
-	token->priority = tagPtr->priority;
+    if (prio >= textPtr->sharedTextPtr->numTags) {
+	prio = textPtr->sharedTextPtr->numTags-1;
     }
-
-    if (newPriority < tagPtr->priority) {
-	low = newPriority;
-	high = tagPtr->priority - 1;
+    if (prio == tagPtr->priority) {
+	return;
+    }
+    if (prio < tagPtr->priority) {
+	low = prio;
+	high = tagPtr->priority-1;
 	delta = 1;
     } else {
-	low = tagPtr->priority + 1;
-	high = newPriority;
+	low = tagPtr->priority+1;
+	high = prio;
 	delta = -1;
     }
 
@@ -2704,24 +1287,18 @@ ChangeTagPriority(
      * Adjust first the 'sel' tag, then all others from the hash table
      */
 
-    for (peer = sharedTextPtr->peers; peer; peer = peer->next) {
-	if (low <= peer->selTagPtr->priority && peer->selTagPtr->priority <= high) {
-	    peer->selTagPtr->priority += delta;
-	}
+    if ((textPtr->selTagPtr->priority >= low)
+	    && (textPtr->selTagPtr->priority <= high)) {
+	textPtr->selTagPtr->priority += delta;
     }
-
-    for (hPtr = Tcl_FirstHashEntry(&sharedTextPtr->tagTable, &search);
-	    hPtr;
-	    hPtr = Tcl_NextHashEntry(&search)) {
+    for (hPtr = Tcl_FirstHashEntry(&textPtr->sharedTextPtr->tagTable, &search);
+	    hPtr != NULL; hPtr = Tcl_NextHashEntry(&search)) {
 	tagPtr2 = (TkTextTag *)Tcl_GetHashValue(hPtr);
-	if (low <= tagPtr2->priority && tagPtr2->priority <= high) {
+	if ((tagPtr2->priority >= low) && (tagPtr2->priority <= high)) {
 	    tagPtr2->priority += delta;
 	}
     }
-
-    tagPtr->priority = newPriority;
-
-    return 1;
+    tagPtr->priority = prio;
 }
 
 /*
@@ -2748,7 +1325,6 @@ TkTextBindProc(
     XEvent *eventPtr)		/* Pointer to X event that just happened. */
 {
     TkText *textPtr = (TkText *)clientData;
-    int dontRepick = textPtr->dontRepick;
     int repick = 0;
 
     textPtr->refCount++;
@@ -2768,9 +1344,6 @@ TkTextBindProc(
 	if ((eventPtr->xbutton.state & ALL_BUTTONS) == mask) {
 	    textPtr->flags &= ~BUTTON_DOWN;
 	    repick = 1;
-	    if (eventPtr->xbutton.state & (Button1|Button2|Button3)) {
-		textPtr->dontRepick = 0; /* in case of button clicks we must repick */
-	    }
 	}
     } else if ((eventPtr->type == EnterNotify)
 	    || (eventPtr->type == LeaveNotify)) {
@@ -2789,42 +1362,37 @@ TkTextBindProc(
 	}
 	TkTextPickCurrent(textPtr, eventPtr);
     }
-    if (!(textPtr->flags & DESTROYED)) {
-	const TkSharedText *sharedTextPtr = textPtr->sharedTextPtr;
 
-	if (sharedTextPtr->tagBindingTable) {
-	    if (!TkTextTagSetIsEmpty(textPtr->curTagInfoPtr)) {
-		/*
-		 * The mouse is inside the text widget, the 'current' mark was updated.
-		 */
+    if ((textPtr->sharedTextPtr->bindingTable != NULL)
+	    && (textPtr->tkwin != NULL) && !(textPtr->flags & DESTROYED)) {
+	if (textPtr->numCurTags > 0) {
+	    /*
+	     * The mouse is inside the text widget, the 'current' mark was updated.
+	     */
 
-		TagBindEvent(textPtr, eventPtr, textPtr->curTagInfoPtr, sharedTextPtr->tagEpoch);
-	    } else if ((eventPtr->type == KeyPress) || (eventPtr->type == KeyRelease)) {
-		 /*
-		  * Key events fire independently of the 'current' mark and use the
-		  * 'insert' mark.
-		  */
+	    TagBindEvent(textPtr, eventPtr, textPtr->numCurTags,
+		textPtr->curTagArrayPtr);
+	} else if ((eventPtr->type == KeyPress) || (eventPtr->type == KeyRelease)) {
+	    /*
+	     * Key events fire independently of the 'current' mark and use the
+	     * 'insert' mark.
+	     */
 
-		TkTextIndex index;
-		TkTextTagSet *insertTags;
+	    TkTextIndex index;
+	    TkTextTag** tagArrayPtr;
+	    Tcl_Size numTags;
 
-		TkTextMarkNameToIndex(textPtr, "insert", &index);
-		insertTags = TkTextIndexGetContentSegment(&index, NULL)->tagInfoPtr;
-		if (!TkTextTagSetIsEmpty(insertTags)) {
-		    TagBindEvent(textPtr, eventPtr, insertTags, sharedTextPtr->tagEpoch);
-		}
-	    }
-	    if (textPtr->flags & DESTROYED) {
-		TkTextDecrRefCountAndTestIfDestroyed(textPtr);
-		return;
-	    }
+	    TkTextMarkNameToIndex(textPtr, "insert", &index);
+	    tagArrayPtr = TkBTreeGetTags(&index, textPtr, &numTags);
+	    SortTags(numTags, tagArrayPtr);
+	    TagBindEvent(textPtr, eventPtr, numTags, tagArrayPtr);
 	}
     }
     if (repick) {
 	unsigned int oldState;
 
 	oldState = eventPtr->xbutton.state;
-	eventPtr->xbutton.state &= ~ALL_BUTTONS;
+	eventPtr->xbutton.state &= ~(unsigned long)ALL_BUTTONS;
 	if (!(textPtr->flags & DESTROYED)) {
 	    TkTextPickCurrent(textPtr, eventPtr);
 	}
@@ -2832,8 +1400,9 @@ TkTextBindProc(
     }
 
   done:
-    textPtr->dontRepick = dontRepick;
-    TkTextDecrRefCountAndTestIfDestroyed(textPtr);
+    if (textPtr->refCount-- <= 1) {
+	Tcl_Free(textPtr);
+    }
 }
 
 /*
@@ -2859,36 +1428,23 @@ TkTextBindProc(
  *--------------------------------------------------------------
  */
 
-static int
-DispChunkContainsX(
-    TkText *textPtr,
-    const TkTextDispChunk *chunkPtr,
-    int x)
-{
-    int cx = TkTextGetXPixelFromChunk(textPtr, chunkPtr);
-    return cx <= x && x < cx + chunkPtr->width;
-}
-
 void
 TkTextPickCurrent(
-    TkText *textPtr,		/* Text widget in which to select current character. */
+    TkText *textPtr,	/* Text widget in which to select current
+				 * character. */
     XEvent *eventPtr)		/* Event describing location of mouse cursor.
-				 * Must be EnterWindow, LeaveWindow, ButtonRelease, or MotionNotify. */
+				 * Must be EnterWindow, LeaveWindow,
+				 * ButtonRelease, or MotionNotify. */
 {
-    TkSharedText *sharedTextPtr = textPtr->sharedTextPtr;
-    int sameChunkWithUnchangedTags = 0;
-    TkTextTagSet *newTagInfoPtr;
-    TkTextTagSet *leaveTags;
-    TkTextTagSet *enterTags;
-    const TkTextDispChunk *newDispChunkPtr = NULL;
-    int nearby = 0;
-    int sentEvents = 0;
-    int newLineY = TK_TEXT_IS_NEARBY;
     TkTextIndex index;
+    TkTextTag **oldArrayPtr, **newArrayPtr;
+    TkTextTag **copyArrayPtr = NULL;
+				/* Initialization needed to prevent compiler
+				 * warning. */
+    int numOldTags, i, nearby;
+    Tcl_Size numNewTags, j;
+    size_t size;
     XEvent event;
-    unsigned tagEpoch;
-
-    assert(!(textPtr->flags & DESTROYED));
 
     /*
      * If a button is down, then don't do anything at all; we'll be called
@@ -2897,19 +1453,20 @@ TkTextPickCurrent(
      */
 
     if (textPtr->flags & BUTTON_DOWN) {
-	if ((eventPtr->type != EnterNotify && eventPtr->type != LeaveNotify)
-		|| (eventPtr->xcrossing.mode != NotifyGrab
-		    && eventPtr->xcrossing.mode != NotifyUngrab)) {
+	if (((eventPtr->type == EnterNotify)
+		|| (eventPtr->type == LeaveNotify))
+		&& ((eventPtr->xcrossing.mode == NotifyGrab)
+		|| (eventPtr->xcrossing.mode == NotifyUngrab))) {
+	    /*
+	     * Special case: the window is being entered or left because of a
+	     * grab or ungrab. In this case, repick after all. Furthermore,
+	     * clear BUTTON_DOWN to release the simulated grab.
+	     */
+
+	    textPtr->flags &= ~BUTTON_DOWN;
+	} else {
 	    return;
 	}
-
-	/*
-	 * Special case: the window is being entered or left because of a
-	 * grab or ungrab. In this case, repick after all. Furthermore,
-	 * clear BUTTON_DOWN to release the simulated grab.
-	 */
-
-	textPtr->flags &= ~BUTTON_DOWN;
     }
 
     /*
@@ -2922,10 +1479,12 @@ TkTextPickCurrent(
      */
 
     if (eventPtr != &textPtr->pickEvent) {
-	if (eventPtr->type == MotionNotify || eventPtr->type == ButtonRelease) {
+	if ((eventPtr->type == MotionNotify)
+		|| (eventPtr->type == ButtonRelease)) {
 	    textPtr->pickEvent.xcrossing.type = EnterNotify;
 	    textPtr->pickEvent.xcrossing.serial = eventPtr->xmotion.serial;
-	    textPtr->pickEvent.xcrossing.send_event = eventPtr->xmotion.send_event;
+	    textPtr->pickEvent.xcrossing.send_event
+		    = eventPtr->xmotion.send_event;
 	    textPtr->pickEvent.xcrossing.display = eventPtr->xmotion.display;
 	    textPtr->pickEvent.xcrossing.window = eventPtr->xmotion.window;
 	    textPtr->pickEvent.xcrossing.root = eventPtr->xmotion.root;
@@ -2937,7 +1496,8 @@ TkTextPickCurrent(
 	    textPtr->pickEvent.xcrossing.y_root = eventPtr->xmotion.y_root;
 	    textPtr->pickEvent.xcrossing.mode = NotifyNormal;
 	    textPtr->pickEvent.xcrossing.detail = NotifyNonlinear;
-	    textPtr->pickEvent.xcrossing.same_screen = eventPtr->xmotion.same_screen;
+	    textPtr->pickEvent.xcrossing.same_screen
+		    = eventPtr->xmotion.same_screen;
 	    textPtr->pickEvent.xcrossing.focus = False;
 	    textPtr->pickEvent.xcrossing.state = eventPtr->xmotion.state;
 	} else {
@@ -2945,302 +1505,70 @@ TkTextPickCurrent(
 	}
     }
 
-    if (textPtr->dontRepick) {
-	/*
-	 * The widget is scrolling, so avoid repicking until the scroll operation stops,
-	 * but it's important that 'pickEvent' is up-to-date (see above).
-	 */
-	return;
+    /*
+     * Find the new current character, then find and sort all of the tags
+     * associated with it.
+     */
+
+    if (textPtr->pickEvent.type != LeaveNotify) {
+	TkTextPixelIndex(textPtr, textPtr->pickEvent.xcrossing.x,
+		textPtr->pickEvent.xcrossing.y, &index, &nearby);
+	if (nearby) {
+	    newArrayPtr = NULL;
+	    numNewTags = 0;
+	} else {
+	    newArrayPtr = TkBTreeGetTags(&index, textPtr, &numNewTags);
+	    SortTags(numNewTags, newArrayPtr);
+	}
+    } else {
+	newArrayPtr = NULL;
+	numNewTags = 0;
     }
 
     /*
-     * Find the new current character, then find and sort all of the tags associated with it.
+     * Resort the tags associated with the previous marked character (the
+     * priorities might have changed), then make a copy of the new tags, and
+     * compare the old tags to the copy, nullifying any tags that are present
+     * in both groups (i.e. the tags that haven't changed).
      */
 
-    if (textPtr->pickEvent.type == LeaveNotify) {
-	TkTextTagSetIncrRefCount(newTagInfoPtr = sharedTextPtr->emptyTagInfoPtr);
-	TkTextTagSetIncrRefCount(leaveTags = textPtr->curTagInfoPtr);
-	TkTextTagSetIncrRefCount(enterTags = sharedTextPtr->emptyTagInfoPtr);
-    } else {
-	newDispChunkPtr = TkTextPixelIndex(textPtr,
-		textPtr->pickEvent.xcrossing.x, textPtr->pickEvent.xcrossing.y, &index, &nearby);
-
-	if (newDispChunkPtr) {
-	    if (!nearby) {
-		newLineY = TkTextGetYPixelFromChunk(textPtr, newDispChunkPtr);
+    SortTags(textPtr->numCurTags, textPtr->curTagArrayPtr);
+    if (numNewTags > 0) {
+	size = numNewTags * sizeof(TkTextTag *);
+	copyArrayPtr = (TkTextTag **)Tcl_Alloc(size);
+	memcpy(copyArrayPtr, newArrayPtr, size);
+	for (i = 0; i < textPtr->numCurTags; i++) {
+	    for (j = 0; j < numNewTags; j++) {
+		if (textPtr->curTagArrayPtr[i] == copyArrayPtr[j]) {
+		    textPtr->curTagArrayPtr[i] = NULL;
+		    copyArrayPtr[j] = NULL;
+		    break;
+		}
 	    }
-	    sameChunkWithUnchangedTags = (newDispChunkPtr->uniqID == textPtr->lastChunkID);
-	}
-
-	/*
-	 * We want to avoid that a cursor movement is constantly splitting and
-	 * joining char segments. So we postpone the insertion of the "current"
-	 * mark until TextWidgetObjCmd will be executed.
-	 */
-
-	textPtr->currentMarkIndex = index;
-	TkTextIndexToByteIndex(&textPtr->currentMarkIndex);
-	textPtr->haveToSetCurrentMark = 1;
-	sharedTextPtr->haveToSetCurrentMark = 1;
-
-	if (textPtr->lastLineY == TK_TEXT_NEARBY_IS_UNDETERMINED
-		|| (textPtr->lastLineY == TK_TEXT_IS_NEARBY) != nearby) {
-	    sameChunkWithUnchangedTags = 0;
-	} else if (nearby) {
-	    sameChunkWithUnchangedTags = 1;
-	} else if (eventPtr->type != MotionNotify || sharedTextPtr->numMotionEventBindings > 0) {
-	    sameChunkWithUnchangedTags = 0;
-	}
-
-	if (nearby) {
-	    TkTextTagSetIncrRefCount(newTagInfoPtr = sharedTextPtr->emptyTagInfoPtr);
-	    TkTextTagSetIncrRefCount(leaveTags = textPtr->curTagInfoPtr);
-	    TkTextTagSetIncrRefCount(enterTags = sharedTextPtr->emptyTagInfoPtr);
-	} else if (sameChunkWithUnchangedTags) {
-	    TkTextTagSetIncrRefCount(newTagInfoPtr = textPtr->curTagInfoPtr);
-	    TkTextTagSetIncrRefCount(leaveTags = sharedTextPtr->emptyTagInfoPtr);
-	    TkTextTagSetIncrRefCount(enterTags = sharedTextPtr->emptyTagInfoPtr);
-	} else {
-	    /*
-	     * NOTE: the tag event handling depends on the display content, and not on
-	     * the content of the B-Tree.
-	     */
-
-	    if (!(newTagInfoPtr = TkTextGetTagSetFromChunk(newDispChunkPtr))) {
-		newTagInfoPtr = sharedTextPtr->emptyTagInfoPtr;
-	    }
-	    TkTextTagSetIncrRefCount(newTagInfoPtr);
-	    leaveTags = TkTextTagSetCopy(textPtr->curTagInfoPtr);
-	    leaveTags = TkTextTagSetRemoveFromThis(leaveTags, newTagInfoPtr);
-	    enterTags = TkTextTagSetRemoveFromThis(TkTextTagSetCopy(newTagInfoPtr), leaveTags);
-	    enterTags = TkTextTagSetRemoveFromThis(enterTags, textPtr->curTagInfoPtr);
 	}
     }
 
-    if (newLineY != TK_TEXT_IS_NEARBY
-	    && textPtr->lastLineY != TK_TEXT_IS_NEARBY
-	    && !sameChunkWithUnchangedTags
-	    && sharedTextPtr->tagBindingTable) {
-	if (textPtr->lastLineY == newLineY) {
-	    /*
-	     * We have to work-around a severe problem: per default the event handler is
-	     * collapsing mouse motion events. This must not happen, a collapse of motion
-	     * events has to be done on window level. For the text widget this means that
-	     * we sometimes miss the transition from tagged region to tagged region. So we
-	     * have to use a work-around for the x-direction: if the display line has not
-	     * changed, then call TkTextPixelIndex for every intermediate x position. Of
-	     * course this can be handled a bit more clever: traverse all the chunks
-	     * between new chunk and old chunk, and send the first leave event, provided
-	     * that this happens.
-	     *
-	     *     leaveTags = old.tags
-	     *     for chunk = old.successor to new.predecessor
-	     *         foreach t in (leaveTags - chunk.tags)
-	     *             t.sendLeave
-	     *             leaveTags -= t # do not send anymore
-	     *         rof
-	     *     rof
-	     */
+    /*
+     * Invoke the binding system with a LeaveNotify event for all of the tags
+     * that have gone away. We have to be careful here, because it's possible
+     * that the binding could do something (like calling tkwait) that
+     * eventually modifies textPtr->curTagArrayPtr. To avoid problems in
+     * situations like this, update curTagArrayPtr to its new value before
+     * invoking any bindings, and don't use it any more here.
+     */
 
-	    const TkTextDispChunk *nextDispChunkPtr;
-	    int lastX = textPtr->lastX;
-	    int movedToLeft;
-	    int sx, sy; /* translation to current scroll position */
-
-	    TkTextGetViewOffset(textPtr, &sx, &sy);
-	    movedToLeft = textPtr->pickEvent.xcrossing.x + sx <= lastX;
-	    nextDispChunkPtr = newDispChunkPtr;
-
-	    if (movedToLeft) {
-		/*
-		 * Setup nextDispChunkPtr to predecessor of last chunk.
-		 */
-
-		/* find last chunk */
-		while (nextDispChunkPtr->nextPtr
-			&& !DispChunkContainsX(textPtr, nextDispChunkPtr, lastX)) {
-		    nextDispChunkPtr = nextDispChunkPtr->nextPtr;
-		}
-		if (nextDispChunkPtr != newDispChunkPtr
-			&& DispChunkContainsX(textPtr, nextDispChunkPtr, lastX)) {
-		    /* move to predecessor of last chunk */
-		    nextDispChunkPtr = nextDispChunkPtr->prevPtr;
-		}
-	    } else {
-		/*
-		 * Setup nextDispChunkPtr to successor of last chunk.
-		 */
-
-		/* find last chunk */
-		while (nextDispChunkPtr->prevPtr
-			&& !DispChunkContainsX(textPtr, nextDispChunkPtr, lastX)) {
-		    nextDispChunkPtr = nextDispChunkPtr->prevPtr;
-		}
-		if (nextDispChunkPtr != newDispChunkPtr
-			&& DispChunkContainsX(textPtr, nextDispChunkPtr, lastX)) {
-		    /* move to successor of last chunk */
-		    nextDispChunkPtr = nextDispChunkPtr->nextPtr;
-		}
-	    }
-
-	    if (nextDispChunkPtr != newDispChunkPtr) {
-		if (textPtr->curTagInfoPtr != sharedTextPtr->emptyTagInfoPtr) {
-		    /*
-		     * TkTextTagSetJoinComplementTo() requires this:
-		     */
-		    if (TkTextTagSetSize(textPtr->curTagInfoPtr) < sharedTextPtr->tagInfoSize) {
-			textPtr->curTagInfoPtr = TkTextTagSetResize(
-				textPtr->curTagInfoPtr, sharedTextPtr->tagInfoSize);
-		    }
-		    if (TkTextTagSetSize(leaveTags) < sharedTextPtr->tagInfoSize) {
-			leaveTags = TkTextTagSetResize(leaveTags, sharedTextPtr->tagInfoSize);
-		    }
-		    if (TkTextTagSetSize(enterTags) < sharedTextPtr->tagInfoSize) {
-			enterTags = TkTextTagSetResize(enterTags, sharedTextPtr->tagInfoSize);
-		    }
-
-		    do {
-			const TkTextTagSet *chunkTagInfoPtr;
-
-			if ((chunkTagInfoPtr = TkTextGetTagSetFromChunk(nextDispChunkPtr))) {
-			    leaveTags = TkTextTagSetJoinComplementTo(leaveTags,
-				    chunkTagInfoPtr, textPtr->curTagInfoPtr);
-			    enterTags = TkTextTagSetJoinComplementTo(enterTags,
-				    chunkTagInfoPtr, textPtr->curTagInfoPtr);
-			}
-
-			nextDispChunkPtr = movedToLeft ?
-				nextDispChunkPtr->prevPtr : nextDispChunkPtr->nextPtr;
-		    } while (nextDispChunkPtr != newDispChunkPtr);
-		}
-
-		/* Delete intermediate enter/leave pairs. */
-		leaveTags = TkTextTagSetIntersect(leaveTags, textPtr->curTagInfoPtr);
-		enterTags = TkTextTagSetIntersect(enterTags, newTagInfoPtr);
-	    }
-	} else if (textPtr->lastLineY != TK_TEXT_NEARBY_IS_UNDETERMINED) {
-	    const TkTextDispChunk *chunkPtr, *cPtr;
-	    const TkTextTagSet *tPtr;
-	    TkTextTagSet *commonTags = TkTextTagSetCopy(newTagInfoPtr);
+    numOldTags = textPtr->numCurTags;
+    textPtr->numCurTags = numNewTags;
+    oldArrayPtr = textPtr->curTagArrayPtr;
+    textPtr->curTagArrayPtr = newArrayPtr;
+    if (numOldTags != 0) {
+	if ((textPtr->sharedTextPtr->bindingTable != NULL)
+		&& (textPtr->tkwin != NULL)
+		&& !(textPtr->flags & DESTROYED)) {
+	    event = textPtr->pickEvent;
+	    event.type = LeaveNotify;
 
 	    /*
-	     * The display line has changed, so we have to send leave/enter events
-	     * for all the affected tags, otherwise the event handling would depend
-	     * on the contingencies of the layout, and this must not happen.
-	     *
-	     * But do not track a change of the display line if the new display chunk
-	     * belongs to the same region as old display chunk.
-	     */
-
-	    if (newLineY < textPtr->lastLineY) {
-		/*
-		 * Mouse pointer has moved to any predecessing display line.
-		 */
-
-		for (cPtr = chunkPtr = newDispChunkPtr;
-			chunkPtr && textPtr->lastLineY > TkTextGetYPixelFromChunk(textPtr, chunkPtr);
-			cPtr = chunkPtr = TkTextGetFirstChunkOfNextDispLine(chunkPtr)) {
-		    for ( ; cPtr; cPtr = cPtr->nextPtr) {
-			if ((tPtr = TkTextGetTagSetFromChunk(cPtr))) {
-			    commonTags = TkTextTagSetIntersectThis(commonTags, tPtr);
-			}
-		    }
-		}
-		if (cPtr) {
-		    int x = textPtr->lastX;
-
-		    for ( ; cPtr; cPtr = cPtr->nextPtr) {
-			if ((tPtr = TkTextGetTagSetFromChunk(cPtr))) {
-			    commonTags = TkTextTagSetIntersectThis(commonTags, tPtr);
-			}
-			if (DispChunkContainsX(textPtr, cPtr, x)) {
-			    break;
-			}
-		    }
-		}
-	    } else {
-		/*
-		 * Mouse pointer has moved to any successing display line.
-		 */
-
-		for (cPtr = chunkPtr = newDispChunkPtr;
-			chunkPtr && textPtr->lastLineY < TkTextGetYPixelFromChunk(textPtr, chunkPtr);
-			cPtr = chunkPtr = TkTextGetLastChunkOfPrevDispLine(chunkPtr)) {
-		    for ( ; cPtr; cPtr = cPtr->prevPtr) {
-			if ((tPtr = TkTextGetTagSetFromChunk(cPtr))) {
-			    commonTags = TkTextTagSetIntersectThis(commonTags, tPtr);
-			}
-		    }
-		}
-		if (cPtr) {
-		    int x = textPtr->lastX;
-
-		    for ( ; cPtr; cPtr = cPtr->prevPtr) {
-			if ((tPtr = TkTextGetTagSetFromChunk(cPtr))) {
-			    commonTags = TkTextTagSetIntersectThis(commonTags, tPtr);
-			}
-			if (DispChunkContainsX(textPtr, cPtr, x)) {
-			    break;
-			}
-		    }
-		}
-	    }
-
-	    TkTextTagSetDecrRefCount(enterTags);
-	    TkTextTagSetDecrRefCount(leaveTags);
-	    enterTags = TkTextTagSetRemoveFromThis(TkTextTagSetCopy(newTagInfoPtr), commonTags);
-	    leaveTags = TkTextTagSetRemoveFromThis(TkTextTagSetCopy(textPtr->curTagInfoPtr), commonTags);
-	    TkTextTagSetDecrRefCount(commonTags);
-	}
-    }
-
-    tagEpoch = sharedTextPtr->tagEpoch;
-
-    if (sharedTextPtr->tagBindingTable && !TkTextTagSetIsEmpty(leaveTags)) {
-	/*
-	 * Invoke the binding system with a LeaveNotify event for all of the tags
-	 * that have gone away.
-	 *
-	 * Always use a detail of NotifyAncestor. Besides being
-	 * consistent, this avoids problems where the binding code will
-	 * discard NotifyInferior events.
-	 */
-
-	event = textPtr->pickEvent;
-	event.type = LeaveNotify;
-	event.xcrossing.detail = NotifyAncestor;
-	TagBindEvent(textPtr, &event, leaveTags, tagEpoch);
-	sentEvents = 1;
-    }
-
-    if (!(textPtr->flags & DESTROYED)) {
-	int sx, sy; /* translation to current scroll position */
-
-	if (sentEvents) {
-	    /*
-	     * Reset the "current" mark (be careful to recompute its location, since
-	     * it might have changed during an event binding).
-	     *
-	     * We want to avoid that a cursor movement is constantly splitting and
-	     * joining char segments. So we postpone the insertion of the "current"
-	     * mark until TextWidgetObjCmd will be executed.
-	     */
-
-	    newDispChunkPtr = TkTextPixelIndex(textPtr,
-		    textPtr->pickEvent.xcrossing.x, textPtr->pickEvent.xcrossing.y, &index, &nearby);
-
-	    newLineY = nearby ? TK_TEXT_IS_NEARBY : TkTextGetYPixelFromChunk(textPtr, newDispChunkPtr);
-	    textPtr->currentMarkIndex = index;
-	    TkTextIndexToByteIndex(&textPtr->currentMarkIndex);
-	    textPtr->haveToSetCurrentMark = 1;
-	    sharedTextPtr->haveToSetCurrentMark = 1;
-	}
-
-	if (sharedTextPtr->tagBindingTable && !TkTextTagSetIsEmpty(enterTags)) {
-	    /*
-	     * Invoke the binding system with a EnterNotify event for all of the tags
-	     * that have just appeared.
-	     *
 	     * Behaviour before ticket #47d4f29159:
 	     *   Always use a detail of NotifyAncestor. Besides being
 	     *   consistent, this avoids problems where the binding code will
@@ -3254,27 +1582,33 @@ TkTextPickCurrent(
 	     *   ticket #47d4f29159, which doesn't harm.
 	     */
 
+	    event.xcrossing.detail = NotifyAncestor;
+	    TagBindEvent(textPtr, &event, numOldTags, oldArrayPtr);
+	}
+	Tcl_Free(oldArrayPtr);
+    }
+
+    /*
+     * Reset the "current" mark (be careful to recompute its location, since
+     * it might have changed during an event binding). Then invoke the binding
+     * system with an EnterNotify event for all of the tags that have just
+     * appeared.
+     */
+
+    TkTextPixelIndex(textPtr, textPtr->pickEvent.xcrossing.x,
+	    textPtr->pickEvent.xcrossing.y, &index, &nearby);
+    TkTextSetMark(textPtr, "current", &index);
+    if (numNewTags != 0) {
+	if ((textPtr->sharedTextPtr->bindingTable != NULL)
+		&& (textPtr->tkwin != NULL)
+		&& !(textPtr->flags & DESTROYED) && !nearby) {
 	    event = textPtr->pickEvent;
 	    event.type = EnterNotify;
 	    event.xcrossing.detail = NotifyAncestor;
-	    TagBindEvent(textPtr, &event, enterTags, tagEpoch);
+	    TagBindEvent(textPtr, &event, numNewTags, copyArrayPtr);
 	}
-
-	TkTextTagSetDecrRefCount(textPtr->curTagInfoPtr);
-	TkTextTagSetIncrRefCount(textPtr->curTagInfoPtr = TkTextTagSetIsEmpty(newTagInfoPtr) ?
-		sharedTextPtr->emptyTagInfoPtr : newTagInfoPtr);
-
-	TkTextGetViewOffset(textPtr, &sx, &sy);
-	textPtr->lastLineY = newLineY;
-	textPtr->lastX = textPtr->pickEvent.xcrossing.x + sx;
-	if (newDispChunkPtr) {
-	    textPtr->lastChunkID = newDispChunkPtr->uniqID;
-	}
+	Tcl_Free(copyArrayPtr);
     }
-
-    TkTextTagSetDecrRefCount(leaveTags);
-    TkTextTagSetDecrRefCount(enterTags);
-    TkTextTagSetDecrRefCount(newTagInfoPtr);
 }
 
 /*
@@ -3300,319 +1634,57 @@ static void
 TagBindEvent(
     TkText *textPtr,		/* Text widget to fire bindings in. */
     XEvent *eventPtr,		/* What actually happened. */
-    TkTextTagSet *tagInfoPtr,	/* Set of relevant tags. */
-    unsigned epoch)		/* Last epoch of tag creation. */
+    int numTags,		/* Number of relevant tags. */
+    TkTextTag **tagArrayPtr)	/* Array of relevant tags. */
 {
-    TkTextTag *tagArrayBuf[TK_TEXT_SET_MAX_BIT_SIZE];
-    TkTextTag **tagArrPtr = tagArrayBuf;
-    const TkSharedText *sharedTextPtr = textPtr->sharedTextPtr;
-    unsigned maxTags = sharedTextPtr->numTags;
-    unsigned countTags = 0;
-    unsigned i;
+#   define NUM_BIND_TAGS 10
+    const char *nameArray[NUM_BIND_TAGS];
+    const char **nameArrPtr;
+    int i;
 
-    assert(textPtr->sharedTextPtr->tagBindingTable);
+    /*
+     * Try to avoid allocation unless there are lots of tags.
+     */
 
-    for (i = TkTextTagSetFindFirst(tagInfoPtr);
-	    i != TK_TEXT_TAG_SET_NPOS;
-	    i = TkTextTagSetFindNext(tagInfoPtr, i)) {
-	TkTextTag *tagPtr;
-
-	/*
-	 * Take into account that some tags have been gone in the meanwhile.
-	 */
-
-	if (i >= maxTags) {
-	    break;
-	}
-	if ((tagPtr = sharedTextPtr->tagLookup[i]) && tagPtr->tagEpoch <= epoch) {
-	    if (countTags == sizeof(tagArrayBuf)/sizeof(tagArrayBuf[0])) {
-		/* It's quite unexpected that this case happens. */
-		unsigned count = TkTextTagSetCount(tagInfoPtr);
-		tagArrPtr = (TkTextTag **)Tcl_Alloc(count*sizeof(tagArrayBuf[0]));
-		memcpy(tagArrPtr, tagArrayBuf, countTags*sizeof(tagArrayBuf[0]));
-	    }
-	    tagArrPtr[countTags++] = tagPtr;
-	}
+    if (numTags > NUM_BIND_TAGS) {
+	nameArrPtr = (const char **)Tcl_Alloc(numTags * sizeof(const char *));
+    } else {
+	nameArrPtr = nameArray;
     }
 
-    if (countTags) {
-	TkTextSortTags(countTags, tagArrPtr);
-	for (i = 0; i < countTags; ++i) {
-	    tagArrPtr[i] = (TkTextTag *) tagArrPtr[i]->name;
-	}
-	Tk_BindEvent(textPtr->sharedTextPtr->tagBindingTable, eventPtr,
-		textPtr->tkwin, countTags, (void **) tagArrPtr);
+    /*
+     * We use tag names as keys in the hash table. We do this instead of using
+     * the actual tagPtr objects because we want one "sel" tag binding for all
+     * peer widgets, despite the fact that each has its own tagPtr object.
+     */
 
-	if (tagArrPtr != tagArrayBuf) {
-	    Tcl_Free(tagArrPtr);
-	}
-    }
-}
-
-/*
- *--------------------------------------------------------------
- *
- * EnumerateTags --
- *
- *	Implements the "tag enumerate" command, see documentation.
- *
- * Results:
- *	A standard Tcl result.
- *
- * Side effects:
- *	Memory is allocated for the result, if needed (standard Tcl result
- *	side effects).
- *
- *--------------------------------------------------------------
- */
+    for (i = 0; i < numTags; i++) {
+	TkTextTag *tagPtr = tagArrayPtr[i];
 
-static TkBitField *
-AddBits(
-    TkBitField *dst,		/* can be NULL */
-    const TkBitField *src)
-{
-    if (!dst) {
-	dst = TkBitResize(NULL, TkBitSize(src));
-    }
-    TkBitJoin(dst, src);
-    return dst;
-}
-
-static TkBitField *
-AddComplementBits(
-    TkBitField *dst,		/* can be NULL */
-    const TkBitField *src)
-{
-    if (!dst) {
-	dst = TkBitResize(NULL, TkBitSize(src));
-    }
-    TkBitComplementTo(dst, src);
-    return dst;
-}
-
-static TkBitField *
-AddSet(
-    const TkSharedText *sharedTextPtr,
-    TkBitField *dst,		/* can be NULL */
-    const TkTextTagSet *src)
-{
-    TkBitField *cmpl = TkTextTagSetToBits(src, TkBitSize(sharedTextPtr->usedTags));
-
-    dst = AddBits(dst, cmpl);
-    TkBitDecrRefCount(cmpl);
-    return dst;
-}
-
-static TkBitField *
-AddComplementSet(
-    const TkSharedText *sharedTextPtr,
-    TkBitField *dst,		/* can be NULL */
-    const TkTextTagSet *src)
-{
-    TkBitField *cmpl = TkTextTagSetToBits(src, TkBitSize(sharedTextPtr->usedTags));
-
-    dst = AddComplementBits(dst, cmpl);
-    TkBitDecrRefCount(cmpl);
-    return dst;
-}
-
-static int
-EnumerateTags(
-    Tcl_Interp *interp,
-    TkText *textPtr,
-    int objc,
-    Tcl_Obj *const *objv)
-{
-    static const char *const optStrings[] = {
-	"-all", "-discardselection", "-display", "-elide", "-geometry", "-lineheight",
-	"-nodisplay", "-noelide", "-nogeometry", "-nolineheight", "-noselection",
-	"-noundo", "-noused", "-selection", "-undo", "-unused", "-used", NULL
-    };
-    enum opts {
-	ENUM_ALL, ENUM_DISCARD_SELECTION, ENUM_DISPLAY, ENUM_ELIDE, ENUM_GEOEMTRY, ENUM_LINEHEIGHT,
-	ENUM_NO_DISPLAY, ENUM_NO_ELIDE, ENUM_NO_GEOMETRY, ENUM_NO_LINEHEIGHT, ENUM_NO_SELECTION,
-	ENUM_NO_UNDO, ENUM_NO_USED, ENUM_SELECTION, ENUM_UNDO, ENUM_UNUSED, ENUM_USED
-    };
-
-    const TkSharedText *sharedTextPtr = textPtr->sharedTextPtr;
-    TkBitField *includeBits = NULL;
-    TkBitField *discardBits = NULL;
-    int discardSelection = 0;
-    TkTextTag **arrayPtr;
-    int index, countTags, i;
-    unsigned k;
-
-    for (i = 3; i < objc; ++i) {
-	const char *option = Tcl_GetString(objv[i]);
-
-	if (*option != '-') {
-	    break;
-	}
-
-	if (Tcl_GetIndexFromObjStruct(interp, objv[i], optStrings, sizeof(char *),
-		"tag option", 0, &index) != TCL_OK) {
-	    if (includeBits) { TkBitDecrRefCount(includeBits); }
-	    if (discardBits) { TkBitDecrRefCount(discardBits); }
-	    return TCL_ERROR;
-	}
-
-	switch ((enum opts) index) {
-	case ENUM_ALL:
-	case ENUM_DISCARD_SELECTION:
-	    discardSelection = 1;
-	    break;
-	case ENUM_DISPLAY:
-	    includeBits = AddBits(includeBits, sharedTextPtr->affectDisplayTags);
-	    break;
-	case ENUM_ELIDE:
-	    includeBits = AddBits(includeBits, sharedTextPtr->elisionTags);
-	    break;
-	case ENUM_GEOEMTRY:
-	    includeBits = AddBits(includeBits, sharedTextPtr->affectGeometryTags);
-	    break;
-	case ENUM_LINEHEIGHT:
-	    includeBits = AddBits(includeBits, sharedTextPtr->affectLineHeightTags);
-	    break;
-	case ENUM_NO_DISPLAY:
-	    discardBits = AddBits(discardBits, sharedTextPtr->affectDisplayTags);
-	    break;
-	case ENUM_NO_ELIDE:
-	    discardBits = AddBits(discardBits, sharedTextPtr->elisionTags);
-	    break;
-	case ENUM_NO_GEOMETRY:
-	    discardBits = AddBits(discardBits, sharedTextPtr->affectGeometryTags);
-	    break;
-	case ENUM_NO_LINEHEIGHT:
-	    discardBits = AddBits(discardBits, sharedTextPtr->affectLineHeightTags);
-	    break;
-	case ENUM_NO_SELECTION:
-	    discardSelection = 1;
-	    break;
-	case ENUM_NO_UNDO:
-	    discardBits = AddComplementBits(discardBits, sharedTextPtr->dontUndoTags);
-	    break;
-	case ENUM_NO_USED:
-	    discardBits = AddComplementSet(sharedTextPtr, discardBits,
-		    TkBTreeRootTagInfo(sharedTextPtr->tree));
-	    break;
-	case ENUM_SELECTION:
-	    includeBits = AddBits(includeBits, sharedTextPtr->selectionTags);
-	    break;
-	case ENUM_UNDO:
-	    includeBits = AddComplementBits(includeBits, sharedTextPtr->dontUndoTags);
-	    break;
-	case ENUM_UNUSED:
-	    includeBits = AddComplementSet(sharedTextPtr, includeBits,
-		    TkBTreeRootTagInfo(sharedTextPtr->tree));
-	    break;
-	case ENUM_USED:
-	    includeBits = AddSet(sharedTextPtr, includeBits, TkBTreeRootTagInfo(sharedTextPtr->tree));
-	    break;
-	}
-    }
-
-    if (objc == i + 1) {
-	TkTextIndex index1;
-	TkTextSegment *segPtr;
-	TkTextTagSet *tagInfoPtr;
-
-	if (!TkTextGetIndexFromObj(interp, textPtr, objv[i], &index1)) {
-	    return TCL_ERROR;
-	}
-
-	segPtr = TkTextIndexGetContentSegment(&index1, NULL);
-
-	if (!includeBits && !discardBits) {
-	    TkTextFindTags(interp, textPtr, segPtr, discardSelection);
-	    return TCL_OK;
-	}
-
-	TkTextTagSetIncrRefCount(tagInfoPtr = segPtr->tagInfoPtr);
-	if (includeBits) {
-	    tagInfoPtr = TkTextTagSetIntersectBits(tagInfoPtr, includeBits);
-	    TkBitDecrRefCount(includeBits);
-	}
-	includeBits = TkTextTagSetToBits(tagInfoPtr, TkBitSize(sharedTextPtr->usedTags));
-	TkTextTagSetDecrRefCount(tagInfoPtr);
-    } else if (objc > i) {
-	Tcl_WrongNumArgs(interp, 3, objv, "?options? ?index?");
-	return TCL_ERROR;
-    }
-
-    if (discardSelection) {
-	discardBits = AddBits(discardBits, sharedTextPtr->selectionTags);
-    }
-    if (!includeBits) {
-	if (discardBits) {
-	    includeBits = TkBitCopy(sharedTextPtr->usedTags, -1);
+	if (tagPtr != NULL) {
+	    nameArrPtr[i] = tagPtr->name;
 	} else {
-	    TkBitIncrRefCount(includeBits = sharedTextPtr->usedTags);
+	    /*
+	     * Tag has been deleted elsewhere, and therefore nulled out in
+	     * this array. Tk_BindEvent is clever enough to cope with NULLs
+	     * being thrown at it.
+	     */
+
+	    nameArrPtr[i] = NULL;
 	}
     }
-    if (discardBits) {
-	TkBitRemove(includeBits, discardBits);
+    Tk_BindEvent(textPtr->sharedTextPtr->bindingTable, eventPtr,
+	    textPtr->tkwin, numTags, (void **) nameArrPtr);
+
+    if (numTags > NUM_BIND_TAGS) {
+	Tcl_Free(nameArrPtr);
     }
-
-    arrayPtr = (TkTextTag **)Tcl_Alloc(sharedTextPtr->numEnabledTags * sizeof(TkTextTag *));
-    countTags = 0;
-
-    for (k = TkBitFindFirst(includeBits); k != TK_BIT_NPOS; k = TkBitFindNext(includeBits, k)) {
-	arrayPtr[countTags++] = sharedTextPtr->tagLookup[k];
-    }
-
-    AppendTags(interp, countTags, arrayPtr);
-    Tcl_Free(arrayPtr);
-
-    TkBitDecrRefCount(includeBits);
-    if (discardBits) {
-	TkBitDecrRefCount(discardBits);
-    }
-
-    return TCL_OK;
 }
-
-#ifndef NDEBUG
-/*
- *--------------------------------------------------------------
- *
- * TkpTextPrintTagSet --
- *
- *	This function is for debugging only, printing the content of
- *	the given tag set on stdout.
- *
- * Results:
- *	None.
- *
- * Side effects:
- *	None.
- *
- *--------------------------------------------------------------
- */
-
-void
-TkpTextPrintTagSet(
-    const TkSharedText *sharedTextPtr,
-    const TkTextTagSet *tagInfoPtr)
-{
-    const char *comma = "";
-    unsigned i;
-
-    printf("{");
-    for (i = TkTextTagSetFindFirst(tagInfoPtr);
-	    i != TK_TEXT_TAG_SET_NPOS;
-	    i = TkTextTagSetFindNext(tagInfoPtr, i)) {
-	printf("%s%s", comma, sharedTextPtr->tagLookup[i]->name);
-	comma = ", ";
-    }
-    printf("}\n");
-}
-#endif /* !NDEBUG */
 
 /*
  * Local Variables:
  * mode: c
  * c-basic-offset: 4
- * fill-column: 105
+ * fill-column: 78
  * End:
- * vi:set ts=8 sw=4:
  */
