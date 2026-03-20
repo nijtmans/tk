@@ -954,16 +954,8 @@ typedef struct TkTextTag {
     XColor *inactiveSelFgColor;	/* Foreground color for inactive selected text. NULL means no value
 				 * specified here. */
     Tcl_Obj *spacing1Obj;	/* -spacing1 option. NULL means option not specified. */
-    int spacing1;		/* Extra spacing above first display line for
-				 * text line. Only valid if spacing1Obj is non-NULL. */
     Tcl_Obj *spacing2Obj;	/* -spacing2 option. NULL means option not specified. */
-    int spacing2;		/* Extra spacing between display lines for the
-				 * same text line. Only valid if
-				 * spacing2String is non-NULL. */
     Tcl_Obj *spacing3Obj;	/* -spacing2 option. NULL means option not specified. */
-    int spacing3;		/* Extra spacing below last display line for
-				 * text line. Only valid if spacing3Obj is
-				 * non-NULL. */
     Tcl_Obj *tabStringObj;	/* -tabs option string. NULL means option not
 				 * specified. */
     struct TkTextTabArray *tabArrayPtr;
@@ -1001,12 +993,15 @@ typedef struct TkTextTag {
      * Derived values, and the container for all the options.
      */
 
-    int affectsDisplay;	/* True means that this tag affects the way information is
+    bool affectsDisplay;	/* True means that this tag affects the way information is
 				 * displayed on the screen (so need to redisplay if tag changes). */
-    int affectsDisplayGeometry;/* True means that this tag affects the size with which
+    bool affectsDisplayGeometry;/* True means that this tag affects the size with which
 				 * information is displayed on the screen (so need to recalculate
 				 * line dimensions if tag changes). */
     Tk_OptionTable optionTable;	/* Token representing the configuration specifications. */
+#ifdef BUILD_tk
+    int spacing1, spacing2, spacing3;
+#endif
 } TkTextTag;
 
 /*
@@ -1181,7 +1176,7 @@ typedef struct TkSharedText {
     size_t numMotionEventBindings;
 				/* Number of tags with bindings to motion events. */
     size_t numElisionTags;	/* Number of tags with elide. */
-    int allowUpdateLineMetrics;
+    bool allowUpdateLineMetrics;
 				/* We don't allow line height computations before first Configure
 				 * event has been accepted. */
 
@@ -1189,7 +1184,7 @@ typedef struct TkSharedText {
      * Miscellaneous information.
      */
 
-    int steadyMarks;		/* This option causes that any mark now simultaneous behaves like
+    bool steadyMarks;		/* This option causes that any mark now simultaneous behaves like
 				 * an invisible character, this means that the relative order of
 				 * marks will not change. */
     size_t imageCount;	/* Used for creating unique image names. */
@@ -1218,7 +1213,7 @@ typedef struct TkSharedText {
 				 * this widget. Note that this table is used in display stuff, but
 				 * for technical reasons we have to keep this table in shared
 				 * resource, because it's a shared table. */
-    int breakInfoTableIsInitialized;
+    bool breakInfoTableIsInitialized;
 				/* Flag whether breakInfoTable is initialized. */
 
     /*
@@ -1232,7 +1227,7 @@ typedef struct TkSharedText {
     int maxRedoDepth;		/* The maximum depth of the redo stack expressed as the
 				 * maximum number of compound statements. */
     int maxUndoSize;		/* The maximum number of bytes kept on the undo stack. */
-    int autoSeparators;		/* Non-zero means the separators will be inserted automatically. */
+    bool autoSeparators;	/* True means the separators will be inserted automatically. */
     bool undo;			/* True means the undo/redo behaviour is enabled. */
     int isModified;		/* Flag indicating the computed 'modified' state of the text widget. */
     int isAltered;		/* Flag indicating the computed 'altered' state of the text widget. */
@@ -1551,13 +1546,13 @@ typedef struct TkText {
     struct TkTextStringList *varBindingList;
 				/* Linked list of variables which should be unset when the widget
 				 * will be destroyed. */
-    int sharedIsReleased;	/* Boolean value whether shared resource have been released. */
+    bool sharedIsReleased;	/* Boolean value whether shared resource have been released. */
 
     /*
      * Copies of information from the shared section relating to the editor control mode:
      */
 
-    int steadyMarks;		/* false = behavior of original implementation,
+    bool steadyMarks;		/* false = behavior of original implementation,
 				 * true  = new editor control mode. */
 
     /*
@@ -1566,13 +1561,13 @@ typedef struct TkText {
 
     bool undo;			/* Non-zero means the undo/redo behaviour is
 				 * enabled. */
+    bool autoSeparators;	/* True means the separators will be inserted automatically. */
+    bool undoTagging;		/* Global default value for TkTextTag::undo. */
     int maxUndoDepth;		/* The maximum depth of the undo stack expressed as the
 				 * maximum number of compound statements. */
     int maxRedoDepth;		/* The maximum depth of the redo stack expressed as the
 				 * maximum number of compound statements. */
     int maxUndoSize;		/* The maximum number of bytes kept on the undo stack. */
-    int autoSeparators;		/* Non-zero means the separators will be inserted automatically. */
-    bool undoTagging;		/* Global default value for TkTextTag::undo. */
 
     /*
      * Support of sync command:
@@ -1849,7 +1844,7 @@ typedef int TkTextTagChangedProc(
     const TkTextIndex *indexPtr1,
     const TkTextIndex *indexPtr2,
     const TkTextTag *tagPtr,
-    int affectsDisplayGeometry);
+    bool affectsDisplayGeometry);
 
 /*
  * Callback function for TkTextPerformWatchCmd().
@@ -2049,7 +2044,7 @@ MODULE_SCOPE void	TkTextInspectUndoMarkItem(const TkSharedText *sharedTextPtr,
 			    const TkTextMarkChange *changePtr, Tcl_Obj* objPtr);
 MODULE_SCOPE int	TkTextTagChangedUndoRedo(const TkSharedText *sharedTextPtr, TkText *textPtr,
 			    const TkTextIndex *index1Ptr, const TkTextIndex *index2Ptr,
-			    const TkTextTag *tagPtr, int affectsDisplayGeometry);
+			    const TkTextTag *tagPtr, bool affectsDisplayGeometry);
 MODULE_SCOPE void	TkTextReplaceTags(TkText *textPtr, TkTextSegment *segPtr, int undoable,
 			    Tcl_Obj *tagListPtr);
 MODULE_SCOPE void	TkTextFindTags(Tcl_Interp *interp, TkText *textPtr, const TkTextSegment *segPtr,
@@ -2161,7 +2156,7 @@ MODULE_SCOPE Tcl_Obj *	TkTextNewIndexObj(const TkTextIndex *indexPtr);
 MODULE_SCOPE void	TkTextRedrawRegion(TkText *textPtr, int x, int y, int width, int height);
 MODULE_SCOPE int	TkTextRedrawTag(const TkSharedText *sharedTextPtr, TkText *textPtr,
 			    const TkTextIndex *index1Ptr, const TkTextIndex *index2Ptr,
-			    const TkTextTag *tagPtr, int affectsDisplayGeometry);
+			    const TkTextTag *tagPtr, bool affectsDisplayGeometry);
 MODULE_SCOPE void	TkTextRelayoutWindow(TkText *textPtr, int mask);
 MODULE_SCOPE void	TkTextCheckLineMetricUpdate(const TkText *textPtr);
 MODULE_SCOPE void	TkTextCheckDisplayLineConsistency(const TkText *textPtr);

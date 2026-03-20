@@ -1644,7 +1644,7 @@ TkTextCreateDInfo(
 
     if (!sharedTextPtr->breakInfoTableIsInitialized) {
 	Tcl_InitHashTable(&sharedTextPtr->breakInfoTable, TCL_ONE_WORD_KEYS);
-	sharedTextPtr->breakInfoTableIsInitialized = 1;
+	sharedTextPtr->breakInfoTableIsInitialized = true;
     }
 
     if (sharedTextPtr->allowUpdateLineMetrics) {
@@ -9398,7 +9398,7 @@ TextRedrawTag(
     const TkTextIndex *index2Ptr,
 				/* Character just after last one to consider for redisplay.
 				 * NULL means process all the characters in the text. */
-    int affectsDisplayGeometry)/* Whether the display geometry is affected. */
+    bool affectsDisplayGeometry)/* Whether the display geometry is affected. */
 {
     TextDInfo *dInfoPtr;
     DLine *dlPtr;
@@ -9491,7 +9491,7 @@ RedrawTagsInPeer(
     TkText *textPtr,
     TkTextIndex *indexPtr1,
     TkTextIndex *indexPtr2,
-    int affectsDisplayGeometry)
+    bool affectsDisplayGeometry)
 {
     TkTextIndex start, end;
 
@@ -9533,7 +9533,7 @@ TkTextRedrawTag(
 				 * both indices are NULL, or both are non-Null. */
     const TkTextTag *tagPtr,	/* Information about tag, can be NULL, but only if the indices are
 				 * non-NULL*/
-    int affectsDisplayGeometry)/* Whether the display geometry is affected. If argument tagPtr is
+    bool affectsDisplayGeometry)/* Whether the display geometry is affected. If argument tagPtr is
 				 * given, then also this tag will be tested if the display geometry
 				 * is affected. */
 {
@@ -9546,7 +9546,7 @@ TkTextRedrawTag(
     }
 
     if (tagPtr && tagPtr->affectsDisplayGeometry) {
-	affectsDisplayGeometry = 1;
+	affectsDisplayGeometry = true;
     }
 
     if (!index1Ptr) {
