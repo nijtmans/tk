@@ -27,6 +27,14 @@ to the userbase.
  - [Pointer warp relative to the screen's root window fails if the Tk root window is withdrawn](https://core.tcl-lang.org/tk/tktview/e2418c)
  - [Directory library/demos unexpectedly embedded into tcl9tk9x.dll](https://core.tcl-lang.org/tk/tktview/6a9bae)
  - [Use the native selection colors for listbox and ttk::treeview widgets on aqua](https://core.tcl-lang.org/tk/tktview/c6292f)
+ - [ttk::entry placeholder length computation confuses string length and character length](https://core.tcl-lang.org/tk/tktview/992d6f)
+ - [crash with invalid data in [image create photo]](https://core.tcl-lang.org/tk/tktview/f0b3fa)
+ - [Segfault under Windows when executing test file menu.test with "-singleproc 0"](https://core.tcl-lang.org/tk/tktview/d8f964)
+ - [Check recursive menu usage to avoid crash](https://core.tcl-lang.org/tk/info/7f67bb40)
+ - [Get rid of the ugly Motif-style cascade arrows on X11](https://core.tcl-lang.org/tk/info/aca9953f)
+ - ["wm forget ." segfaults](https://core.tcl-lang.org/tk/info/8c362075)
+ - [macOS/aqua: <Map> events are generated for windows that are already mapped, and wish crashes](https://core.tcl-lang.org/tk/info/d4d89d13)
+ - [Block cursor in text widget may hide the character underneath](https://core.tcl-lang.org/tk/info/556606)
 
 Release Tk 9.0.3 arises from the check-in with tag `core-9-0-3`.
 
