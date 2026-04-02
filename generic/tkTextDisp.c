@@ -7158,14 +7158,14 @@ TkTextPixelIndex(
 				 * window. */
     TkTextIndex *indexPtr,	/* This index gets filled in with the index of
 				 * the character nearest to (x,y). */
-    int *nearest)		/* If non-NULL then gets set to 0 if (x,y) is
+    bool *nearest)		/* If non-NULL then gets set to 0 if (x,y) is
 				 * actually over the returned index, and 1 if
 				 * it is just nearby (e.g. if x,y is on the
 				 * border of the widget). */
 {
     TextDInfo *dInfoPtr = textPtr->dInfoPtr;
     DLine *dlPtr, *validDlPtr;
-    int nearby = 0;
+    bool nearby = false;
 
     /*
      * Make sure that all of the layout information about what's displayed
@@ -7185,15 +7185,15 @@ TkTextPixelIndex(
     if (y < dInfoPtr->y) {
 	y = dInfoPtr->y;
 	x = dInfoPtr->x;
-	nearby = 1;
+	nearby = true;
     }
     if (x >= dInfoPtr->maxX) {
 	x = dInfoPtr->maxX - 1;
-	nearby = 1;
+	nearby = true;
     }
     if (x < dInfoPtr->x) {
 	x = dInfoPtr->x;
-	nearby = 1;
+	nearby = true;
     }
 
     /*
@@ -7202,7 +7202,7 @@ TkTextPixelIndex(
 
     if (dInfoPtr->dLinePtr == NULL) {
 	if (nearest != NULL) {
-	    *nearest = 1;
+	    *nearest = true;
 	}
 	*indexPtr = textPtr->topIndex;
 	return;
@@ -7220,7 +7220,7 @@ TkTextPixelIndex(
 	     */
 
 	    x = dInfoPtr->maxX - 1;
-	    nearby = 1;
+	    nearby = true;
 	    break;
 	}
     }
