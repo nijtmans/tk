@@ -237,10 +237,10 @@ static const tabbingMode tabbingModes[] = {
 };
 
 static const char *const appearanceStrings[] = {
-    "aqua", "auto", "darkaqua", NULL
+    "light", "dark", "auto", NULL
 };
 enum appearances {
-    APPEARANCE_AQUA, APPEARANCE_AUTO, APPEARANCE_DARKAQUA
+    APPEARANCE_LIGHT, APPEARANCE_DARK, APPEARANCE_AUTO
 };
 
 static Bool wantsToBeTab(NSWindow *macWindow) {
@@ -298,13 +298,13 @@ static void syncLayout(NSWindow *macWindow)
 
 typedef enum {
     WMATT_ALPHA, WMATT_APPEARANCE, WMATT_BUTTONS, WMATT_FULLSCREEN,
-    WMATT_ISDARK, WMATT_MODIFIED, WMATT_NOTIFY, WMATT_TITLEPATH, WMATT_TOPMOST,
+    WMATT_MODIFIED, WMATT_NOTIFY, WMATT_TITLEPATH, WMATT_TOPMOST,
     WMATT_TRANSPARENT, WMATT_STYLEMASK, WMATT_CLASS, WMATT_TABBINGID,
     WMATT_TABBINGMODE, WMATT_TYPE, _WMATT_LAST_ATTRIBUTE
 } WmAttribute;
 
 static const char *const WmAttributeNames[] = {
-    "-alpha", "-appearance", "-buttons", "-fullscreen", "-isdark", "-modified",
+    "-alpha", "-appearance", "-buttons", "-fullscreen", "-modified",
     "-notify", "-titlepath", "-topmost", "-transparent", "-stylemask", "-class",
     "-tabbingid", "-tabbingmode", "-type", NULL
 };
@@ -349,6 +349,7 @@ static void		TopLevelEventProc(void *clientData,
 static void		WmStackorderToplevelWrapperMap(TkWindow *winPtr,
 			    Display *display, Tcl_HashTable *table);
 static void		UpdateGeometryInfo(void *clientData);
+static void		UpdatePointerWinAfterDestroy(TKWindow *deadNSWindow);
 static void		UpdateSizeHints(TkWindow *winPtr);
 static void		UpdateVRootGeometry(WmInfo *wmPtr);
 static int		WmAspectCmd(Tk_Window tkwin, TkWindow *winPtr,
@@ -451,10 +452,12 @@ static int		WmWithdrawCmd(Tk_Window tkwin, TkWindow *winPtr,
 			    Tcl_Interp *interp, Tcl_Size objc,
 			    Tcl_Obj *const objv[]);
 static void		WmUpdateGeom(WmInfo *wmPtr, TkWindow *winPtr);
+#if 0
 static int		WmWinStyle(Tcl_Interp *interp, TkWindow *winPtr,
 			    Tcl_Size objc, Tcl_Obj *const objv[]);
 static int		WmWinAppearance(Tcl_Interp *interp, TkWindow *winPtr,
 			    Tcl_Size objc, Tcl_Obj *const objv[]);
+#endif
 static void		ApplyWindowAttributeFlagChanges(TkWindow *winPtr,
 			    NSWindow *macWindow, UInt64 oldAttributes,
 			    int oldFlags, int create, int initial);
@@ -1138,6 +1141,89 @@ TkWmUnmapWindow(
 /*
  *----------------------------------------------------------------------
  *
+ * UpdatePointerWinAfterDestroy --
+ *
+ *	Determine the new pointer window after the destruction of the old pointer
+ *      window, and notify Tk of it.
+ *
+ * Results:
+ *	None
+ *
+ * Side effects:
+ *	See description.
+ *
+ *----------------------------------------------------------------------
+ */
+
+static void UpdatePointerWinAfterDestroy (
+    TKWindow *deadNSWindow)	/* Top-level window that's being deleted */
+{
+    Tk_Window target = NULL;
+    TkWindow *winPtr;
+    NSWindow *w;
+
+    NSPoint mouse = [NSEvent mouseLocation];
+    if (! NSPointInRect(mouse, [deadNSWindow frame])) {
+	return;
+    }
+
+    /*
+     * Determine the new window to contain the screen pointer (target window).
+     * In case that the procedure doesn't yield a result, let the root window
+     * of the screen be the new pointer window (target == NULL).
+     */
+
+    /* Step 1: Find the toplevel that will contain the screen pointer */
+    winPtr = NULL;
+    for (w in [NSApp orderedWindows]) {
+	if (w == deadNSWindow || w == NULL) {
+	    continue;
+	}
+	winPtr = TkMacOSXGetTkWindow(w);
+	if (winPtr == NULL || ! Tk_IsMapped((Tk_Window)winPtr)) {
+	    continue;
+	}
+	if (NSPointInRect(mouse, [w frame])) {
+	    target = (Tk_Window)winPtr;
+	    break;
+	}
+    }
+
+    NSPoint local = [w tkConvertPointFromScreen: mouse];
+    int top_x = floor(local.x),
+	top_y = floor(w.frame.size.height - local.y);
+    int root_x = floor(mouse.x),
+	root_y = floor(TkMacOSXZeroScreenHeight() - mouse.y);
+
+    Bool doUpdatePointer = True;
+    if (target) {
+	/*
+	 * Step 2: Find the Tk internal window within the toplevel that will contain
+	 *         the screen pointer.
+	 */
+	int dummy_x, dummy_y;
+	target = Tk_TopCoordsToWindow(target, top_x, top_y, &dummy_x, &dummy_y);
+	if (! Tk_IsTopLevel(target) && (Tk_Parent(target) == NULL)) {
+	   /*
+	    * The parent of the Tk internal window is in the process of being destroyed.
+	    * Don't call Tk_UpdatePointer in this case.
+	    */
+	    doUpdatePointer = False;
+	}
+    }
+    if (doUpdatePointer) {
+	Tk_UpdatePointer(target, root_x, root_y, [NSApp tkButtonState]);
+	if (target == NULL) {
+	    [NSApp setTkPointerWindow:nil];
+	} else {
+	    [NSApp setTkPointerWindow: (TkWindow *)target];
+	}
+    }
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
  * TkWmDeadWindow --
  *
  *	This procedure is invoked when a top-level window is about to be
@@ -1159,8 +1245,6 @@ void
 TkWmDeadWindow(
     TkWindow *winPtr)		/* Top-level window that's being deleted. */
 {
-    TkWindow *winPtr2;
-    NSWindow *w;
     WmInfo *wmPtr = winPtr->wmInfoPtr, *wmPtr2;
     TKWindow *deadNSWindow = NULL;
     if (Tk_WindowId(winPtr) == None) {
@@ -1234,50 +1318,7 @@ TkWmDeadWindow(
 	Tcl_Free(transientPtr);
     }
 
-    /*
-     * Remove references to the Tk window from the mouse event processing
-     * state which is recorded in the NSApplication object and notify Tk
-     * of the new pointer window.
-     */
-
-    NSPoint mouse = [NSEvent mouseLocation];
-    [NSApp setTkPointerWindow:nil];
-    winPtr2 = NULL;
-
-    for (w in [NSApp orderedWindows]) {
-	if (w == deadNSWindow || w == NULL) {
-	    continue;
-	}
-	winPtr2 = TkMacOSXGetTkWindow(w);
-	if (winPtr2 == NULL) {
-	    continue;
-	}
-	if (NSPointInRect(mouse, [w frame])) {
-	    [NSApp setTkPointerWindow: winPtr2];
-	    break;
-	}
-    }
-    if (winPtr2) {
-	/*
-	 * We now know which toplevel will contain the pointer when the window
-	 * is destroyed.  We need to know which Tk window within the
-	 * toplevel will contain the pointer.
-	 */
-	NSPoint local = [w tkConvertPointFromScreen: mouse];
-	int top_x = floor(local.x),
-	    top_y = floor(w.frame.size.height - local.y);
-	int root_x = floor(mouse.x),
-	    root_y = floor(TkMacOSXZeroScreenHeight() - mouse.y);
-	int win_x, win_y;
-	Tk_Window target = Tk_TopCoordsToWindow((Tk_Window) winPtr2, top_x, top_y, &win_x, &win_y);
-	/*
-	 * A non-toplevel window can have a NULL parent while it is in the process of
-	 * being destroyed.  We should not call Tk_UpdatePointer in that case.
-	 */
-	if (Tk_Parent(target) != NULL || Tk_IsTopLevel(target)) {
-	    Tk_UpdatePointer(target, root_x, root_y, [NSApp tkButtonState]);
-	}
-    }
+    UpdatePointerWinAfterDestroy(deadNSWindow);
 
     /*
      * Unregister the NSWindow and remove all references to it from the Tk
@@ -1709,11 +1750,11 @@ WmSetAttribute(
 	    return TCL_ERROR;
 	}
 	switch ((enum appearances) index) {
-	case APPEARANCE_AQUA:
+	case APPEARANCE_LIGHT:
 	    macWindow.appearance = [NSAppearance appearanceNamed:
 		NSAppearanceNameAqua];
 	    break;
-	case APPEARANCE_DARKAQUA:
+	case APPEARANCE_DARK:
 #if MAC_OS_X_VERSION_MAX_ALLOWED >= 101400
 	    if (@available(macOS 10.14, *)) {
 		macWindow.appearance = [NSAppearance appearanceNamed:
@@ -1724,6 +1765,7 @@ WmSetAttribute(
 	default:
 	    macWindow.appearance = nil;
 	}
+	Tcl_SetObjResult(interp, Tcl_NewObj());
 	break;
     }
     case WMATT_BUTTONS: {
@@ -1899,9 +1941,6 @@ WmSetAttribute(
 	placeAsTab((TKWindow *)macWindow);
 	break;
     }
-    case WMATT_ISDARK: {
-	break;
-    }
     case WMATT_TITLEPATH: {
 	const char *path = (const char *)Tcl_FSGetNativePath(value);
 	NSString *filename = @"";
@@ -1998,11 +2037,11 @@ WmGetAttribute(
 	if (appearance == nil) {
 	    resultString = appearanceStrings[APPEARANCE_AUTO];
 	} else if (appearance == NSAppearanceNameAqua) {
-	    resultString = appearanceStrings[APPEARANCE_AQUA];
+	    resultString = appearanceStrings[APPEARANCE_LIGHT];
 #if MAC_OS_X_VERSION_MAX_ALLOWED >= 101400
 	} else if (@available(macOS 10.14, *)) {
 	    if (appearance == NSAppearanceNameDarkAqua) {
-		resultString = appearanceStrings[APPEARANCE_DARKAQUA];
+		resultString = appearanceStrings[APPEARANCE_DARK];
 	    }
 #endif // MAC_OS_X_VERSION_MAX_ALLOWED >= 101400
 	}
@@ -2031,9 +2070,6 @@ WmGetAttribute(
 	break;
     case WMATT_FULLSCREEN:
 	result = Tcl_NewBooleanObj([macWindow styleMask] & NSFullScreenWindowMask);
-	break;
-    case WMATT_ISDARK:
-	result = Tcl_NewBooleanObj(TkMacOSXInDarkMode((Tk_Window)winPtr));
 	break;
     case WMATT_MODIFIED:
 	result = Tcl_NewBooleanObj([macWindow isDocumentEdited]);
@@ -5261,7 +5297,7 @@ Tk_GetRootCoords(
      */
 
     x = y = 0;
-    while (1) {
+    while (true) {
 	x += winPtr->changes.x + winPtr->changes.border_width;
 	y += winPtr->changes.y + winPtr->changes.border_width;
 	if (winPtr->flags & TK_TOP_LEVEL) {
@@ -5345,7 +5381,7 @@ Tk_CoordsToWindow(
 
     x = rootX - winPtr->wmInfoPtr->xInParent;
     y = rootY - winPtr->wmInfoPtr->yInParent;
-    while (1) {
+    while (true) {
 	x -= winPtr->changes.x;
 	y -= winPtr->changes.y;
 	nextPtr = NULL;
@@ -5441,7 +5477,7 @@ Tk_TopCoordsToWindow(
     winPtr = (TkWindow *)tkwin;
     x = rootX;
     y = rootY;
-    while (1) {
+    while (true) {
 	nextPtr = NULL;
 
 	/*
@@ -6192,6 +6228,7 @@ TkMacOSXZoomToplevel(
     return true;
 }
 
+#if 0
 /*
  *----------------------------------------------------------------------
  *
@@ -6280,7 +6317,7 @@ TkUnsupported1ObjCmd(
 	return TCL_ERROR;
     }
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -6464,7 +6501,7 @@ WmWinStyle(
 
     return TCL_OK;
 }
-
+
 /*
  *----------------------------------------------------------------------
  *
@@ -6524,11 +6561,11 @@ WmWinAppearance(
 	if (appearance == nil) {
 	    resultString = appearanceStrings[APPEARANCE_AUTO];
 	} else if (appearance == NSAppearanceNameAqua) {
-	    resultString = appearanceStrings[APPEARANCE_AQUA];
+	    resultString = appearanceStrings[APPEARANCE_LIGHT];
 #if MAC_OS_X_VERSION_MAX_ALLOWED >= 101400
 	} else if (@available(macOS 10.14, *)) {
 	    if (appearance == NSAppearanceNameDarkAqua) {
-		resultString = appearanceStrings[APPEARANCE_DARKAQUA];
+		resultString = appearanceStrings[APPEARANCE_DARK];
 	    }
 #endif // MAC_OS_X_VERSION_MAX_ALLOWED >= 101400
 	}
@@ -6545,11 +6582,11 @@ WmWinAppearance(
 	    return TCL_ERROR;
 	}
 	switch ((enum appearances) index) {
-	case APPEARANCE_AQUA:
+	case APPEARANCE_LIGHT:
 	    win.appearance = [NSAppearance appearanceNamed:
 		NSAppearanceNameAqua];
 	    break;
-	case APPEARANCE_DARKAQUA:
+	case APPEARANCE_DARK:
 #if MAC_OS_X_VERSION_MAX_ALLOWED >= 101400
 	    if (@available(macOS 10.14, *)) {
 		win.appearance = [NSAppearance appearanceNamed:
@@ -6565,6 +6602,7 @@ WmWinAppearance(
     return TCL_OK;
 #endif
 }
+#endif
 
 /*
  *----------------------------------------------------------------------
@@ -7050,7 +7088,7 @@ TkMacOSXWindowOffset(
 /*
  *----------------------------------------------------------------------
  *
- * TkpGetMS --
+ * TkGetMS --
  *
  *	Return a relative time in milliseconds. It doesn't matter when the
  *	epoch was.
@@ -7065,7 +7103,7 @@ TkMacOSXWindowOffset(
  */
 
 unsigned long
-TkpGetMS(void)
+TkGetMS(void)
 {
     Tcl_Time now;
 
@@ -7809,6 +7847,57 @@ RemapWindows(
 	    childPtr = childPtr->nextPtr) {
 	RemapWindows(childPtr, (MacDrawable *)winPtr->window);
     }
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * TkMacOSXInDarkMode --
+ *
+ *      Tests whether the given window's NSView has a DarkAqua Appearance.
+ *
+ * Results:
+ *      Returns true if the NSView is in DarkMode, false if not.
+ *
+ * Side effects:
+ *      None.
+ *
+ *----------------------------------------------------------------------
+ */
+
+MODULE_SCOPE bool
+TkMacOSXInDarkMode(Tk_Window tkwin)
+{
+
+#if MAC_OS_X_VERSION_MAX_ALLOWED >= 101400
+    if (@available(macOS 10.14, *)) {
+	TkWindow *winPtr = (TkWindow*) tkwin;
+	NSAppearanceName name;
+	NSView *view = nil;
+	if (winPtr && winPtr->privatePtr) {
+	    view = TkMacOSXGetNSViewForDrawable((Drawable)winPtr->privatePtr);
+	}
+	if (view) {
+	    name = [[view effectiveAppearance] name];
+	} else {
+	    name = [[NSApp effectiveAppearance] name];
+	}
+	return (name == NSAppearanceNameDarkAqua);
+    }
+#else
+    (void) tkwin;
+#endif
+    return false;
+}
+
+/*
+ * This function is also used in the stub function TkpWindowIsDark, now
+ * that dark mode is available on other platforms.
+ */
+
+int TkpWindowIsDark(Tk_Window tkwin, bool *isdark) {
+    *isdark = TkMacOSXInDarkMode(tkwin);
+    return TCL_OK;
 }
 
 /*

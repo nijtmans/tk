@@ -4,11 +4,11 @@ changes to the Tk source code at
 
 > [Tk Source Code](https://core.tcl-lang.org/tk/)
 
-Release Tk 9.1a2 arises from the check-in with tag `core-9-1-a2`.
+Release Tk 9.1b1 arises from the check-in with tag `core-9-1-b1`.
 
-Tk 9.1a2 continues the Tk 9.x series of releases.  The Tk 9.x series
+Tk 9.1b1 continues the Tk 9.x series of releases.  The Tk 9.x series
 do not support Tcl 8.6.  The Tk 9.1 series extends the Tcl 9.0 series.
-To make use of Tk 9.1a2, first a Tcl 9.0 or 9.1 release must be present.
+To make use of Tk 9.1b1, first a Tcl 9.0 or 9.1 release must be present.
 As new Tk features are developed, expect them to appear in Tk 9, but not
 necessarily in Tk 8.
 
@@ -24,12 +24,19 @@ necessarily in Tk 8.
  - [Add accessibility/screen reader support to the core](https://core.tcl-lang.org/tips/doc/trunk/tip/733.md)
  - [Scroll entry with mouse wheel](https://core.tcl-lang.org/tips/doc/trunk/tip/736.md)
  - [Add a Wide.TSpinbox style to the core](https://core.tcl-lang.org/tips/doc/trunk/tip/739.md)
- - [Add support for native file icons to the core]((https://core.tcl-lang.org/tips/doc/trunk/tip/743.md))
+ - [Add support for native file icons to the core](https://core.tcl-lang.org/tips/doc/trunk/tip/743.md)
  - [Re-implement the Aqua send command](https://core.tcl-lang.org/tk/info/1574913cc772201e)
  - [Make the selection colors of the listbox widget fully native-conform](https://core.tcl-lang.org/tips/doc/trunk/tip/747.md)
- - [Add support for bidrectional text / RTL languages on Windows and X11](https://core.tcl-lang.org/tk/info/058e738f9f06fe20)
+ - [Add support for bidrectional text / RTL languages on Windows and X11](https://core.tcl-lang.org/tk/tktview/1b81ff43a2)
+ - [Add Mouse Wheel Zoom Support to Tk Console](https://core.tcl-lang.org/tips/doc/trunk/tip/742.md)
+ - [Consistent dark mode for Windows and macOS](https://core.tcl-lang.org/tips/doc/trunk/tip/750.md)
+ - [Rotated text for label widgets](https://core.tcl-lang.org/tips/doc/trunk/tip/751.md)
+ - [ttk::treeview enhancements](https://core.tcl-lang.org/tips/doc/trunk/tip/740.md)
+ - [Painting performance improvements for images in ttk widgets](https://core.tcl-lang.org/tk/info/7caf9e9edcfbee42)
 
 # Potential incompatibilities to 9.0
  - [MS-Win: Remove the -xpstyle option from tk_chooseDirectory and tk_getOpenFile](https://core.tcl-lang.org/tk/tktview/441c52)
  - [MS-Win: Eliminate the "xpnative" ttk style, in favor of "vista"](https://core.tcl-lang.org/tk/tktview/441c52)
  - [No longer allow negative screen distances in most cases](https://core.tcl-lang.org/tips/doc/trunk/tip/698.md)
+ - [BiDi support is now the default build option on X11 and harfbuzz is a hard build
+ dependency](https://core.tcl-lang.org/tk/tktview/1b81ff43a2)

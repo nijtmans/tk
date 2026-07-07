@@ -3,9 +3,9 @@ on:
   push:
     branches:
     - "main"
-    - "core-9-0-branch"
+    - "core-9-1-branch"
     tags:
-    - "core-**"
+    - "core-*"
 permissions:
   contents: read
 defaults:
@@ -29,11 +29,11 @@ jobs:
           - "--enable-symbols"
     steps:
       - name: Checkout Tk
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           path: tk
       - name: Checkout Tcl 9.1
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: tcltk/tcl
           ref: main
@@ -41,7 +41,7 @@ jobs:
       - name: Setup Environment (compiler=${{ matrix.compiler }})
         run: |
           sudo apt-get update
-          sudo apt-get install libxss-dev libxft-dev libcups2-dev libatk1.0-dev libatk-bridge2.0-dev
+          sudo apt-get install libxss-dev libxft-dev libcups2-dev libatk1.0-dev libatk-bridge2.0-dev libharfbuzz-dev
           mkdir "$HOME/install dir"
           touch tk/doc/man.macros tk/generic/tkStubInit.c
           echo "CFGOPT=$CFGOPT" >> $GITHUB_ENV
@@ -133,11 +133,11 @@ jobs:
           - "--enable-symbols"
     steps:
       - name: Checkout Tk
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           path: tk
       - name: Checkout Tcl 9.1
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           repository: tcltk/tcl
           ref: main
@@ -145,7 +145,7 @@ jobs:
       - name: Setup Environment (compiler=${{ matrix.compiler }})
         run: |
           sudo apt-get update
-          sudo apt-get install libxss-dev libxft-dev libcups2-dev xvfb libicu-dev xfonts-75dpi xfonts-100dpi xfonts-scalable libxfont2 unifont
+          sudo apt-get install libxss-dev libxft-dev libcups2-dev xvfb libicu-dev xfonts-75dpi xfonts-100dpi xfonts-scalable libxfont2 unifont libharfbuzz-dev
           mkdir "$HOME/install dir"
           touch tk/doc/man.macros tk/generic/tkStubInit.c
           echo "CFGOPT=$CFGOPT" >> $GITHUB_ENV

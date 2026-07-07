@@ -198,10 +198,20 @@ namespace eval ttk::theme::aqua {
 
 	# Treeview
 	ttk::style configure Heading \
-	    -font TkHeadingFont \
-	    -foreground systemTextColor \
+	    -font TkHeadingFont -padding {2.25p 0 2.25p 7} \
+	    -foreground systemPopupArrowInactive \
 	    -background systemWindowBackgroundColor
-	ttk::style configure Treeview -rowheight 18 \
+	ttk::style map Heading \
+	    -foreground {
+		selected systemControlTextColor
+		alternate systemControlTextColor} \
+	    -background {
+		selected systemListViewSortColumnBackground
+		alternate systemListViewSortColumnBackground}
+	ttk::style configure Row -focuscolor systemSelectedTextBackgroundColor \
+	    -focussolid 1 -focusthickness 0 -padding {0 0 0 0.75p}
+	ttk::style map Row -focusthickness {focus 1} -padding {focus 0}
+	ttk::style configure Treeview \
 	    -background systemControlBackgroundColor \
 	    -stripedbackground systemControlAlternatingRowColor \
 	    -foreground systemTextColor \
@@ -223,5 +233,36 @@ namespace eval ttk::theme::aqua {
 	    -font TkSmallCaptionFont
 
 	# TODO: panedwindow sashes should be 9 pixels (HIG:Controls:Split Views)
+    }
+}
+
+# ttk::theme::aqua::configureNotebookStyle --
+#
+# Sets theme-specific option values for the ttk::notebook style $style and the
+# style $style.Tab.  Invoked by ::ttk::configureNotebookStyle.
+
+proc ttk::theme::aqua::configureNotebookStyle {style} {
+    set tabPos [ttk::style lookup $style -tabposition {} nw]
+    switch -- [string index $tabPos 0] {
+	n {
+	    ttk::style configure $style -tabmargins {10 0}
+	    ttk::style configure $style.Tab -padding {12 3 12 2}
+	}
+	s {
+	    ttk::style configure $style -tabmargins {10 0}
+	    ttk::style configure $style.Tab -padding {12 2 12 3}
+	}
+	w {
+	    ttk::style configure $style -tabmargins {0 10}
+	    ttk::style configure $style.Tab -padding {3 12 2 12}
+	}
+	e {
+	    ttk::style configure $style -tabmargins {0 10}
+	    ttk::style configure $style.Tab -padding {2 12 3 12}
+	}
+	default {
+	    ttk::style configure $style -tabmargins {10 0}
+	    ttk::style configure $style.Tab -padding {12 3 12 2}
+	}
     }
 }
