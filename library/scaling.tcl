@@ -10,8 +10,8 @@
 # as a percentage of 96dpi), rounded to the nearest multiple of 25.
 #
 # On X11 systems (but not on SDL systems that claim to be X11), the first call
-# of the command also sets [tk scaling] and ::tk::fontScalingFactor to values
-# extracted from the X11 configuration.
+# of the command also sets [tk scaling] to a value extracted from the X11
+# configuration.
 #
 # The command is called during Tk initialization, from icons.tcl, when the
 # latter is sourced by tk.tcl.
@@ -23,6 +23,8 @@ proc ::tk::ScalingPct {} {
     if {![info exists doneScalingInitX11]} {
 	set pct [::tk::ScalingInitX11 $pct]
 	set doneScalingInitX11 1
+
+	variable startScalingLevel [expr {$pct / 100.0}]
     }
 
     #
@@ -52,14 +54,10 @@ proc ::tk::ScalingInitX11 {pct} {
 	# based on https://wiki.archlinux.org/title/HiDPI
 	#
 	set winScalingFactor 1
-	variable fontScalingFactor 1		;# needed in the file ttk/fonts
 	if {[catch {exec ps -e | grep xfce4-session}] == 0} {		;# Xfce
 	    if {[catch {exec xfconf-query -c xsettings \
 		 -p /Gdk/WindowScalingFactor} result] == 0} {
 		set winScalingFactor $result
-		if {$winScalingFactor >= 2} {
-		    set fontScalingFactor 2
-		}
 	    }
 
 	    #
@@ -141,19 +139,6 @@ proc ::tk::ScalingInitX11 {pct} {
 
 proc ::tk::ScaleNum num {
     return [expr {round($num * [tk scaling] * 0.75)}]
-}
-
-# ::tk::FontScalingFactor --
-#
-# Accessor command for variable ::tk::fontScalingFactor.
-
-proc ::tk::FontScalingFactor {} {
-    variable fontScalingFactor
-    if {[info exists fontScalingFactor]} {
-	return $fontScalingFactor
-    } else {
-	return 1
-    }
 }
 
 # ::tk::ScanMonitorsFile --

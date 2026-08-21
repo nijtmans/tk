@@ -65,7 +65,8 @@ static void Fill3DRectangle(
     int relief)			/* Indicates 3D effect: TK_RELIEF_FLAT,
 				 * TK_RELIEF_RAISED, TK_RELIEF_SUNKEN, etc. */
 {
-    if (borderWidth == 1 && width >= 2 && height >= 2 &&
+    if ((borderWidth == 1 || borderWidth == 2) &&
+	    width >= 2*borderWidth && height >= 2*borderWidth &&
 	    (relief == TK_RELIEF_RAISED || relief == TK_RELIEF_SUNKEN)) {
 	GC flatGC  = Tk_3DBorderGC(tkwin, border, TK_3D_FLAT_GC);
 	GC lightGC = Tk_3DBorderGC(tkwin, border, TK_3D_LIGHT_GC);
@@ -79,6 +80,17 @@ static void Fill3DRectangle(
 
 	nGC = wGC = (relief == TK_RELIEF_RAISED ? lightGC : darkGC);
 	sGC = eGC = (relief == TK_RELIEF_RAISED ? darkGC : lightGC);
+
+	XDrawLine(Tk_Display(tkwin), drawable, nGC, x1, y1, x2-1, y1);	/* N */
+	XDrawLine(Tk_Display(tkwin), drawable, wGC, x1, y1, x1, y2-1);	/* W */
+	XDrawLine(Tk_Display(tkwin), drawable, sGC, x1, y2, x2, y2);	/* S */
+	XDrawLine(Tk_Display(tkwin), drawable, eGC, x2, y1, x2, y2);	/* E */
+
+	if (borderWidth == 1) {
+	    return;
+	}
+
+	++x1; ++y1; --x2; --y2;
 
 	XDrawLine(Tk_Display(tkwin), drawable, nGC, x1, y1, x2-1, y1);	/* N */
 	XDrawLine(Tk_Display(tkwin), drawable, wGC, x1, y1, x1, y2-1);	/* W */
@@ -1027,7 +1039,7 @@ static const Ttk_ElementSpec IndicatorElementSpec = {
 /*----------------------------------------------------------------------
  * +++ Arrow element(s).
  *
- *	Draws a solid triangle inside a box.
+ *	Draws a chevron inside a box.
  *	clientData is an enum ArrowDirection pointer.
  */
 
@@ -1043,7 +1055,7 @@ typedef struct {
 /* Size does not include padding */
 static const Ttk_ElementOptionSpec ArrowElementOptions[] = {
     { "-arrowsize", TK_OPTION_PIXELS,
-	offsetof(ArrowElement,sizeObj), "3p" },
+	offsetof(ArrowElement,sizeObj), "4" },
     { "-arrowcolor", TK_OPTION_COLOR,
 	offsetof(ArrowElement,colorObj), "black"},
     { "-arrowpadding", TK_OPTION_STRING,
@@ -1067,25 +1079,13 @@ static void ArrowElementSize(
     TCL_UNUSED(Ttk_Padding *))
 {
     ArrowElement *arrow = (ArrowElement *)elementRecord;
-    ArrowDirection direction = (ArrowDirection)PTR2INT(clientData);
     int size = 4;
+    ArrowDirection direction = (ArrowDirection)PTR2INT(clientData);
     Ttk_Padding padding;
 
-    if (direction <= ARROW_RIGHT) {
-	/* Get scaled size */
-	TkGetScaledPixelValue(NULL, tkwin, arrow->sizeObj, &size);
-	TtkArrowSize(size, direction, widthPtr, heightPtr);
-    } else {
-	double scalingLevel = TkScalingLevel2(tkwin);
-
-	/* Get unscaled size */
-	Tcl_GetIntFromObj(NULL, arrow->sizeObj, &size);
-	TtkArrowSize(size, direction, widthPtr, heightPtr);	/* unscaled */
-
-	/* Scale and then round up */
-	*widthPtr  = (int)ceil(*widthPtr * scalingLevel);	/* scaled */
-	*heightPtr = (int)ceil(*heightPtr * scalingLevel);	/* scaled */
-    }
+    /* Get scaled width and height */
+    Tcl_GetIntFromObj(NULL, arrow->sizeObj, &size);
+    TtkGetScaledArrowSize(size, direction, tkwin, widthPtr, heightPtr);
 
     /* Add scaled padding */
     Ttk_GetPaddingFromObj(NULL, tkwin, arrow->paddingObj, &padding);
@@ -1110,8 +1110,11 @@ static void ArrowElementDraw(
     Tk_3DBorder border = Tk_Get3DBorderFromObj(tkwin, arrow->borderObj);
     int borderWidth = DEFAULT_BORDERWIDTH, relief = TK_RELIEF_RAISED;
     Ttk_Padding padding;
+    int size = 4;
     ArrowDirection direction = (ArrowDirection)PTR2INT(clientData);
     XColor *arrowColor = Tk_GetColorFromObj(tkwin, arrow->colorObj);
+    Tk_Image img;
+    int imgWidth, imgHeight;
 
     /* Create container box */
     TkGetScaledPixelValue(NULL, tkwin, arrow->borderWidthObj, &borderWidth);
@@ -1123,49 +1126,14 @@ static void ArrowElementDraw(
     Ttk_GetPaddingFromObj(NULL, tkwin, arrow->paddingObj, &padding);
     b = Ttk_PadBox(b, padding);
 
-    if (direction <= ARROW_RIGHT) {
-	int cx = 0, cy = 0;
+    Tcl_GetIntFromObj(NULL, arrow->sizeObj, &size);
 
-	/* Calc indicator size */
-	switch (direction) {
-	    case ARROW_UP:
-	    case ARROW_DOWN:
-		TtkArrowSize(b.width/2, direction, &cx, &cy);
-		if ((b.height - cy) % 2 == 1) {
-		    ++cy;
-		}
-		break;
-	    case ARROW_LEFT:
-	    case ARROW_RIGHT:
-		TtkArrowSize(b.height/2, direction, &cx, &cy);
-		if ((b.width - cx) % 2 == 1) {
-		    ++cx;
-		}
-		break;
-	    default:
-		return;
-	}
-
-	/* Anchor box */
-	b = Ttk_AnchorBox(b, cx, cy, TK_ANCHOR_CENTER);
-
-	/* Draw indicator */
-	GC gc = Tk_GCForColor(arrowColor, d);
-	TtkFillArrow(Tk_Display(tkwin), d, gc, b, direction);
-    } else {
-	int size = 4;
-	Tk_Image img;
-	int imgWidth, imgHeight;
-
-	Tcl_GetIntFromObj(NULL, arrow->sizeObj, &size);
-
-	/* Draw indicator */
-	img = TtkMakeChevronImage(size, direction, arrowColor, tkwin);
-	Tk_SizeOfImage(img, &imgWidth, &imgHeight);
-	Tk_RedrawImage(img, 0, 0, imgWidth, imgHeight, d,
-	    b.x + (b.width - imgWidth)/2, b.y + (b.height - imgHeight)/2);
-	Tk_FreeImage(img);
-    }
+    /* Draw indicator */
+    img = TtkMakeChevronImage(size, direction, arrowColor, tkwin);
+    Tk_SizeOfImage(img, &imgWidth, &imgHeight);
+    Tk_RedrawImage(img, 0, 0, imgWidth, imgHeight, d,
+	b.x + (b.width - imgWidth)/2, b.y + (b.height - imgHeight)/2);
+    Tk_FreeImage(img);
 }
 
 static const Ttk_ElementSpec ArrowElementSpec = {
@@ -1179,7 +1147,7 @@ static const Ttk_ElementSpec ArrowElementSpec = {
 /*
  * Modified arrow element for comboboxes and spinboxes:
  *	The width and height are different, and the left edge is drawn in the
- *	same color as the right one.  Inside the box a chevron is drawn.
+ *	same color as the right one.
  */
 
 static void BoxArrowElementSize(
@@ -1192,18 +1160,13 @@ static void BoxArrowElementSize(
     TCL_UNUSED(Ttk_Padding *))
 {
     ArrowElement *arrow = (ArrowElement *)elementRecord;
-    int size = 4;						/* unscaled */
-    double scalingLevel = TkScalingLevel2(tkwin);
+    int size = 4;
     ArrowDirection direction = (ArrowDirection)PTR2INT(clientData);
     Ttk_Padding padding;
 
-    /* Get unscaled size */
+    /* Get scaled width and height */
     Tcl_GetIntFromObj(NULL, arrow->sizeObj, &size);
-    TtkArrowSize(size, direction, widthPtr, heightPtr);		/* unscaled */
-
-    /* Scale and then round up */
-    *widthPtr  = (int)ceil(*widthPtr * scalingLevel);		/* scaled */
-    *heightPtr = (int)ceil(*heightPtr * scalingLevel);		/* scaled */
+    TtkGetScaledArrowSize(size, direction, tkwin, widthPtr, heightPtr);
 
     /* Add scaled padding */
     Ttk_GetPaddingFromObj(NULL, tkwin, arrow->paddingObj, &padding);
@@ -1277,7 +1240,7 @@ typedef struct {
 
 static const Ttk_ElementOptionSpec MenuIndicatorElementOptions[] = {
     { "-arrowsize", TK_OPTION_PIXELS,
-	offsetof(MenuIndicatorElement,sizeObj), "3.75p" },
+	offsetof(MenuIndicatorElement,sizeObj), "5" },
     { "-arrowcolor", TK_OPTION_COLOR,
 	offsetof(MenuIndicatorElement,colorObj), "black" },
     { "-arrowpadding", TK_OPTION_STRING,
@@ -1295,18 +1258,13 @@ static void MenuIndicatorElementSize(
     TCL_UNUSED(Ttk_Padding *))
 {
     MenuIndicatorElement *indicator = (MenuIndicatorElement *)elementRecord;
-    int size = 5;						/* unscaled */
-    double scalingLevel = TkScalingLevel2(tkwin);
+    int size = 5;
     ArrowDirection direction = (ArrowDirection)PTR2INT(clientData);
     Ttk_Padding padding;
 
-    /* Get unscaled size */
+    /* Get scaled width and height */
     Tcl_GetIntFromObj(NULL, indicator->sizeObj, &size);
-    TtkArrowSize(size, direction, widthPtr, heightPtr);		/* unscaled */
-
-    /* Scale and then round up */
-    *widthPtr  = (int)ceil(*widthPtr * scalingLevel);		/* scaled */
-    *heightPtr = (int)ceil(*heightPtr * scalingLevel);		/* scaled */
+    TtkGetScaledArrowSize(size, direction, tkwin, widthPtr, heightPtr);
 
     /* Add scaled padding */
     Ttk_GetPaddingFromObj(NULL, tkwin, indicator->paddingObj, &padding);
@@ -1328,6 +1286,7 @@ static void MenuIndicatorElementDraw(
     ArrowDirection direction = (ArrowDirection)PTR2INT(clientData);
     XColor *arrowColor = Tk_GetColorFromObj(tkwin, indicator->colorObj);
     Tk_Image img;
+    int imgWidth, imgHeight;
 
     /* Apply scaled padding */
     Ttk_GetPaddingFromObj(NULL, tkwin, indicator->paddingObj, &padding);
@@ -1337,7 +1296,8 @@ static void MenuIndicatorElementDraw(
 
     /* Draw indicator */
     img = TtkMakeChevronImage(size, direction, arrowColor, tkwin);
-    Tk_RedrawImage(img, 0, 0, b.width, b.height, d, b.x, b.y);
+    Tk_SizeOfImage(img, &imgWidth, &imgHeight);
+    Tk_RedrawImage(img, 0, 0, imgWidth, imgHeight, d, b.x, b.y);
     Tk_FreeImage(img);
 }
 
@@ -1906,19 +1866,20 @@ static void TabElementDraw(
 	 * Draw slightly outside of the allocated parcel,
 	 * to overwrite the client area border.
 	 */
+	int incr = (int)round(scalingLevel);
 	switch (nbTabPlcStickBit) {
 	    default:
 	    case TTK_STICK_S:
-		b.height += 1;
+		b.height += incr;
 		break;
 	    case TTK_STICK_N:
-		b.height += 1; b.y -= 1;
+		b.height += incr; b.y -= incr;
 		break;
 	    case TTK_STICK_E:
-		b.width += 1;
+		b.width += incr;
 		break;
 	    case TTK_STICK_W:
-		b.width += 1; b.x -= 1;
+		b.width += incr; b.x -= incr;
 		break;
 	}
 

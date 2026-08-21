@@ -235,9 +235,7 @@ namespace eval ::tk::test::generic {
 
 	    switch -- $subCmd {
 		import {
-		    if {[info exists importedDomains($ns)] && ($domain in $importedDomains($ns))} {
-			return -code error "testutils domain \"$domain\" was already imported"
-		    } else {
+		    if {(! [info exists importedDomains($ns)]) || ($domain ni $importedDomains($ns))} {
 
 			# import procs
 			if {[catch {
@@ -794,6 +792,7 @@ namespace eval ::tk::test::image {
     proc imageFinish {} {
 	variable ImageNames
 	set imgs [lsearch -all -inline -glob -not [lsort [image names]] ::tk::icons::indicator*]
+	set imgs [lsearch -all -inline -glob -not $imgs ::tk::icons::arrow*]
 	set imgs [lsearch -all -inline -glob -not $imgs ::tk::icons::chevron*]
 	if {$imgs ne $ImageNames} {
 	    return -code error "images remaining: $imgs != $ImageNames"
@@ -806,6 +805,7 @@ namespace eval ::tk::test::image {
 	variable ImageNames
 	if {![info exists ImageNames]} {
 	    set ImageNames [lsearch -all -inline -glob -not [lsort [image names]] ::tk::icons::indicator*]
+	    set ImageNames [lsearch -all -inline -glob -not $ImageNames ::tk::icons::arrow*]
 	    set ImageNames [lsearch -all -inline -glob -not $ImageNames ::tk::icons::chevron*]
 	}
 	imageCleanup
@@ -1046,12 +1046,15 @@ namespace eval ::tk::test::timing {
 	return $result
     }
 
-    proc dt.reset {{granularity milliseconds}} {
-	if {$granularity ni "microseconds milliseconds seconds"} {
-	    return -code error "invalid parameter \"$granularity\", expected \"microseconds\", \"milliseconds\" or \"seconds\""
-	}
+    proc dt.reset {{granularity ""}} {
 	variable dt
-	set dt(granularity) $granularity
+	set usage "Usage: dt.reset ?-granularity granularity?"
+	if {$granularity ne ""} {
+	    if {$granularity ni "microseconds milliseconds seconds"} {
+		return -code error "invalid parameter \"$granularity\", expected \"microseconds\", \"milliseconds\" or \"seconds\""
+	    }
+	    set dt(granularity) $granularity
+	}
 	set dt(t0) [clock $dt(granularity)]
     }
 
