@@ -39,7 +39,6 @@ jobs:
           touch doc/man.macros generic/tkStubInit.c
           echo "CFGOPT=$CFGOPT" >> $GITHUB_ENV
           echo "CC=$COMPILER" >> $GITHUB_ENV
-          echo "TOOL_DIR=$(cd tcl/tools;pwd)" >> $GITHUB_ENV
           echo "BUILD_CONFIG_ID=$OPTS" >> $GITHUB_ENV
         working-directory: "."
         env:
@@ -48,7 +47,7 @@ jobs:
           OPTS: ${{ matrix.compiler }}${{ matrix.config }}
       - name: Configure (opts=${{ matrix.config }})
         run: |
-          ./configure $CFGOPT "--prefix=$HOME/install dir" || {
+          ./configure $CFGOPT --with-tcl=/usr/lib/tcl9.0 "--prefix=$HOME/install dir" || {
             cat config.log
             echo "::error::Failure during Configure"
             exit 1
@@ -74,12 +73,6 @@ jobs:
       - name: Create Distribution Package
         run: |
           make dist || {
-            echo "::error::Failure during Distribute"
-            exit 1
-          }
-      - name: Convert Documentation to HTML
-        run: |
-          make html-tk TOOL_DIR=$TOOL_DIR || {
             echo "::error::Failure during Distribute"
             exit 1
           }
@@ -117,7 +110,7 @@ jobs:
           COMPILER: ${{ matrix.compiler }}
       - name: Configure ${{ matrix.config }}
         run: |
-          ./configure $CFGOPT "--prefix=$HOME/install dir" || {
+          ./configure $CFGOPT --with-tcl=/usr/lib/tcl9.0 "--prefix=$HOME/install dir" || {
             cat config.log
             echo "::error::Failure during Configure"
             exit 1
