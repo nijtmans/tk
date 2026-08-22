@@ -11,7 +11,7 @@ permissions:
 defaults:
   run:
     shell: bash
-    working-directory: tk/unix
+    working-directory: unix
 env:
   ERROR_ON_FAILURES: 1
 jobs:
@@ -25,25 +25,18 @@ jobs:
         config:
           - ""
           - "CFLAGS=-DTK_NO_DEPRECATED=1"
-          - "--disable-shared"
           - "--enable-symbols"
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
-          path: tk
-      - name: Checkout Tcl 9.0
-        uses: actions/checkout@v7
-        with:
-          repository: tcltk/tcl
-          ref: core-9-0-branch
-          path: tcl
+          path: "."
       - name: Setup Environment (compiler=${{ matrix.compiler }})
         run: |
           sudo apt-get update
-          sudo apt-get install xvfb libx11-dev libxss-dev libxft-dev libicu-dev xfonts-75dpi xfonts-100dpi xfonts-scalable libxfont2 unifont libharfbuzz-dev
+          sudo apt-get install xvfb tcl9.0-dev libx11-dev libxss-dev libxft-dev libicu-dev xfonts-75dpi xfonts-100dpi xfonts-scalable libxfont2 unifont libharfbuzz-dev
           mkdir "$HOME/install dir"
-          touch tk/doc/man.macros tk/generic/tkStubInit.c
+          touch doc/man.macros generic/tkStubInit.c
           echo "CFGOPT=$CFGOPT" >> $GITHUB_ENV
           echo "CC=$COMPILER" >> $GITHUB_ENV
           echo "TOOL_DIR=$(cd tcl/tools;pwd)" >> $GITHUB_ENV
@@ -53,22 +46,9 @@ jobs:
           CFGOPT: ${{ matrix.config }}
           COMPILER: ${{ matrix.compiler }}
           OPTS: ${{ matrix.compiler }}${{ matrix.config }}
-      - name: Configure and Build Tcl
-        run: |
-          ./configure $CFGOPT "--prefix=$HOME/install dir" || {
-            cat config.log
-            echo "::warning::Failure during Tcl Configure"
-            exit 1
-          }
-          make all install  || {
-            echo "::warning::Failure during Tcl Build"
-            exit 1
-          }
-          echo "TCL_CONFIG_PATH=`pwd`" >> $GITHUB_ENV
-        working-directory: tcl/unix
       - name: Configure (opts=${{ matrix.config }})
         run: |
-          ./configure $CFGOPT --with-tcl=$TCL_CONFIG_PATH "--prefix=$HOME/install dir" || {
+          ./configure $CFGOPT "--prefix=$HOME/install dir" || {
             cat config.log
             echo "::error::Failure during Configure"
             exit 1
@@ -116,7 +96,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
-          path: tk
+          path: "."
       - name: Checkout Tcl 9.0
         uses: actions/checkout@v7
         with:
@@ -126,31 +106,18 @@ jobs:
       - name: Setup Environment (compiler=${{ matrix.compiler }})
         run: |
           sudo apt-get update
-          sudo apt-get install xvfb libx11-dev libxss-dev libxft-dev libicu-dev xfonts-75dpi xfonts-100dpi xfonts-scalable libxfont2 unifont libharfbuzz-dev
+          sudo apt-get install tcl9.0-dev xvfb libx11-dev libxss-dev libxft-dev libicu-dev xfonts-75dpi xfonts-100dpi xfonts-scalable libxfont2 unifont libharfbuzz-dev
           mkdir "$HOME/install dir"
-          touch tk/doc/man.macros tk/generic/tkStubInit.c
+          touch doc/man.macros generic/tkStubInit.c
           echo "CFGOPT=$CFGOPT" >> $GITHUB_ENV
           echo "CC=$COMPILER" >> $GITHUB_ENV
         working-directory: "."
         env:
           CFGOPT: ${{ matrix.config }}
           COMPILER: ${{ matrix.compiler }}
-      - name: Configure and Build Tcl
-        run: |
-          ./configure $CFGOPT "--prefix=$HOME/install dir" || {
-            cat config.log
-            echo "::warning::Failure during Tcl Configure"
-            exit 1
-          }
-          make all install  || {
-            echo "::warning::Failure during Tcl Build"
-            exit 1
-          }
-          echo "TCL_CONFIG_PATH=`pwd`" >> $GITHUB_ENV
-        working-directory: tcl/unix
       - name: Configure ${{ matrix.config }}
         run: |
-          ./configure $CFGOPT --with-tcl=$TCL_CONFIG_PATH "--prefix=$HOME/install dir" || {
+          ./configure $CFGOPT "--prefix=$HOME/install dir" || {
             cat config.log
             echo "::error::Failure during Configure"
             exit 1
