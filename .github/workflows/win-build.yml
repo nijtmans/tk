@@ -36,11 +36,7 @@ jobs:
           ref: manifest-in-rc-only
           path: tcl
       - name: Init MSVC
-        shell: cmd
-        run: |
-          for /f "usebackq tokens=*" %%i in (`vswhere -latest -property installationPath`) do set "VS_PATH=%%i"
-          call "%VS_PATH%\VC\Auxiliary\Build\vcvarsall.bat" ${{ matrix.arch }}
-          set | findstr /i "^VC ^VCTools ^Windows ^Universal ^INCLUDE ^LIB ^PATH ^DevEnv" >> %GITHUB_ENV%
+        uses: ilammy/msvc-dev-cmd@v1
       - name: Make Install Location
         working-directory: tcl
         run: |
@@ -119,7 +115,7 @@ jobs:
       - name: Install MSYS2
         uses: msys2/setup-msys2@v2
         with:
-          msystem: UCRT64
+          msystem: MINGW64
           install: git mingw-w64-x86_64-toolchain make zip
       - name: Checkout Tk
         uses: actions/checkout@v7
