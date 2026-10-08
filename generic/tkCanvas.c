@@ -1466,7 +1466,7 @@ CanvasWidgetCmd(
 	if (canvasPtr->textInfo.gotFocus) {
 	    EventuallyRedrawItem(canvasPtr, itemPtr);
 	}
-	if (Tcl_GetString(objv[2])[0] == 0) {
+	if (TkObjIsEmpty(objv[2])) {
 	    canvasPtr->textInfo.focusItemPtr = NULL;
 	    goto done;
 	}
@@ -1684,7 +1684,7 @@ CanvasWidgetCmd(
 	}
 
 	xBlank = 0;
-	if (Tcl_GetString(objv[3])[0] == '\0') {
+	if (TkObjIsEmpty(objv[3])) {
 	    xBlank = 1;
 	} else if (Tk_CanvasGetCoordFromObj(interp, (Tk_Canvas) canvasPtr,
 		objv[3], &newX) != TCL_OK) {
@@ -1693,7 +1693,7 @@ CanvasWidgetCmd(
 	}
 
 	yBlank = 0;
-	if (Tcl_GetString(objv[4])[0] == '\0') {
+	if (TkObjIsEmpty(objv[4])) {
 	    yBlank = 1;
 	} else if (Tk_CanvasGetCoordFromObj(interp, (Tk_Canvas) canvasPtr,
 		objv[4], &newY) != TCL_OK) {
@@ -3248,7 +3248,13 @@ DisplayCanvas(
     canvasPtr->flags &= ~(REDRAW_PENDING|BBOX_NOT_EMPTY);
     canvasPtr->redrawX1 = canvasPtr->redrawX2 = 0;
     canvasPtr->redrawY1 = canvasPtr->redrawY2 = 0;
-    if (canvasPtr->flags & UPDATE_SCROLLBARS) {
+
+    /*
+     * Postpone the scrollbar update until the window is mapped: the size of
+     * an unmapped window is not final. [Bug 991849]
+     */
+
+    if ((canvasPtr->flags & UPDATE_SCROLLBARS) && Tk_IsMapped(tkwin)) {
 	CanvasUpdateScrollbars(canvasPtr);
     }
     if (repickAgain) {
