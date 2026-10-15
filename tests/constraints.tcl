@@ -25,16 +25,42 @@ testConstraint notAqua [expr {[tk windowingsystem] ne "aqua"}]
 testConstraint aqua [expr {[tk windowingsystem] eq "aqua"}]
 testConstraint x11 [expr {[tk windowingsystem] eq "x11"}]
 testConstraint win32 [expr {[tk windowingsystem] eq "win32"}]
-testConstraint nonwin [expr {[tk windowingsystem] ne "win32"}]
 testConstraint aquaOrWin32 [expr {
     ([tk windowingsystem] eq "win32") || [testConstraint aqua]
 }]
 testConstraint haveDISPLAY [expr {[info exists env(DISPLAY)] && [testConstraint x11]}]
 testConstraint altDisplay  [info exists env(TK_ALT_DISPLAY)]
 
+# constraint for tests that need a window manager, e.g. to iconify a toplevel.
+# On X11 there may be none (e.g. on GitHub CI). A window manager sets the
+# WM_STATE property on the toplevels it manages before mapping them, so check
+# it when the main window is mapped. Without the test commands, check whether
+# the main window was reparented, as most (but not all) window managers do.
+if {[testConstraint x11]} {
+    wm deiconify .
+    if {![winfo ismapped .]} {
+	tkwait visibility .
+    }
+    if {[llength [info commands testprop]] && [llength [info commands testwrapper]]} {
+	testConstraint withWindowManager [expr {
+	    [testprop [testwrapper .] WM_STATE] ne ""
+	}]
+    } else {
+	testConstraint withWindowManager [expr {[wm frame .] ne [winfo id .]}]
+    }
+} else {
+    testConstraint withWindowManager 1
+}
+
 # constraint for running a test on all windowing system except aqua
 # where the test fails due to a known bug
 testConstraint aquaKnownBug [expr {[testConstraint notAqua] || [testConstraint knownBug]}]
+
+# This constraint is for running an aqua test only when user interaction is
+# possible, not on a CI runner.  Some actions, such as writing to the
+# filesystem, require that the user review and dismiss a system dialog, which
+# cannot be done on a CI runner.
+testConstraint notMacCI [expr {[testConstraint notAqua] || ![info exists ::env(CI)]}]
 
 # constraint based on whether our display is secure
 testutils import child
@@ -173,10 +199,14 @@ testConstraint testmenubar     [llength [info commands testmenubar]]
 testConstraint testmetrics     [llength [info commands testmetrics]]
 testConstraint testmovemouse   [llength [info commands testmovemouse]]
 testConstraint testobjconfig   [llength [info commands testobjconfig]]
+testConstraint testpixel       [llength [info commands testpixel]]
 testConstraint testpressbutton [llength [info commands testpressbutton]]
 testConstraint testsend        [llength [info commands testsend]]
+testConstraint testsendinput   [llength [info commands testsendinput]]
+testConstraint testsetlocale   [llength [info commands testsetlocale]]
 testConstraint testtext        [llength [info commands testtext]]
 testConstraint testwinevent    [llength [info commands testwinevent]]
 testConstraint testwrapper     [llength [info commands testwrapper]]
+testConstraint testxfocus      [llength [info commands testxfocus]]
 
 # EOF

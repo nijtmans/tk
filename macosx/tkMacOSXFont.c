@@ -1337,6 +1337,7 @@ TkpDrawAngledCharsInContext(
     }
     string = [[TKNSString alloc] initWithTclUtfBytes:source length:numBytes];
     if (!string) {
+	TkMacOSXRestoreDrawingContext(&drawingContext);
 	return;
     }
 
@@ -1527,10 +1528,10 @@ TkMacOSXUseAntialiasedText(
 				 * variable.*/
     int enable)			/* Initial value. */
 {
-    static Boolean initialized = FALSE;
+    static bool initialized = false;
 
     if (!initialized) {
-	initialized = TRUE;
+	initialized = true;
 
 	if (Tcl_CreateNamespace(interp, "::tk::mac", NULL, NULL) == NULL) {
 	    Tcl_ResetResult(interp);

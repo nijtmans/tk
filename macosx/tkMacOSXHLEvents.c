@@ -63,6 +63,15 @@ static const char getSdefProc[] = "::tk::mac::GetDynamicSdef";
 
 #pragma mark TKApplication(TKHLEvents)
 
+static void showPreferencesWhenIdle(void *clientData) {
+    Tcl_Interp *interp = (Tcl_Interp *) clientData;
+    int code = Tcl_EvalEx(interp, "::tk::mac::ShowPreferences",
+			  TCL_INDEX_NONE, TCL_EVAL_GLOBAL);
+    if (code != TCL_OK) {
+	Tcl_BackgroundException(interp, code);
+    }
+}
+
 @implementation TKApplication(TKHLEvents)
 - (void) terminate: (id) sender
 {
@@ -145,13 +154,9 @@ static const char getSdefProc[] = "::tk::mac::GetDynamicSdef";
     (void)event;
     (void)replyEvent;
 
-    if (_eventInterp &&
-	    Tcl_FindCommand(_eventInterp, "::tk::mac::ShowPreferences", NULL, 0)){
-	int code = Tcl_EvalEx(_eventInterp, "::tk::mac::ShowPreferences",
-			      TCL_INDEX_NONE, TCL_EVAL_GLOBAL);
-	if (code != TCL_OK) {
-	    Tcl_BackgroundException(_eventInterp, code);
-	}
+    if (_eventInterp && Tcl_FindCommand(
+	   _eventInterp, "::tk::mac::ShowPreferences", NULL, 0)){
+	Tcl_DoWhenIdle(showPreferencesWhenIdle, _eventInterp);
     }
 }
 
@@ -498,10 +503,10 @@ TkMacOSXInitAppleEvents(
     TCL_UNUSED(Tcl_Interp *))
 {
     NSAppleEventManager *aeManager = [NSAppleEventManager sharedAppleEventManager];
-    static Boolean initialized = FALSE;
+    static bool initialized = false;
 
     if (!initialized) {
-	initialized = TRUE;
+	initialized = true;
 
 	[aeManager setEventHandler:NSApp
 	    andSelector:@selector(handleQuitApplicationEvent:withReplyEvent:)

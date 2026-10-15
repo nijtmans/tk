@@ -107,6 +107,7 @@ TCL_GENERIC_DIR		= $(TCLDIR)/generic
 # The directory containing the platform specific Tcl sources and headers
 # appropriate for this version of Tk:
 TCL_PLATFORM_DIR	= $(TCLDIR)/unix
+TCL_INCLUDES		= @TCL_INCLUDES@
 
 # The directory containing the Tcl library archive file appropriate
 # for this version of Tk:
@@ -337,17 +338,16 @@ CC			= @CC@
 
 CC_SWITCHES_NO_STUBS = -I${UNIX_DIR} -I${GENERIC_DIR} -I${BMAP_DIR} \
 ${@TK_WINDOWINGSYSTEM@_INCLUDES} ${CFLAGS} ${CFLAGS_WARNING} \
-${SHLIB_CFLAGS} -I${TCL_GENERIC_DIR} -I${TCL_PLATFORM_DIR} ${AC_FLAGS} \
+${SHLIB_CFLAGS} ${TCL_INCLUDES} ${AC_FLAGS} \
 ${PROTO_FLAGS} ${SECURITY_FLAGS} ${MEM_DEBUG_FLAGS} ${KEYSYM_FLAGS} \
-${NO_DEPRECATED_FLAGS} -DTCL_UTF_MAX=4 @EXTRA_CC_SWITCHES@
+${NO_DEPRECATED_FLAGS} @EXTRA_CC_SWITCHES@
 
 CC_SWITCHES = $(CC_SWITCHES_NO_STUBS) @TCL_STUB_FLAGS@
 
 APP_CC_SWITCHES = $(CC_SWITCHES_NO_STUBS) @EXTRA_APP_CC_SWITCHES@
 
 DEPEND_SWITCHES = -I${UNIX_DIR} -I${GENERIC_DIR} -I${BMAP_DIR} \
-${@TK_WINDOWINGSYSTEM@_INCLUDES} ${CFLAGS} -I${TCL_GENERIC_DIR} \
--I${TCL_PLATFORM_DIR} ${AC_FLAGS} ${PROTO_FLAGS} ${SECURITY_FLAGS} \
+${@TK_WINDOWINGSYSTEM@_INCLUDES} ${CFLAGS} ${TCL_INCLUDES} ${AC_FLAGS} ${PROTO_FLAGS} ${SECURITY_FLAGS} \
 ${MEM_DEBUG_FLAGS} ${KEYSYM_FLAGS} @EXTRA_CC_SWITCHES@
 
 WISH_OBJS = tkAppInit.o
@@ -625,7 +625,7 @@ ${TK_ZIP_FILE}: ${ZIP_INSTALL_OBJS}
 	    cp -a $(TOP_DIR)/library/* ${TK_VFS_PATH}; \
 	fi
 	rm -rf ${TK_VFS_PATH}/demos
-	@find ${TK_VFS_ROOT} -type d -empty -delete
+	@find ${TK_VFS_ROOT} -depth -type d -exec rmdir {} + 2>/dev/null || :
 	@echo "creating ${TK_ZIP_FILE} from ${TK_VFS_PATH}"
 	-@if test "${ZIPFS_BUILD}" = "2" ; then \
 	    cp ${TCL_BIN_DIR}/tclsh ${TK_VFS_ROOT}/../${TK_ZIP_FILE} || cp ${TCL_BIN_DIR}/../bin/tclsh${TCLVERSION} ${TK_VFS_ROOT}/../${TK_ZIP_FILE}; \

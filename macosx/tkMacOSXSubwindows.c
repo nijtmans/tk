@@ -73,8 +73,8 @@ XDestroyWindow(
     if (!Tk_IsTopLevel(macWin->winPtr)) {
 	if (macWin->winPtr->parentPtr != NULL) {
 	    TkMacOSXInvalClipRgns((Tk_Window)macWin->winPtr->parentPtr);
-	    Tcl_CancelIdleCall(TkMacOSXRedrawViewIdleTask, (void *) view);
-	    Tcl_DoWhenIdle(TkMacOSXRedrawViewIdleTask, (void *) view);
+	    Tcl_CancelIdleCall(TkMacOSXRedrawViewIdleTask, view);
+	    Tcl_DoWhenIdle(TkMacOSXRedrawViewIdleTask, view);
 	}
 	if (macWin->visRgn) {
 	    CFRelease(macWin->visRgn);
@@ -152,7 +152,7 @@ XMapWindow(
 	return BadWindow;
     }
     MacDrawable *macWin = (MacDrawable *)window;
-    static Bool initialized = NO;
+    static bool initialized = false;
     NSPoint mouse = [NSEvent mouseLocation];
     int x = mouse.x, y = TkMacOSXZeroScreenHeight() - mouse.y;
     //fprintf(stderr, "XMapWindow: %s\n", Tk_PathName(macWin->winPtr));
@@ -202,7 +202,7 @@ XMapWindow(
 		 * visible.
 		 */
 
-		for (int try = 0; try < 20; try++) {
+		for (int count = 0; count < 20; count++) {
 		    if ([[NSApp orderedWindows] firstObject] == win) {
 			break;
 		    }
@@ -245,8 +245,8 @@ XMapWindow(
      * it in an idle task.
      */
 
-    Tcl_CancelIdleCall(TkMacOSXRedrawViewIdleTask, (void *) view);
-    Tcl_DoWhenIdle(TkMacOSXRedrawViewIdleTask, (void *) view);
+    Tcl_CancelIdleCall(TkMacOSXRedrawViewIdleTask, view);
+    Tcl_DoWhenIdle(TkMacOSXRedrawViewIdleTask, view);
 
     /*
      * Generate VisibilityNotify events for window and all mapped children.
@@ -260,7 +260,7 @@ XMapWindow(
 	event.xvisibility.state = VisibilityUnobscured;
 	NotifyVisibility(winPtr, &event);
     } else {
-	initialized = YES;
+	initialized = true;
     }
     return Success;
 }
@@ -370,14 +370,20 @@ XUnmapWindow(
 	}
 	TkMacOSXInvalClipRgns((Tk_Window)winPtr);
     } else {
+	TKContentView *view = [win contentView];
 
 	/*
 	 * Rebuild the clip regions for the parent so it will be allowed
 	 * to draw in the space from which this subwindow was removed and then
-	 * redraw the window.
+	 * redraw the window.  As in XMapWindow, the redraw is done in an idle
+	 * task, so that unmapping many windows redraws the view only once.
 	 */
 
 	TkMacOSXInvalClipRgns((Tk_Window)winPtr->parentPtr);
+	if (view) {
+	    Tcl_CancelIdleCall(TkMacOSXRedrawViewIdleTask, view);
+	    Tcl_DoWhenIdle(TkMacOSXRedrawViewIdleTask, view);
+	}
     }
     return Success;
 }

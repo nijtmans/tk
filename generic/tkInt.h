@@ -541,6 +541,8 @@ typedef struct TkDisplay {
     XIMStyle inputStyle;	/* Input style selected for this display. */
     XFontSet inputXfs;		/* XFontSet cached for over-the-spot XIM. */
 #endif /* TK_USE_INPUT_METHODS */
+    Tcl_HashTable inputXfsTable;/* Maps pixel sizes to XFontSets for
+				 * over-the-spot XIM. */
     Tcl_HashTable winTable;	/* Maps from X window ids to TkWindow ptrs. */
 
     Tcl_Size refCount;		/* Reference count of how many Tk applications
@@ -548,6 +550,16 @@ typedef struct TkDisplay {
 				 * the display when we no longer have any Tk
 				 * applications using it. */
 
+#if TCL_MAJOR_VERSION < 9
+    /*
+     * The following field were all added for Tk8.3
+     */
+
+    int mouseButtonState;	/* Current mouse button state for this
+				 * display. NOT USED as of 8.6.10 */
+    Window mouseButtonWindow;	/* Window the button state was set in, added
+				 * in Tk 8.4. */
+#endif /* TCL_MAJOR_VERSION < 9 */
     Tk_Window warpWindow;
     Tk_Window warpMainwin;	/* For finding the root window for warping
 				 * purposes. */
@@ -566,11 +578,10 @@ typedef struct TkDisplay {
     int iconDataSize;		/* Size of default iconphoto image data. */
     unsigned char *iconDataPtr;	/* Default iconphoto image data, if set. */
     int ximGeneration;          /* Used to invalidate XIC */
-#if !defined(TK_USE_INPUT_METHODS) && (TCL_MAJOR_VERSION < 9)
-    XIM inputMethod;		/* Input method for this display. */
-    XIMStyle inputStyle;	/* Input style selected for this display. */
-    XFontSet inputXfs;		/* XFontSet cached for over-the-spot XIM. */
-#endif /* TK_USE_INPUT_METHODS */
+    Tcl_HashTable deletedWinTable;
+				/* Maps from X window ids of recently deleted
+				 * windows to the serial number of the last
+				 * request made before the deletion. */
 } TkDisplay;
 
 /*
@@ -581,11 +592,15 @@ typedef struct TkDisplay {
  *	Whether to use input methods for this display
  *  TK_DISPLAY_WM_TRACING:		(default off)
  *	Whether we should do wm tracing on this display.
+ *  TK_DISPLAY_HAS_EMBEDDED:		(default off)
+ *	A toplevel of this application has been embedded in a container on
+ *	this display, so its windows can be destroyed by the container.
  */
 
 #define TK_DISPLAY_COLLAPSE_MOTION_EVENTS	(1 << 0)
 #define TK_DISPLAY_USE_IM			(1 << 1)
 #define TK_DISPLAY_WM_TRACING			(1 << 3)
+#define TK_DISPLAY_HAS_EMBEDDED			(1 << 4)
 
 /*
  * One of the following structures exists for each error handler created by a
@@ -700,7 +715,7 @@ typedef struct TkMainInfo {
 				 * Tcl's version of [update] after Tk is shut
 				 * down, in case it's a Tcl_ObjCmdProc2 */
 #endif
-    unsigned int ttkNbTabsStickBit;
+    unsigned int nbTabPosition, nbTabPlacement;
 				/* Information used by ttk::notebook. */
     int troughInnerX, troughInnerY, troughInnerWidth, troughInnerHeight;
 				/* Information used by ttk::scale. */
@@ -920,7 +935,7 @@ typedef struct {
 #   ifndef XMaxTransChars
 #	define XMaxTransChars 7
 #   endif
-    char trans_chars[XMaxTransChars]; /* translated characters */
+    char trans_chars[XMaxTransChars]; /* translated characters (UTF-8) */
     unsigned char nbytes;
 #elif !defined(MAC_OSX_TK)
     char *charValuePtr;		/* A pointer to a string that holds the key's
@@ -1211,6 +1226,7 @@ MODULE_SCOPE void	TkFreeGeometryContainer(Tk_Window tkwin,
 			    const char *name);
 
 MODULE_SCOPE void	TkRegisterObjTypes(void);
+MODULE_SCOPE void	TkRecordDeletedWindow(TkDisplay *dispPtr, Window window);
 MODULE_SCOPE Tcl_ObjCmdProc TkDeadAppObjCmd;
 MODULE_SCOPE int	TkCanvasGetCoordObj(Tcl_Interp *interp,
 			    Tk_Canvas canvas, Tcl_Obj *obj,
@@ -1226,6 +1242,7 @@ MODULE_SCOPE void	TkCreateExitHandler(Tcl_ExitProc *proc,
 			    void *clientData);
 MODULE_SCOPE void	TkDeleteExitHandler(Tcl_ExitProc *proc,
 			    void *clientData);
+MODULE_SCOPE unsigned long TkpGetEventTime(void);
 MODULE_SCOPE Tcl_ExitProc	TkFinalize;
 MODULE_SCOPE Tcl_ExitProc	TkFinalizeThread;
 MODULE_SCOPE void	TkpBuildRegionFromAlphaData(Region region,
@@ -1264,6 +1281,8 @@ MODULE_SCOPE Tcl_Command TkMakeEnsemble(Tcl_Interp *interp,
 			    const char *nsname, const char *name,
 			    void *clientData, const TkEnsemble *map);
 MODULE_SCOPE double	TkScalingLevel(Tk_Window tkwin);
+MODULE_SCOPE int	TkFormatDouble(char *buffer, size_t size,
+			    const char *format, double value);
 MODULE_SCOPE bool	TkObjIsEmpty(Tcl_Obj *objPtr);
 MODULE_SCOPE int	TkInitTkCmd(Tcl_Interp *interp,
 			    void *clientData);

@@ -56,7 +56,7 @@ namespace eval ttk::theme::clam {
 	    -bordercolor {alternate #000000}
 
 	ttk::style configure Toolbutton \
-	    -anchor center -padding 1.5p -relief flat
+	    -anchor center -justify center -padding 1.5p -relief flat
 	ttk::style map Toolbutton \
 	    -relief [list \
 		    disabled flat \
@@ -66,9 +66,12 @@ namespace eval ttk::theme::clam {
 	    -background [list \
 		    disabled $colors(-frame) \
 		    pressed $colors(-darker) \
+		    selected $colors(-darker) \
 		    active $colors(-lighter)] \
-	    -lightcolor [list pressed $colors(-darker)] \
-	    -darkcolor [list pressed $colors(-darker)]
+	    -lightcolor [list \
+		    pressed $colors(-darker) selected $colors(-darker)] \
+	    -darkcolor [list \
+		    pressed $colors(-darker) selected $colors(-darker)]
 
 	ttk::style configure TCheckbutton \
 	    -indicatorbackground "#ffffff" \
@@ -101,7 +104,8 @@ namespace eval ttk::theme::clam {
 
 	ttk::style configure TEntry -padding 1 -insertwidth 1
 	ttk::style map TEntry \
-	    -background [list readonly $colors(-frame)] \
+	    -fieldbackground [list readonly $colors(-frame) \
+				  disabled $colors(-frame)] \
 	    -bordercolor [list focus $colors(-selectbg)] \
 	    -lightcolor [list focus #6f9dc6]
 
@@ -111,16 +115,19 @@ namespace eval ttk::theme::clam {
 	    -background [list active $colors(-lighter) \
 			     pressed $colors(-lighter)] \
 	    -fieldbackground [list {readonly focus} $colors(-selectbg) \
-				  readonly $colors(-frame)] \
+				  readonly $colors(-frame) \
+				  disabled $colors(-frame)] \
 	    -foreground [list {readonly focus} $colors(-selectfg)] \
 	    -arrowcolor [list disabled $colors(-disabledfg)] \
 	    -bordercolor [list focus $colors(-selectbg)]
 	ttk::style configure ComboboxPopdownFrame \
 	    -relief solid -borderwidth 1
 
-	ttk::style configure TSpinbox -arrowsize 7.5p -padding {1.5p 0 7.5p 0}
+	ttk::style configure TSpinbox -arrowsize 7.5p \
+	    -padding {1.5p 0.75p 7.5p 0.75p}
 	ttk::style map TSpinbox \
-	    -background [list readonly $colors(-frame)] \
+	    -fieldbackground [list readonly $colors(-frame) \
+				  disabled $colors(-frame)] \
 	    -arrowcolor [list disabled $colors(-disabledfg)] \
 	    -bordercolor [list focus $colors(-selectbg)]
 

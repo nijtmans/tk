@@ -26,7 +26,7 @@ m4_ifdef([SC_USE_CONFIG_HEADERS], [
 TK_VERSION=9.0
 TK_MAJOR_VERSION=9
 TK_MINOR_VERSION=0
-TK_PATCH_LEVEL=".4"
+TK_PATCH_LEVEL=".5"
 VERSION=${TK_VERSION}
 LOCALES="cs da de el en en_gb eo es fr hu it nl pl pt ru sv"
 
@@ -41,6 +41,18 @@ if test "${TCL_MAJOR_VERSION}" -lt 9 ; then
     AC_MSG_ERROR([${PACKAGE_NAME} ${PACKAGE_VERSION} requires Tcl 9.0+
 Found config for Tcl ${TCL_VERSION}])
 fi
+
+#------------------------------------------------------------------------
+# Compile against the Tcl source tree if it is accessible, otherwise use
+# the installed Tcl headers.
+#------------------------------------------------------------------------
+
+if test -r "${TCL_SRC_DIR}/generic/tcl.h"; then
+    TCL_INCLUDES='-I${TCL_GENERIC_DIR} -I${TCL_PLATFORM_DIR}'
+else
+    TCL_INCLUDES="${TCL_INCLUDE_SPEC}"
+fi
+AC_SUBST(TCL_INCLUDES)
 
 SC_PROG_TCLSH
 SC_BUILD_TCLSH
@@ -76,6 +88,7 @@ if test "${CFLAGS+set}" != "set" ; then
 fi
 
 AC_PROG_CC
+AC_PROG_CPP
 AC_C_INLINE
 
 #------------------------------------------------------------------------
@@ -350,6 +363,7 @@ if test $tk_aqua = no; then
 	[enable_xft=$enableval], [enable_xft="default"])
     XFT_CFLAGS=""
     XFT_LIBS=""
+    XFT_DEPS=""
     if test "$enable_xft" = "no" ; then
 	AC_MSG_RESULT([$enable_xft])
     else
@@ -375,6 +389,7 @@ if test $tk_aqua = no; then
 	    ],[#include <X11/Xlib.h>])
 	    CFLAGS=$tk_oldCFlags
 	    LIBS=$tk_oldLibs
+	    XFT_DEPS="xft fontconfig"
 	fi
 	dnl make sure that linking against Xft libraries finds freetype
 	if test "$found_xft" = "yes" ; then
@@ -408,6 +423,7 @@ if test $tk_aqua = no; then
 	    enable_xft=no
 	    XFT_CFLAGS=""
 	    XFT_LIBS=""
+	    XFT_DEPS=""
 	else
 	    enable_xft=yes
 	fi
@@ -420,6 +436,7 @@ if test $tk_aqua = no; then
     fi
     AC_SUBST(XFT_CFLAGS)
     AC_SUBST(XFT_LIBS)
+    AC_SUBST(XFT_DEPS)
     AC_SUBST(UNIX_FONT_OBJS)
 fi
 
@@ -445,7 +462,7 @@ if test $tk_aqua = no; then
 	    found_cups=no
 	else
 	    found_cups=yes
-	    CUPS_CFLAGS="-DHAVE_CUPS"
+	    CUPS_CFLAGS="-DHAVE_CUPS `cups-config --cflags`"
 	    CUPS_LIBS=`cups-config --libs`
 	fi
 	AC_MSG_RESULT([$found_cups])

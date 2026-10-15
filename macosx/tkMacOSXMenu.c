@@ -164,6 +164,25 @@ static int	ModifierCharWidth(Tk_Font tkfont);
 
 TKBackgroundLoop *backgroundLoop = nil;
 
+typedef struct invokeArgs {
+    TkMenu *menuPtr;
+    Tcl_Size itemIndex;
+} invokeArgs;
+
+static void invokeMenuIdleTask(void *clientData) {
+    invokeArgs *args = (invokeArgs *) clientData;
+    int result = TkInvokeMenu(args->menuPtr->interp, args->menuPtr,
+			      args->itemIndex);
+    if (result != TCL_OK && result != TCL_CONTINUE &&
+	result != TCL_BREAK) {
+	Tcl_AddErrorInfo(args->menuPtr->interp, "\n    (menu invoke)");
+	Tcl_BackgroundException(args->menuPtr->interp, result);
+    }
+    Tcl_Release(args->menuPtr);
+    Tcl_Release(args->menuPtr->interp);
+    ckfree(clientData);
+}
+
 #pragma mark TKMenu
 
 /*
@@ -362,19 +381,13 @@ static Bool runMenuCommand = true;
 	NSMenuItem *menuItem = (NSMenuItem *) sender;
 	TkMenu *menuPtr = (TkMenu *) _tkMenu;
 	TkMenuEntry *mePtr = (TkMenuEntry *) [menuItem tag];
-
 	if (menuPtr && mePtr) {
-	    Tcl_Interp *interp = menuPtr->interp;
-	    Tcl_Preserve(interp);
-	    Tcl_Preserve(menuPtr);
-	    int result = TkInvokeMenu(interp, menuPtr, mePtr->index);
-	    if (result != TCL_OK && result != TCL_CONTINUE &&
-		    result != TCL_BREAK) {
-		Tcl_AddErrorInfo(interp, "\n    (menu invoke)");
-		Tcl_BackgroundException(interp, result);
-	    }
-	    Tcl_Release(menuPtr);
-	    Tcl_Release(interp);
+	    invokeArgs *args = ckalloc(sizeof(invokeArgs));
+	    args->menuPtr = menuPtr;
+	    args->itemIndex = mePtr->index;
+	    Tcl_Preserve(args->menuPtr);
+	    Tcl_Preserve(args->menuPtr->interp);
+	    Tcl_DoWhenIdle(invokeMenuIdleTask, args);
 	}
     }
 }
@@ -735,7 +748,7 @@ TkpConfigureMenuEntry(
     GC gc = (mePtr->textGC ? mePtr->textGC : mePtr->menuPtr->textGC);
     Tcl_Obj *fontPtr = (mePtr->fontPtr ?
 			mePtr->fontPtr : mePtr->menuPtr->fontPtr);
-    static int initialized = 0;
+    static bool initialized = false;
 
     if (!initialized) {
 	TkColor *tkColPtr = TkpGetColor(NULL, DEF_MENU_BG_COLOR);
@@ -759,6 +772,24 @@ TkpConfigureMenuEntry(
 	[image setTemplate:YES];
     }
     [menuItem setImage:image];
+
+#if defined(MAC_OS_VERSION_27_0) && \
+	MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_VERSION_27_0
+
+    /*
+     * Starting with macOS 27 (Golden Gate), AppKit decides whether menu item
+     * images are visible and will typically hide them unless the item asks
+     * otherwise.  Tk entries only have an image if the script requested one,
+     * so ask that it always be shown.
+     */
+
+    if (@available(macOS 27.0, *)) {
+	[menuItem setPreferredImageVisibility:(image ?
+		NSMenuItemImageVisibilityVisible :
+		NSMenuItemImageVisibilityAutomatic)];
+    }
+#endif
+
     if ((!image || mePtr->compound != COMPOUND_NONE) && mePtr->labelPtr &&
 	    mePtr->labelLength) {
 	title = [[[TKNSString alloc]
@@ -942,7 +973,7 @@ TkpPostMenu(
     TkWindow *realWinPtr;
     NSView *realWinView;
 
-    while (1) {
+    while (true) {
 	if (realWin == NULL) {
 	    return TCL_ERROR;
 	}
@@ -1286,7 +1317,7 @@ ParseAccelerator(
     int i;
 
     *maskPtr = 0;
-    while (1) {
+    while (true) {
 	i = 0;
 	while (allModifiers[i].name) {
 	    size_t l = allModifiers[i].len;
@@ -1399,7 +1430,7 @@ TkpComputeStandardMenuGeometry(
     Tcl_Size i;
     int entryWidth, maxIndicatorSpace, borderWidth, activeBorderWidth;
     TkMenuEntry *mePtr;
-    int haveAccel = 0;
+    bool haveAccel = false;
 
     /*
      * Do nothing if this menu is a clone.
@@ -1435,7 +1466,7 @@ TkpComputeStandardMenuGeometry(
     for (i = 0; i < menuPtr->numEntries; i++) {
 	mePtr = menuPtr->entries[i];
 	if (mePtr->type == CASCADE_ENTRY || mePtr->accelLength > 0) {
-	    haveAccel = 1;
+	    haveAccel = true;
 	    break;
 	}
     }
@@ -1467,18 +1498,19 @@ TkpComputeStandardMenuGeometry(
 	     */
 
 	    NSMenuItem *menuItem = (NSMenuItem *) mePtr->platformEntryData;
-	    int haveImage = 0, width = 0, height = 0;
+	    bool haveImage = false;
+	    int width = 0, height = 0;
 
 	    if (mePtr->image) {
 		Tk_SizeOfImage(mePtr->image, &width, &height);
-		haveImage = 1;
+		haveImage = true;
 		height += 2; /* tweak */
 	    } else if (mePtr->bitmapPtr) {
 		Pixmap bitmap = Tk_GetBitmapFromObj(menuPtr->tkwin,
 			mePtr->bitmapPtr);
 
 		Tk_SizeOfBitmap(menuPtr->display, bitmap, &width, &height);
-		haveImage = 1;
+		haveImage = true;
 		height += 2; /* tweak */
 	    }
 	    if (!haveImage || (mePtr->compound != COMPOUND_NONE)) {

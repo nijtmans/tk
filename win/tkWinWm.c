@@ -18,7 +18,6 @@
 #include <wtypes.h>
 #include <shobjidl.h>
 #include <shlguid.h>
-#include <shellapi.h>
 #include "tkWinIco.h"
 /*
  * These next two defines are only valid on Win2K/XP+.
@@ -1445,7 +1444,7 @@ ReadIconOrCursorFromFile(
     BlockOfIconImagesPtr lpIR;
     Tcl_Channel channel;
     int i;
-    DWORD dwBytesRead;
+    Tcl_Size dwBytesRead;
     LPICONDIRENTRY lpIDE;
 
     /*
@@ -1502,7 +1501,7 @@ ReadIconOrCursorFromFile(
 
     dwBytesRead = Tcl_Read(channel, (char *) lpIDE,
 	    (int) (lpIR->nNumImages * sizeof(ICONDIRENTRY)));
-    if (dwBytesRead != lpIR->nNumImages * sizeof(ICONDIRENTRY)) {
+    if (dwBytesRead != lpIR->nNumImages * (Tcl_Size)sizeof(ICONDIRENTRY)) {
 	Tcl_SetObjResult(interp, Tcl_ObjPrintf(
 		"error reading file: %s", Tcl_PosixError(interp)));
 	Tcl_SetErrorCode(interp, "TK", "WM", "ICON", "READ", (char *)NULL);
@@ -1985,10 +1984,31 @@ UpdateWrapper(
 	 */
 
 	if (wmPtr->flags & WM_FULLSCREEN) {
-	    x = 0;
-	    y = 0;
-	    width = WidthOfScreen(Tk_Screen(winPtr));
-	    height = HeightOfScreen(Tk_Screen(winPtr));
+	    /*
+	     * Cover the monitor the window currently is on, not always the
+	     * primary one.
+	     */
+
+	    RECT winRect;
+	    MONITORINFO mi;
+
+	    winRect.left = wmPtr->x;
+	    winRect.top = wmPtr->y;
+	    winRect.right = wmPtr->x + width;
+	    winRect.bottom = wmPtr->y + height;
+	    mi.cbSize = sizeof(mi);
+	    if (GetMonitorInfoW(MonitorFromRect(&winRect,
+		    MONITOR_DEFAULTTONEAREST), &mi)) {
+		x = mi.rcMonitor.left;
+		y = mi.rcMonitor.top;
+		width = mi.rcMonitor.right - mi.rcMonitor.left;
+		height = mi.rcMonitor.bottom - mi.rcMonitor.top;
+	    } else {
+		x = 0;
+		y = 0;
+		width = WidthOfScreen(Tk_Screen(winPtr));
+		height = HeightOfScreen(Tk_Screen(winPtr));
+	    }
 	} else if (!(wmPtr->sizeHintsFlags & (USPosition | PPosition))
 		&& (wmPtr->flags & WM_NEVER_MAPPED)) {
 	    x = CW_USEDEFAULT;
@@ -2203,8 +2223,16 @@ UpdateWrapper(
      */
 
     if (tsdPtr->firstWindow) {
-	tsdPtr->firstWindow = 0;
-	SetActiveWindow(wmPtr->wrapper);
+	/*
+	 * Do not waste the activation on an invisible window, e.g. the
+	 * withdrawn console. [Bug 2effa4b316]
+	 */
+
+	state = wmPtr->hints.initial_state;
+	if (state == NormalState || state == ZoomState) {
+	    tsdPtr->firstWindow = 0;
+	    SetActiveWindow(wmPtr->wrapper);
+	}
     } else if (focusHWND) {
 	SetFocus(focusHWND);
     }
@@ -5710,8 +5738,19 @@ WmWaitVisibilityOrMapProc(
 	int state = containerPtr->wmInfoPtr->hints.initial_state;
 
 	if ((state == NormalState) || (state == ZoomState)) {
+	    HWND wrapper = winPtr->wmInfoPtr->wrapper;
+
+	    /*
+	     * Recreate the wrapper only if it is not yet owned by the
+	     * container's wrapper. Destroying it needlessly would also destroy
+	     * any dialog that is owned by it. [Bug 3009885]
+	     */
+
 	    state = winPtr->wmInfoPtr->hints.initial_state;
-	    if ((state == NormalState) || (state == ZoomState)) {
+	    if (((state == NormalState) || (state == ZoomState))
+		    && (wrapper == NULL || containerPtr->window == None
+		    || GetWindow(wrapper, GW_OWNER) != GetAncestor(
+			    Tk_GetHWND(containerPtr->window), GA_ROOT))) {
 		UpdateWrapper(winPtr);
 	    }
 	}
@@ -8037,7 +8076,11 @@ WmProc(
 	 * All other toplevels are deemed non-minimizable when a grab is
 	 * present.
 	 * If there is a grab in effect and this window is outside the
-	 * grab tree then ignore all system commands. [Bug 1847002]
+	 * grab tree then ignore all system commands, except moving, sizing
+	 * and restoring. [Bug 1847002]
+	 * Restoring must be allowed, otherwise the window cannot be restored
+	 * after "show desktop" (Win+D), which minimizes it without
+	 * WM_SYSCOMMAND. [ed6c3a787d]
 	 */
 
 	if (winPtr) {
@@ -8049,8 +8092,16 @@ WmProc(
 		goto done;
 	    }
 	    if (grab == TK_GRAB_EXCLUDED
-		&& !(SC_MOVE == cmd || SC_SIZE == cmd)) {
+		&& !(SC_MOVE == cmd || SC_SIZE == cmd || SC_RESTORE == cmd)) {
 		goto done;
+	    }
+	    /*
+	     * The mouse capture set by a global grab stops the window
+	     * from being restored. [Bug 3138512]
+	     */
+
+	    if (SC_RESTORE == cmd && GetCapture() != NULL) {
+		ReleaseCapture();
 	    }
 	}
 	/* fall through */
@@ -8374,7 +8425,7 @@ TkpWinToplevelWithDraw(
 {
     WmInfo *wmPtr = winPtr->wmInfoPtr;
     int resetTempStyle = 0;
-    LONG exStyle = 0;
+    LONG_PTR exStyle = 0;
 
     /*
      * Special handling of transient toplevels (wmPtr->containerPtr != NULL),
@@ -8470,10 +8521,12 @@ TkpWinToplevelDeiconify(
 
     /*
      * If we were in the ZoomState (maximized), 'wm deiconify' should not
-     * cause the window to shrink
+     * cause the window to shrink. A withdrawn window has lost its ZoomState,
+     * but a hidden wrapper keeps its maximized style.
      */
 
-    if (wmPtr->hints.initial_state == ZoomState) {
+    if (wmPtr->hints.initial_state == ZoomState
+	    || (wmPtr->wrapper && IsZoomed(wmPtr->wrapper))) {
 	TkpWmSetState(winPtr, ZoomState);
     } else {
 	TkpWmSetState(winPtr, NormalState);

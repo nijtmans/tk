@@ -349,6 +349,7 @@ static void		TopLevelEventProc(void *clientData,
 static void		WmStackorderToplevelWrapperMap(TkWindow *winPtr,
 			    Display *display, Tcl_HashTable *table);
 static void		UpdateGeometryInfo(void *clientData);
+static void		UpdatePointerWinAfterDestroy(TKWindow *deadNSWindow);
 static void		UpdateSizeHints(TkWindow *winPtr);
 static void		UpdateVRootGeometry(WmInfo *wmPtr);
 static int		WmAspectCmd(Tk_Window tkwin, TkWindow *winPtr,
@@ -1138,6 +1139,89 @@ TkWmUnmapWindow(
 /*
  *----------------------------------------------------------------------
  *
+ * UpdatePointerWinAfterDestroy --
+ *
+ *	Determine the new pointer window after the destruction of the old pointer
+ *      window, and notify Tk of it.
+ *
+ * Results:
+ *	None
+ *
+ * Side effects:
+ *	See description.
+ *
+ *----------------------------------------------------------------------
+ */
+
+static void UpdatePointerWinAfterDestroy (
+    TKWindow *deadNSWindow)	/* Top-level window that's being deleted */
+{
+    Tk_Window target = NULL;
+    TkWindow *winPtr;
+    NSWindow *w;
+
+    NSPoint mouse = [NSEvent mouseLocation];
+    if (! NSPointInRect(mouse, [deadNSWindow frame])) {
+	return;
+    }
+
+    /*
+     * Determine the new window to contain the screen pointer (target window).
+     * In case that the procedure doesn't yield a result, let the root window
+     * of the screen be the new pointer window (target == NULL).
+     */
+
+    /* Step 1: Find the toplevel that will contain the screen pointer */
+    winPtr = NULL;
+    for (w in [NSApp orderedWindows]) {
+	if (w == deadNSWindow || w == NULL) {
+	    continue;
+	}
+	winPtr = TkMacOSXGetTkWindow(w);
+	if (winPtr == NULL || ! Tk_IsMapped((Tk_Window)winPtr)) {
+	    continue;
+	}
+	if (NSPointInRect(mouse, [w frame])) {
+	    target = (Tk_Window)winPtr;
+	    break;
+	}
+    }
+
+    NSPoint local = [w tkConvertPointFromScreen: mouse];
+    int top_x = floor(local.x),
+	top_y = floor(w.frame.size.height - local.y);
+    int root_x = floor(mouse.x),
+	root_y = floor(TkMacOSXZeroScreenHeight() - mouse.y);
+
+    Bool doUpdatePointer = True;
+    if (target) {
+	/*
+	 * Step 2: Find the Tk internal window within the toplevel that will contain
+	 *         the screen pointer.
+	 */
+	int dummy_x, dummy_y;
+	target = Tk_TopCoordsToWindow(target, top_x, top_y, &dummy_x, &dummy_y);
+	if (! Tk_IsTopLevel(target) && (Tk_Parent(target) == NULL)) {
+	   /*
+	    * The parent of the Tk internal window is in the process of being destroyed.
+	    * Don't call Tk_UpdatePointer in this case.
+	    */
+	    doUpdatePointer = False;
+	}
+    }
+    if (doUpdatePointer) {
+	Tk_UpdatePointer(target, root_x, root_y, [NSApp tkButtonState]);
+	if (target == NULL) {
+	    [NSApp setTkPointerWindow:nil];
+	} else {
+	    [NSApp setTkPointerWindow: (TkWindow *)target];
+	}
+    }
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
  * TkWmDeadWindow --
  *
  *	This procedure is invoked when a top-level window is about to be
@@ -1159,8 +1243,6 @@ void
 TkWmDeadWindow(
     TkWindow *winPtr)		/* Top-level window that's being deleted. */
 {
-    TkWindow *winPtr2;
-    NSWindow *w;
     WmInfo *wmPtr = winPtr->wmInfoPtr, *wmPtr2;
     TKWindow *deadNSWindow = NULL;
     if (Tk_WindowId(winPtr) == None) {
@@ -1234,50 +1316,7 @@ TkWmDeadWindow(
 	ckfree(transientPtr);
     }
 
-    /*
-     * Remove references to the Tk window from the mouse event processing
-     * state which is recorded in the NSApplication object and notify Tk
-     * of the new pointer window.
-     */
-
-    NSPoint mouse = [NSEvent mouseLocation];
-    [NSApp setTkPointerWindow:nil];
-    winPtr2 = NULL;
-
-    for (w in [NSApp orderedWindows]) {
-	if (w == deadNSWindow || w == NULL) {
-	    continue;
-	}
-	winPtr2 = TkMacOSXGetTkWindow(w);
-	if (winPtr2 == NULL) {
-	    continue;
-	}
-	if (NSPointInRect(mouse, [w frame])) {
-	    [NSApp setTkPointerWindow: winPtr2];
-	    break;
-	}
-    }
-    if (winPtr2) {
-	/*
-	 * We now know which toplevel will contain the pointer when the window
-	 * is destroyed.  We need to know which Tk window within the
-	 * toplevel will contain the pointer.
-	 */
-	NSPoint local = [w tkConvertPointFromScreen: mouse];
-	int top_x = floor(local.x),
-	    top_y = floor(w.frame.size.height - local.y);
-	int root_x = floor(mouse.x),
-	    root_y = floor(TkMacOSXZeroScreenHeight() - mouse.y);
-	int win_x, win_y;
-	Tk_Window target = Tk_TopCoordsToWindow((Tk_Window) winPtr2, top_x, top_y, &win_x, &win_y);
-	/*
-	 * A non-toplevel window can have a NULL parent while it is in the process of
-	 * being destroyed.  We should not call Tk_UpdatePointer in that case.
-	 */
-	if (Tk_Parent(target) != NULL || Tk_IsTopLevel(target)) {
-	    Tk_UpdatePointer(target, root_x, root_y, [NSApp tkButtonState]);
-	}
-    }
+    UpdatePointerWinAfterDestroy(deadNSWindow);
 
     /*
      * Unregister the NSWindow and remove all references to it from the Tk
@@ -1342,8 +1381,8 @@ TkWmDeadWindow(
 	 */
 
 	TKContentView *deadView = [deadNSWindow contentView];
-	Tcl_CancelIdleCall(TkMacOSXRedrawViewIdleTask, (void *) deadView);
-	Tcl_CancelIdleCall(TkMacOSXUpdateViewIdleTask, (void *) deadView);
+	Tcl_CancelIdleCall(TkMacOSXRedrawViewIdleTask, deadView);
+	Tcl_CancelIdleCall(TkMacOSXUpdateViewIdleTask, deadView);
 	CGContextRelease(deadView.tkLayerBitmapContext);
 	[deadNSWindow close];
 #if MAC_OS_X_VERSION_MAX_ALLOWED >= 101400
@@ -1627,7 +1666,7 @@ WmAspectCmd(
 	}
 	return TCL_OK;
     }
-    if (*Tcl_GetString(objv[3]) == '\0') {
+    if (TkObjIsEmpty(objv[3])) {
 	wmPtr->sizeHintsFlags &= ~PAspect;
     } else {
 	if ((Tcl_GetIntFromObj(interp, objv[3], &numer1) != TCL_OK)
@@ -1807,11 +1846,15 @@ WmSetAttribute(
 		} else {
 		    styleMaskValue |= styleMaskBits[index].bitvalue;
 		}
-		/*
-		 * Be sure not to change the fullscreen bit.
-		 */
-		styleMaskValue |= (NSWindowStyleMaskFullScreen & macWindow.styleMask);
 	    }
+	    /*
+	     * Be sure not to change the fullscreen bit! Clearing the
+	     * fullscreen bit for a window which is in fullscreen mode causes
+	     * an exception.  This is handled outside of the loop above because
+	     * that loop does not run if the command argument is an empty list.
+	     * See ticket [393f9b0ab8].
+	     */
+	    styleMaskValue |= (NSWindowStyleMaskFullScreen & macWindow.styleMask);
 	    /*
 	     * A resizable docmodal NSWindow or NSPanel does not work
 	     * correctly.  It cannot be resized from the top edge.  Other bits,
@@ -2396,7 +2439,7 @@ WmCommandCmd(
 	}
 	return TCL_OK;
     }
-    if (*Tcl_GetString(objv[3]) == '\0') {
+    if (TkObjIsEmpty(objv[3])) {
 	if (wmPtr->commandObj != NULL) {
 	    Tcl_DecrRefCount(wmPtr->commandObj);
 	    wmPtr->commandObj = NULL;
@@ -2783,7 +2826,7 @@ WmGridCmd(
 	}
 	return TCL_OK;
     }
-    if (*Tcl_GetString(objv[3]) == '\0') {
+    if (TkObjIsEmpty(objv[3])) {
 	/*
 	 * Turn off gridding and reset the width and height to make sense as
 	 * ungridded numbers.
@@ -3359,7 +3402,7 @@ WmIconpositionCmd(
 	return TCL_OK;
     }
 
-    if (*Tcl_GetString(objv[3]) == '\0') {
+    if (TkObjIsEmpty(objv[3])) {
 	wmPtr->hints.flags &= ~IconPositionHint;
     } else {
 	if ((Tcl_GetIntFromObj(interp, objv[3], &x) != TCL_OK)
@@ -3414,7 +3457,7 @@ WmIconwindowCmd(
 	return TCL_OK;
     }
 
-    if (*Tcl_GetString(objv[3]) == '\0') {
+    if (TkObjIsEmpty(objv[3])) {
 	wmPtr->hints.flags &= ~IconWindowHint;
 	if (wmPtr->icon != NULL) {
 	    wmPtr2 = ((TkWindow *)wmPtr->icon)->wmInfoPtr;
@@ -3774,7 +3817,7 @@ WmPositionfromCmd(
 	return TCL_OK;
     }
 
-    if (*Tcl_GetString(objv[3]) == '\0') {
+    if (TkObjIsEmpty(objv[3])) {
 	wmPtr->sizeHintsFlags &= ~(USPosition|PPosition);
     } else {
 	if (Tcl_GetIndexFromObjStruct(interp, objv[3], optionStrings,
@@ -3879,7 +3922,7 @@ WmProtocolCmd(
 	    break;
 	}
     }
-    if (Tcl_GetString(objv[4])[0]) {
+    if (!TkObjIsEmpty(objv[4])) {
 	protPtr = (ProtocolHandler *)ckalloc(sizeof(ProtocolHandler));
 	protPtr->protocol = protocol;
 	protPtr->nextPtr = wmPtr->protPtr;
@@ -4014,7 +4057,7 @@ WmSizefromCmd(
 	return TCL_OK;
     }
 
-    if (*Tcl_GetString(objv[3]) == '\0') {
+    if (TkObjIsEmpty(objv[3])) {
 	wmPtr->sizeHintsFlags &= ~(USSize|PSize);
     } else {
 	if (Tcl_GetIndexFromObjStruct(interp, objv[3], optionStrings,
@@ -4370,7 +4413,7 @@ WmTransientCmd(
 	}
 	return TCL_OK;
     }
-    if (*Tcl_GetString(objv[3]) == '\0') {
+    if (TkObjIsEmpty(objv[3])) {
 	RemoveTransient(winPtr);
     } else {
 	if (TkGetWindowFromObj(interp, tkwin, objv[3], &container) != TCL_OK) {
@@ -5261,7 +5304,7 @@ Tk_GetRootCoords(
      */
 
     x = y = 0;
-    while (1) {
+    while (true) {
 	x += winPtr->changes.x + winPtr->changes.border_width;
 	y += winPtr->changes.y + winPtr->changes.border_width;
 	if (winPtr->flags & TK_TOP_LEVEL) {
@@ -5345,7 +5388,7 @@ Tk_CoordsToWindow(
 
     x = rootX - winPtr->wmInfoPtr->xInParent;
     y = rootY - winPtr->wmInfoPtr->yInParent;
-    while (1) {
+    while (true) {
 	x -= winPtr->changes.x;
 	y -= winPtr->changes.y;
 	nextPtr = NULL;
@@ -5441,7 +5484,7 @@ Tk_TopCoordsToWindow(
     winPtr = (TkWindow *)tkwin;
     x = rootX;
     y = rootY;
-    while (1) {
+    while (true) {
 	nextPtr = NULL;
 
 	/*
@@ -6702,7 +6745,7 @@ TkMacOSXMakeRealWindowExist(
     NSString *identifier;
     char *tabbingId = NULL;
     long tabbingMode = NSWindowTabbingModeAutomatic;
-    static int initialized = 0;
+    static bool initialized = false;
 
     if (TkMacOSXHostToplevelExists(winPtr)) {
 	return;
@@ -6744,7 +6787,7 @@ TkMacOSXMakeRealWindowExist(
 	    Tcl_InitHashTable(&pathnameToSubclass, TCL_STRING_KEYS);
 	    Tcl_InitHashTable(&pathnameToTabbingId, TCL_STRING_KEYS);
 	    Tcl_InitHashTable(&pathnameToTabbingMode, TCL_STRING_KEYS);
-	    initialized = 1;
+	    initialized = true;
 	}
 	hPtr = Tcl_FindHashEntry(&pathnameToSubclass, Tk_PathName(winPtr));
 	index = hPtr ? PTR2INT(Tcl_GetHashValue(hPtr)) : subclassNSWindow;
@@ -7207,6 +7250,29 @@ TkpGetMS(void)
 
     Tcl_GetTime(&now);
     return (long) now.sec * 1000 + now.usec / 1000;
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * TkpGetEventTime --
+ *
+ *	The time of the event which is currently being processed. On this
+ *	platform it is the current time.
+ *
+ * Results:
+ *	Number of milliseconds.
+ *
+ * Side effects:
+ *	None.
+ *
+ *----------------------------------------------------------------------
+ */
+
+unsigned long
+TkpGetEventTime(void)
+{
+    return TkpGetMS();
 }
 
 /*

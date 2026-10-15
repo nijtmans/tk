@@ -39,6 +39,8 @@ typedef struct TkFontInfo {
     int updatePending;		/* Non-zero when a World Changed event has
 				 * already been queued to handle a change to a
 				 * named font. */
+    int freePending;		/* Non-zero when FreeUnusedFonts has already
+				 * been scheduled. */
 } TkFontInfo;
 
 /*
@@ -344,6 +346,9 @@ static int		ParseFontNameObj(Tcl_Interp *interp, Tk_Window tkwin,
 static void		RecomputeWidgets(TkWindow *winPtr);
 static int		SetFontFromAny(Tcl_Interp *interp, Tcl_Obj *objPtr);
 static void		TheWorldHasChanged(void *clientData);
+static void		FreeUnusedFonts(void *clientData);
+static void		DeleteFont(TkFont *fontPtr);
+static Tk_Window	FindWindowOnScreen(TkWindow *winPtr, Screen *screen);
 static void		UpdateDependentFonts(TkFontInfo *fiPtr,
 			    Tk_Window tkwin, Tcl_HashEntry *namedHashPtr);
 
@@ -392,6 +397,7 @@ TkFontPkgInit(
     Tcl_InitHashTable(&fiPtr->namedTable, TCL_STRING_KEYS);
     fiPtr->mainPtr = mainPtr;
     fiPtr->updatePending = 0;
+    fiPtr->freePending = 0;
     mainPtr->fontInfoPtr = fiPtr;
 
     TkpFontPkgInit(mainPtr);
@@ -425,6 +431,11 @@ TkFontPkgFree(
 #ifdef PURIFY
     int fontsLeft = 0;
 #endif
+
+    if (fiPtr->freePending) {
+	Tcl_CancelIdleCall(FreeUnusedFonts, fiPtr);
+    }
+    FreeUnusedFonts(fiPtr);
 
     for (searchPtr = Tcl_FirstHashEntry(&fiPtr->fontCache, &search);
 	    searchPtr != NULL;
@@ -857,6 +868,7 @@ UpdateDependentFonts(
     Tcl_HashEntry *cacheHashPtr;
     Tcl_HashSearch search;
     TkFont *fontPtr;
+    Tk_Window fontWin;
     NamedFont *nfPtr = (NamedFont *)Tcl_GetHashValue(namedHashPtr);
 
     if (nfPtr->refCount == 0) {
@@ -873,7 +885,20 @@ UpdateDependentFonts(
 	for (fontPtr = (TkFont *)Tcl_GetHashValue(cacheHashPtr);
 		fontPtr != NULL; fontPtr = fontPtr->nextPtr) {
 	    if (fontPtr->namedHashPtr == namedHashPtr) {
-		TkpGetFontFromAttributes(fontPtr, tkwin, &nfPtr->fa);
+		/*
+		 * The font must be recreated for the screen where it is used,
+		 * which may be not the screen of tkwin. [Bug 483387]
+		 */
+
+		fontWin = tkwin;
+		if (Tk_Screen(tkwin) != fontPtr->screen) {
+		    fontWin = FindWindowOnScreen(fiPtr->mainPtr->winPtr,
+			    fontPtr->screen);
+		    if (fontWin == NULL) {
+			continue;
+		    }
+		}
+		TkpGetFontFromAttributes(fontPtr, fontWin, &nfPtr->fa);
 		if (!fiPtr->updatePending) {
 		    fiPtr->updatePending = 1;
 		    Tcl_DoWhenIdle(TheWorldHasChanged, fiPtr);
@@ -882,6 +907,43 @@ UpdateDependentFonts(
 	}
 	cacheHashPtr = Tcl_NextHashEntry(&search);
     }
+}
+
+/*
+ *---------------------------------------------------------------------------
+ *
+ * FindWindowOnScreen --
+ *
+ *	Finds a window of the application on the given screen.
+ *
+ * Results:
+ *	The window, or NULL if there is no window on that screen.
+ *
+ * Side effects:
+ *	None.
+ *
+ *---------------------------------------------------------------------------
+ */
+
+static Tk_Window
+FindWindowOnScreen(
+    TkWindow *winPtr,		/* Root of the window hierarchy to search. */
+    Screen *screen)		/* The screen to look for. */
+{
+    TkWindow *childPtr;
+    Tk_Window found;
+
+    if (Tk_Screen((Tk_Window) winPtr) == screen) {
+	return (Tk_Window) winPtr;
+    }
+    for (childPtr = winPtr->childList; childPtr != NULL;
+	    childPtr = childPtr->nextPtr) {
+	found = FindWindowOnScreen(childPtr, screen);
+	if (found != NULL) {
+	    return found;
+	}
+    }
+    return NULL;
 }
 
 static void
@@ -1127,7 +1189,7 @@ Tk_AllocFontFromObj(
 
     oldFontPtr = (TkFont *)objPtr->internalRep.twoPtrValue.ptr1;
     if (oldFontPtr != NULL) {
-	if (oldFontPtr->resourceRefCount == 0) {
+	if (oldFontPtr->cacheHashPtr == NULL) {
 	    /*
 	     * This is a stale reference: it refers to a TkFont that's no
 	     * longer in use. Clear the reference.
@@ -1324,7 +1386,7 @@ Tk_GetFontFromObj(
 
     fontPtr = (TkFont *)objPtr->internalRep.twoPtrValue.ptr1;
     if (fontPtr != NULL) {
-	if (fontPtr->resourceRefCount == 0) {
+	if (fontPtr->cacheHashPtr == NULL) {
 	    /*
 	     * This is a stale reference: it refers to a TkFont that's no
 	     * longer in use. Clear the reference.
@@ -1464,8 +1526,8 @@ void
 Tk_FreeFont(
     Tk_Font tkfont)		/* Font to be released. */
 {
-    TkFont *fontPtr = (TkFont *) tkfont, *prevPtr;
-    NamedFont *nfPtr;
+    TkFont *fontPtr = (TkFont *) tkfont;
+    TkFontInfo *fiPtr;
 
     if (fontPtr == NULL) {
 	return;
@@ -1473,6 +1535,82 @@ Tk_FreeFont(
     if (fontPtr->resourceRefCount-- > 1) {
 	return;
     }
+
+    /*
+     * Keep the unused font until idle time, since it may be needed again
+     * soon, e.g. the default font of a widget created with another -font
+     * value. [Bug 8da7af2f8e]
+     */
+
+    fiPtr = (TkFontInfo *) fontPtr->cacheHashPtr->tablePtr;
+    if (!fiPtr->freePending) {
+	fiPtr->freePending = 1;
+	Tcl_DoWhenIdle(FreeUnusedFonts, fiPtr);
+    }
+}
+
+/*
+ *---------------------------------------------------------------------------
+ *
+ * FreeUnusedFonts --
+ *
+ *	Deletes the unused fonts. Called as an idle handler.
+ *
+ * Results:
+ *	None.
+ *
+ * Side effects:
+ *	See DeleteFont.
+ *
+ *---------------------------------------------------------------------------
+ */
+
+static void
+FreeUnusedFonts(
+    void *clientData)		/* Info about application's fonts. */
+{
+    TkFontInfo *fiPtr = (TkFontInfo *)clientData;
+    Tcl_HashEntry *hPtr, *nextHPtr;
+    Tcl_HashSearch search;
+    TkFont *fontPtr, *nextPtr;
+
+    fiPtr->freePending = 0;
+    for (hPtr = Tcl_FirstHashEntry(&fiPtr->fontCache, &search);
+	    hPtr != NULL; hPtr = nextHPtr) {
+	nextHPtr = Tcl_NextHashEntry(&search);
+	for (fontPtr = (TkFont *)Tcl_GetHashValue(hPtr); fontPtr != NULL;
+		fontPtr = nextPtr) {
+	    nextPtr = fontPtr->nextPtr;
+	    if (fontPtr->resourceRefCount == 0) {
+		DeleteFont(fontPtr);
+	    }
+	}
+    }
+}
+
+/*
+ *---------------------------------------------------------------------------
+ *
+ * DeleteFont --
+ *
+ *	Removes an unused font from the cache and releases its resources.
+ *
+ * Results:
+ *	None.
+ *
+ * Side effects:
+ *	The font structure is freed unless objects still refer to it.
+ *
+ *---------------------------------------------------------------------------
+ */
+
+static void
+DeleteFont(
+    TkFont *fontPtr)		/* Font to be deleted. */
+{
+    TkFont *prevPtr;
+    NamedFont *nfPtr;
+
     if (fontPtr->namedHashPtr != NULL) {
 	/*
 	 * This font derived from a named font. Reduce the reference count on
@@ -1500,6 +1638,7 @@ Tk_FreeFont(
 	prevPtr->nextPtr = fontPtr->nextPtr;
     }
 
+    fontPtr->cacheHashPtr = NULL;
     TkpDeleteFont(fontPtr);
     if (fontPtr->objRefCount == 0) {
 	ckfree(fontPtr);
@@ -1567,7 +1706,7 @@ FreeFontObj(
     TkFont *fontPtr = (TkFont *)objPtr->internalRep.twoPtrValue.ptr1;
 
     if (fontPtr != NULL) {
-	if ((fontPtr->objRefCount-- <= 1) && (fontPtr->resourceRefCount == 0)) {
+	if ((fontPtr->objRefCount-- <= 1) && (fontPtr->cacheHashPtr == NULL)) {
 	    ckfree(fontPtr);
 	}
 	objPtr->internalRep.twoPtrValue.ptr1 = NULL;

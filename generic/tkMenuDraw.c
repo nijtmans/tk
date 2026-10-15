@@ -248,6 +248,12 @@ TkMenuConfigureDrawOptions(
 	gcValues.stipple = menuPtr->gray;
 	newGC = Tk_GetGC(menuPtr->tkwin,
 	    GCForeground|GCFillStyle|GCStipple, &gcValues);
+    } else {
+	/* If we are unable to create the gray50 bitmap, just create a GC with
+	 * the same mask as the disabledGC.  We cannot resuse the disabledGC
+	 * because they get freed separately.
+	 */
+	newGC = Tk_GetGC(menuPtr->tkwin, mask, &gcValues);
     }
     if (menuPtr->disabledImageGC != NULL) {
 	Tk_FreeGC(menuPtr->display, menuPtr->disabledImageGC);
@@ -666,9 +672,29 @@ DisplayMenu(
 	}
 	mePtr->entryFlags &= ~ENTRY_NEEDS_REDISPLAY;
 
+#ifndef TK_NO_DOUBLE_BUFFERING
+	/*
+	 * In order to avoid the entry blinking, it is drawn into off-screen
+	 * memory and copied on-screen in a single operation.  [Bug 791527]
+	 */
+
+	if ((mePtr->width > 0) && (mePtr->height > 0)) {
+	    Pixmap pixmap = Tk_GetPixmap(menuPtr->display,
+		    Tk_WindowId(tkwin), mePtr->width, mePtr->height,
+		    Tk_Depth(tkwin));
+
+	    TkpDrawMenuEntry(mePtr, pixmap, tkfont, &menuMetrics, 0, 0,
+		    mePtr->width, mePtr->height, strictMotif, 1);
+	    XCopyArea(menuPtr->display, pixmap, Tk_WindowId(tkwin),
+		    menuPtr->textGC, 0, 0, (unsigned) mePtr->width,
+		    (unsigned) mePtr->height, mePtr->x, mePtr->y);
+	    Tk_FreePixmap(menuPtr->display, pixmap);
+	}
+#else
 	TkpDrawMenuEntry(mePtr, Tk_WindowId(menuPtr->tkwin), tkfont,
 		&menuMetrics, mePtr->x, mePtr->y, mePtr->width,
 		mePtr->height, strictMotif, 1);
+#endif /* TK_NO_DOUBLE_BUFFERING */
 
 	if (mePtr->entryFlags & ENTRY_LAST_COLUMN) {
 
@@ -983,11 +1009,42 @@ AdjustMenuCoords(
     int *xPtr,
     int *yPtr)
 {
+    TkMenu *childPtr = (mePtr->childMenuRefPtr != NULL)
+	    ? mePtr->childMenuRefPtr->menuPtr : NULL;
+    int vRootX, vRootY, vRootWidth, vRootHeight;
+
+    if ((childPtr != NULL) && (childPtr->tkwin != NULL)) {
+	TkRecomputeMenu(childPtr);
+	Tk_GetVRootGeometry(menuPtr->tkwin, &vRootX, &vRootY,
+		&vRootWidth, &vRootHeight);
+    } else {
+	childPtr = NULL;
+    }
+
     if (menuPtr->menuType == MENUBAR) {
 	*xPtr += mePtr->x;
 	*yPtr += mePtr->y + mePtr->height;
+
+	/*
+	 * If the submenu does not fit below the menubar, but fits above it,
+	 * post it above. Otherwise it would be moved up to overlap the
+	 * menubar entry, and releasing the mouse button would invoke the
+	 * menu item under the pointer.
+	 */
+
+	if (childPtr != NULL) {
+	    int height = Tk_ReqHeight(childPtr->tkwin);
+
+	    childPtr->cascadeLeft = false;
+
+	    if ((*yPtr + height > vRootY + vRootHeight)
+		    && (*yPtr - mePtr->height - height >= vRootY)) {
+		*yPtr -= mePtr->height + height;
+	    }
+	}
     } else {
-	int borderWidth, activeBorderWidth;
+	int borderWidth, activeBorderWidth, offset, right;
+	bool left = false;
 	double scalingLevel = TkScalingLevel(menuPtr->tkwin);
 	int scaled2 = (int)round(2*scalingLevel);
 
@@ -995,8 +1052,36 @@ AdjustMenuCoords(
 		&borderWidth);
 	Tk_GetPixelsFromObj(NULL, menuPtr->tkwin,
 		menuPtr->activeBorderWidthPtr, &activeBorderWidth);
-	*xPtr += Tk_Width(menuPtr->tkwin) - borderWidth	- activeBorderWidth
-		- scaled2;
+	offset = activeBorderWidth + scaled2;
+
+	/*
+	 * Post the cascade to the right of the entry's column (of the menu
+	 * for the last column), or to the left of the column if this menu
+	 * was itself posted to the left of its parent, as long as it fits
+	 * there. Otherwise post it on the other side if it fits there.
+	 * Otherwise it would be moved to overlap the menu, hiding its
+	 * entries and the pointer, or overlap the parent menu.
+	 */
+
+	if (mePtr->entryFlags & ENTRY_LAST_COLUMN) {
+	    right = *xPtr + Tk_Width(menuPtr->tkwin) - borderWidth - offset;
+	} else {
+	    right = *xPtr + mePtr->x + mePtr->width - offset;
+	}
+	if (childPtr != NULL) {
+	    int width = Tk_ReqWidth(childPtr->tkwin);
+	    int leftX = *xPtr + mePtr->x + offset - width;
+	    bool fitsRight = (right + width <= vRootX + vRootWidth);
+	    bool fitsLeft = (leftX >= vRootX);
+
+	    left = menuPtr->cascadeLeft ? (fitsLeft || !fitsRight)
+		    : (!fitsRight && fitsLeft);
+	    childPtr->cascadeLeft = left;
+	    if (left) {
+		right = leftX;
+	    }
+	}
+	*xPtr = right;
 	*yPtr += mePtr->y + activeBorderWidth + scaled2;
     }
 }
