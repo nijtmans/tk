@@ -99,10 +99,10 @@ option add *Text.padY 1  ; # same padding in x and y, see proc bo; tests work wi
 # The frame .f is needed to make sure that the overall window is always
 # fairly wide, even if the text window is very narrow.  This is needed
 # because some window managers don't allow the overall width of a window
-# to get very narrow.
+# to get very narrow (e.g. about 400 pixels on Windows with 350% scaling).
 
 catch {destroy .f .t}
-frame .f -width 100 -height 20
+frame .f -width 480 -height 20
 pack .f -side left
 
 set bigFont {Helvetica -24}  ; # note: not a fixed-width font!
@@ -159,6 +159,9 @@ update
 if {([winfo rooty .] < 50) || ([winfo rootx .] < 50)} {
     wm geom . +50+50
 }
+
+# The natural size of the main window, used by many tests.
+scan [wm geom .] %dx%d width height
 
 #
 # TESTS
@@ -374,9 +377,7 @@ foreach m [.t mark names] {
     catch {.t mark unset $m}
 }
 
-test textDisp-2.8 {LayoutDLine, extra chunk at end of dline} -setup {
-    scan [wm geom .] %dx%d width height
-} -body {
+test textDisp-2.8 {LayoutDLine, extra chunk at end of dline} -body {
     wm geom . [expr {$width+1}]x$height
     update
     .t configure -wrap char
@@ -774,10 +775,7 @@ test textDisp-4.4 {UpdateDisplayInfo, wrap-mode "none"} {
 	[list [xchar 0] [yline 3] $fixedWidth  $fixedHeight] \
 	{1.0 2.0 3.0}]
 test textDisp-4.5 {UpdateDisplayInfo, tiny window} {
-    if {[tk windowingsystem] eq "win32"} {
-	wm overrideredirect . 1
-    }
-    wm geom . 103x$height
+    wm geom . [expr {[winfo reqwidth .f] + 3}]x$height
     update
     .t configure -wrap none
     .t delete 1.0 end
@@ -789,35 +787,16 @@ test textDisp-4.5 {UpdateDisplayInfo, tiny window} {
 	[list [xchar 0] [yline 3] 1 $fixedHeight] \
 	{1.0 2.0 3.0}]
 
-#
-# COMMON TEST SETUP
-#
-
-if {[tk windowingsystem] eq "win32"} {
-    wm overrideredirect . 0
-}
-
 test textDisp-4.6 {UpdateDisplayInfo, tiny window} {
-    # This test was failing on Windows because the title bar on .
-    # was a certain minimum size and it was interfering with the size
-    # requested.  The "overrideredirect" gets rid of the titlebar so
-    # the toplevel can shrink to the appropriate size.  On Unix, setting
-    # the overrideredirect on "." confuses the window manager and
-    # causes subsequent tests to fail.
-
-    if {[tk windowingsystem] eq "win32"} {
-	wm overrideredirect . 1
-    }
     frame .f2 -width 20 -height 100
     pack .f2 -before .f
-    wm geom . 103x103
+    wm geom . [expr {[winfo reqwidth .f] + 3}]x103
     update
     .t configure -wrap none -borderwidth 2
     .t delete 1.0 end
     .t insert end "Line 1\nLine 2 is so long that it wraps around\nLine 3"
     update
     set x [list [.t bbox 1.0] [.t bbox 2.0] $tk_textRelayout]
-    wm overrideredirect . 0
     update
     set expected [list [list [xchar 0] [yline 1] 1 1] {} 1.0]
     lequal $x $expected
@@ -833,16 +812,6 @@ wm geom . {}
 update
 
 test textDisp-4.7 {UpdateDisplayInfo, filling in extra vertical space} {
-    # This test was failing on Windows because the title bar on .
-    # was a certain minimum size and it was interfering with the size
-    # requested.  The "overrideredirect" gets rid of the titlebar so
-    # the toplevel can shrink to the appropriate size.  On Unix, setting
-    # the overrideredirect on "." confuses the window manager and
-    # causes subsequent tests to fail.
-
-    if {[tk windowingsystem] eq "win32"} {
-	wm overrideredirect . 1
-    }
     .t delete 1.0 end
     .t insert end "1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12\n13\n14\n15\n16\n17"
     .t yview 1.0
@@ -850,7 +819,6 @@ test textDisp-4.7 {UpdateDisplayInfo, filling in extra vertical space} {
     .t yview 16.0
     update
     set x [list [.t index @0,0] $tk_textRelayout $tk_textRedraw]
-    wm overrideredirect . 0
     update
     set x
 } {8.0 {16.0 17.0 15.0 14.0 13.0 12.0 11.0 10.0 9.0 8.0} {8.0 9.0 10.0 11.0 12.0 13.0 14.0 15.0 16.0 17.0}}
@@ -1854,7 +1822,7 @@ test textDisp-11.13 {TkTestSetYView, partially visible last line} {
 catch {destroy .top}
 toplevel .top
 wm geometry .top +0+0
-text .top.t -width 30 -height 3
+text .top.t -font $fixedFont -width 30 -height 3
 pack .top.t
 .top.t insert end "Line 1"
 for {set i 2} {$i <= 20} {incr i} {
@@ -1909,7 +1877,8 @@ test textDisp-11.19 {TkTextSetYView, see in elided lines} {
 	.top.t insert end "Line $i\n"
     }
     # button just for having a line with a larger height
-    button .top.t.b -text "Test" -bd 2 -highlightthickness 2
+    button .top.t.b -text "Test" -font $fixedFont -padx 1 -pady 1 -bd 2 \
+	    -highlightthickness 2
     .top.t window create 21.0 -window .top.t.b
     .top.t tag add hidden 15.36 21.0
     .top.t tag configure hidden -elide true
@@ -2153,7 +2122,7 @@ test textDisp-13.11 {TkTextSeeCmd procedure} {} {
     # characters and calling see at the line end shall actually show
     # this character
     toplevel .top2
-    pack [text .top2.t2 -wrap none]
+    pack [text .top2.t2 -font $fixedFont -wrap none]
     for {set i 1} {$i < 5} {incr i} {
 	.top2.t2 insert end [string repeat "Line $i: éèàçù" 5]\n
     }
@@ -4027,9 +3996,6 @@ test textDisp-24.15 {TkTextCharLayoutProc, -wrap none} {
     lequal [list [.t bbox 1.19] [.t bbox 1.20]] $expected
 } {1}
 test textDisp-24.16 {TkTextCharLayoutProc, no chars fit} {
-    if {[tk windowingsystem] eq "win32"} {
-	wm overrideredirect . 1
-    }
     .t configure -wrap char
     .t delete 1.0 end
     .t insert 1.0 "abcdefghijklmnopqrstuvwxyz"
@@ -4041,14 +4007,6 @@ test textDisp-24.16 {TkTextCharLayoutProc, no chars fit} {
 } [list [list [xchar 0] [yline 1] 1 $fixedHeight] \
 	[list [xchar 0] [yline 2] 1 $fixedHeight] \
 	[list [xchar 0] [yline 3] 1 $fixedHeight]]
-
-#
-# COMMON TEST SETUP
-#
-
-if {[tk windowingsystem] eq "win32"} {
-    wm overrideredirect . 0
-}
 
 test textDisp-24.17 {TkTextCharLayoutProc, -wrap word} {
     .t configure -wrap word
@@ -4339,7 +4297,7 @@ test textDisp-26.12 {AdjustForTab procedure, adjusting chunks} {
     .t tag add x 1.0 end
     .t tag add y 1.7
     .t tag add y 1.9
-    button .b -text "="
+    button .b -text "=" -font $fixedFont -padx 1 -pady 1
     .t window create 1.3 -window .b
     update
     lindex [.t bbox 1.5] 0
@@ -4485,8 +4443,12 @@ test textDisp-27.6 {SizeOfTab procedure, center alignment} {
 	[list [xchar 5] [yline 2] $fixedWidth $fixedHeight]]
 test textDisp-27.7 {SizeOfTab procedure, center alignment, wrap -none (potential numerical problems)} {
     .t delete 1.0 end
-    set cm [winfo fpixels .t 1c]
-    .t configure -tabs {1c 2c center 3c 4c 5c 6c 7c 8c} -wrap none -width 40
+    # 1 cm at 96 DPI: a fractional number of pixels which does not depend on
+    # the scaling.
+    set cm 37.795275590551185
+    .t configure -tabs [list $cm [expr {2*$cm}] center [expr {3*$cm}] \
+	    [expr {4*$cm}] [expr {5*$cm}] [expr {6*$cm}] [expr {7*$cm}] \
+	    [expr {8*$cm}]] -wrap none -width 40
     .t insert 1.0 a\tb\tc\td\te\n012345678934567890a\tbb\tcc\tdd
     set width [expr {$fixedWidth * 19}]
     set tab $cm
@@ -4506,8 +4468,12 @@ test textDisp-27.7 {SizeOfTab procedure, center alignment, wrap -none (potential
 test textDisp-27.7.1 {SizeOfTab procedure, center alignment, wrap -none (potential numerical problems)} {
     .t delete 1.0 end
     .t configure -tabstyle wordprocessor
-    set cm [winfo fpixels .t 1c]
-    .t configure -tabs {1c 2c center 3c 4c 5c 6c 7c 8c} -wrap none -width 40
+    # 1 cm at 96 DPI: a fractional number of pixels which does not depend on
+    # the scaling.
+    set cm 37.795275590551185
+    .t configure -tabs [list $cm [expr {2*$cm}] center [expr {3*$cm}] \
+	    [expr {4*$cm}] [expr {5*$cm}] [expr {6*$cm}] [expr {7*$cm}] \
+	    [expr {8*$cm}]] -wrap none -width 40
     .t insert 1.0 a\tb\tc\td\te\n012345678934567890a\tbb\tcc\tdd
     set width [expr {$fixedWidth * 19}]
     set tab $cm
@@ -4526,10 +4492,13 @@ test textDisp-27.7.1 {SizeOfTab procedure, center alignment, wrap -none (potenti
 } [list 0 [yline 2] $fixedWidth $fixedHeight]
 test textDisp-27.7.2 {SizeOfTab procedure, fractional tab interpolation problem} {
     .t delete 1.0 end
-    set interpolatetab {1c 2c}
+    # 1 cm at 96 DPI: a fractional number of pixels which does not depend on
+    # the scaling.
+    set cm 37.795275590551185
+    set interpolatetab [list $cm [expr {2*$cm}]]
     set precisetab {}
     for {set i 1} {$i < 20} {incr i} {
-	lappend precisetab "${i}c"
+	lappend precisetab [expr {$i*$cm}]
     }
     .t configure -tabs $interpolatetab -wrap none -width 150
     .t insert 1.0 [string repeat "a\t" 20]
@@ -4741,7 +4710,7 @@ test textDisp-29.2.5 {miscellaneous: can show last character} -setup {
 } -body {
     toplevel .t2
     wm geometry .t2 121x141+200+200
-    text .t2.t -width 5 -height 5 -font {Arial 10} \
+    text .t2.t -width 5 -height 5 -font {Arial -13} \
       -wrap none -xscrollcommand ".t2.s set" \
       -bd 2 -highlightthickness 0 -padx 1
     .t2.t insert end "WWWWWWWWWWWWi"
@@ -5150,16 +5119,20 @@ test textDisp-33.2 {one line longer than fits in the widget} {
     after cancel $timer
     set tk_textHeightCalc
 } {1.0}
-test textDisp-33.3 {one line longer than fits in the widget} {
-    destroy .tt
-    pack [text .tt -wrap char]
+test textDisp-33.3 {one line longer than fits in the widget} -setup {
+    destroy .top
+    toplevel .top
+} -body {
+    pack [text .top.tt -wrap char]
     set tk_textHeightCalc ""
-    .tt insert 1.0 [string repeat "more wrap + " 300]
+    .top.tt insert 1.0 [string repeat "more wrap + " 300]
     update
-    .tt sync
+    .top.tt sync
     # Each line should have been recalculated just once
-    expr {[llength $tk_textHeightCalc] == [.tt count -displaylines 1.0 end]}
-} 1
+    expr {[llength $tk_textHeightCalc] == [.top.tt count -displaylines 1.0 end]}
+} -cleanup {
+    destroy .top
+} -result 1
 test textDisp-33.4 {one line longer than fits in the widget} {
     destroy .tt
     pack [text .tt -wrap char]
@@ -5280,7 +5253,81 @@ test textDisp-38.3 {layout of the text in a window which has not been mapped use
 } -cleanup {
     destroy .top
 } -result 5
+test textDisp-40.1 {index @x,y inside a multi-byte character in a font of its own} -setup {
+    destroy .t1
+    set res {}
+} -body {
+    # The character is a display chunk of its own, which the search for the
+    # index at x measures without its last byte: inside the character.
+    text .t1 -font {Courier -12} -wrap none
+    .t1 tag configure big -font $bigFont
+    pack .t1
+    foreach ch [list \u00e9 \u2611] {
+	.t1 delete 1.0 end
+	.t1 insert end $ch big " text"
+	update
+	lassign [.t1 bbox 1.0] x y w h
+	set indices {}
+	for {set dx 0} {$dx < $w} {incr dx} {
+	    lappend indices [.t1 index @[expr {$x + $dx}],[expr {$y + $h/2}]]
+	}
+	lappend res [lsort -unique $indices]
+    }
+    set res
+} -cleanup {
+    destroy .t1
+} -result {1.0 1.0}
+test textDisp-40.2 {display lineend at a multi-byte character ending the display line - bug 18f35ed566} -setup {
+    destroy .t1
+    set res {}
+} -body {
+    text .t1 -font {Courier -12} -width 1 -wrap char
+    pack .t1
+    foreach ch [list \u00e4 \u2611] {
+	.t1 delete 1.0 end
+	.t1 insert end a${ch}b
+	update
+	set end [.t1 index "1.1 display lineend"]
+	lappend res $end [expr {[.t1 get "1.1 display linestart" "$end +1c"] eq $ch}]
+    }
+    set res
+} -cleanup {
+    destroy .t1
+} -result {1.1 1 1.1 1}
 
+test textDisp-41.1 {many text widgets complete their line metrics update - bug 1348333} -setup {
+    toplevel .tt
+} -body {
+    # About 600 widgets are needed to show the bug.  A small font keeps the
+    # toplevel within a small screen: the widgets of a row clipped by it are
+    # unmapped, and an unmapped text widget never completes the update.
+    for {set i 0} {$i < 30} {incr i} {
+	pack [frame .tt.f$i]
+	for {set j 0} {$j < 30} {incr j} {
+	    text .tt.f$i.t$j -height 1 -width 2 -font {TkFixedFont -8}
+	    .tt.f$i.t$j insert end $i$j
+	    pack .tt.f$i.t$j -side left
+	}
+    }
+    # Without the fix, no widget gets synchronized at all.  Allow up to 10
+    # seconds for slow machines.
+    for {set n 0} {$n < 100} {incr n} {
+	pause 100
+	set pending 0
+	foreach f [winfo children .tt] {
+	    foreach t [winfo children $f] {
+		incr pending [$t pendingsync]
+	    }
+	}
+	if {$pending == 0} {
+	    break
+	}
+    }
+    set pending
+} -cleanup {
+    destroy .tt
+    unset -nocomplain i j f t n pending
+} -result 0
 #
 # TESTFILE CLEANUP
 #

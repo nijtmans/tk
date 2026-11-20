@@ -164,7 +164,7 @@ enum NSWindowSubclass {
     subclassNSPanel = 1
 };
 /* This array must be indexed by the enum above.*/
-static const char *subclassNames[] = {"nswindow", "nspanel", NULL};
+static const char *const subclassNames[] = {"nswindow", "nspanel", NULL};
 
 typedef struct buttonField_t {
     unsigned zoom: 1;
@@ -173,7 +173,7 @@ typedef struct buttonField_t {
 } buttonField;
 
 /* The order of these names must match the order of the bits above! */
-static const char *buttonNames[] = {"zoom", "miniaturize", "close", NULL};
+static const char *const buttonNames[] = {"zoom", "miniaturize", "close", NULL};
 
 typedef union windowButtonState_t {
     int intvalue;
@@ -467,7 +467,7 @@ static void		GetMaxSize(TkWindow *winPtr, int *maxWidthPtr,
 			    int *maxHeightPtr);
 static void		RemapWindows(TkWindow *winPtr,
 			    MacDrawable *parentWin);
-static void             RemoveTransient(TkWindow *winPtr);
+static void		RemoveTransient(TkWindow *winPtr);
 
 #if MAC_OS_X_VERSION_MAX_ALLOWED >= 101300
 
@@ -843,46 +843,68 @@ FrontMostToplevelAtPoint(
     return NULL;
 }
 
+NSWindow *TkMacOSXGetKeyWindowSuccessor(
+    Tcl_Interp *interp,
+    NSWindow *ignore)
+{
+    for (NSWindow *w in [NSApp orderedWindows]) {
+	if (w == ignore) {
+	    continue;
+	}
+	TkWindow *winPtr = TkMacOSXGetTkWindow(w);
+	if (!winPtr || !winPtr->wmInfoPtr) {
+	    continue;
+	}
+	if (winPtr->flags & TK_ALREADY_DEAD) {
+	    continue;
+	}
+	if (interp && interp != Tk_Interp((Tk_Window) winPtr)) {
+	    continue;
+	}
+	/*
+	 * Windows stay visible during the order out animation, so we need to
+	 * exclude any iconic or withdrawn windows as well.
+	 */
+	if (winPtr->wmInfoPtr->hints.initial_state == IconicState
+		|| winPtr->wmInfoPtr->hints.initial_state == WithdrawnState) {
+	    continue;
+	}
+	if ([w isVisible] && [w canBecomeKeyWindow]) {
+	    return w;
+	}
+    }
+    return NULL;
+}
+
 void TkMacOSXAssignNewKeyWindow(
     Tcl_Interp *interp,
     NSWindow *ignore)
 {
-    TkWindow *winPtr;
-
     /*
      * Avoid bug 5692042764: set tkEventTarget to NULL if there is no window to
      * send Tk events to.
      */
 
     [NSApp setTkEventTarget: NULL];
-    for (NSWindow *w in [NSApp orderedWindows]) {
-	WmInfo *wmPtr;
-	BOOL isOnScreen;
-	winPtr = TkMacOSXGetTkWindow(w);
-	if (!winPtr
-	    || !winPtr->wmInfoPtr
-	    || (winPtr->flags & TK_ALREADY_DEAD)) {
-	    continue;
+
+    NSWindow *successor = TkMacOSXGetKeyWindowSuccessor(interp, ignore);
+    if (successor) {
+	TkWindow *winPtr= TkMacOSXGetTkWindow(successor);
+	[successor makeKeyAndOrderFront:NSApp];
+	/* Set the menubar for the new front window. */
+	if (winPtr->wmInfoPtr &&
+	    winPtr->wmInfoPtr->menuPtr &&
+	    winPtr->wmInfoPtr->menuPtr->mainMenuPtr) {
+	    TKMenu *menu = (TKMenu *) winPtr->wmInfoPtr->menuPtr->platformData;
+	    [NSApp tkSetMainMenu:menu];
+	    [NSApp setTkEventTarget: winPtr];
 	}
-	if (interp && interp != Tk_Interp((Tk_Window) winPtr)) {
-	    continue;
-	}
-	wmPtr = winPtr->wmInfoPtr;
-	isOnScreen = (wmPtr->hints.initial_state != IconicState &&
-		      wmPtr->hints.initial_state != WithdrawnState);
-	if (w != ignore && isOnScreen && [w canBecomeKeyWindow]) {
-	    TKMenu *menu;
-	    [w makeKeyAndOrderFront:NSApp];
-	    /* Set the menubar for the new front window. */
-	    if (winPtr->wmInfoPtr &&
-		winPtr->wmInfoPtr->menuPtr &&
-		winPtr->wmInfoPtr->menuPtr->mainMenuPtr) {
-		menu = (TKMenu *) winPtr->wmInfoPtr->menuPtr->platformData;
-		[NSApp tkSetMainMenu:menu];
-		[NSApp setTkEventTarget: winPtr];
-	    }
-	    break;
-	}
+    } else {
+	/*
+	 * No window can become key: show the menubar of the main window, which
+	 * is all that an application without visible windows offers.
+	 */
+	TkMacOSXInstallMainMenubar(interp);
     }
 }
 
@@ -1384,6 +1406,7 @@ TkWmDeadWindow(
 	Tcl_CancelIdleCall(TkMacOSXRedrawViewIdleTask, deadView);
 	Tcl_CancelIdleCall(TkMacOSXUpdateViewIdleTask, deadView);
 	CGContextRelease(deadView.tkLayerBitmapContext);
+	deadView.tkLayerBitmapContext = NULL;
 	[deadNSWindow close];
 #if MAC_OS_X_VERSION_MAX_ALLOWED >= 101400
 	NSUserDefaults *preferences = [NSUserDefaults standardUserDefaults];
@@ -1544,7 +1567,7 @@ Tk_WmObjCmd(
 	Tcl_SetObjResult(interp, Tcl_ObjPrintf(
 		"window \"%s\" isn't a top-level window", winPtr->pathName));
 	Tcl_SetErrorCode(interp, "TK", "LOOKUP", "TOPLEVEL", winPtr->pathName,
-		NULL);
+		(char *)NULL);
 	return TCL_ERROR;
     }
 
@@ -2614,13 +2637,24 @@ WmFocusmodelCmd(
 
 static int
 WmForgetCmd(
-    TCL_UNUSED(Tk_Window),		/* Main window of the application. */
+    Tk_Window mainWin,		/* Main window of the application. */
     TkWindow *winPtr,			/* Toplevel or Frame to work with */
-    TCL_UNUSED(Tcl_Interp *),		/* Current interpreter. */
+    Tcl_Interp *interp,		/* Current interpreter. */
     TCL_UNUSED(Tcl_Size),		/* Number of arguments. */
     TCL_UNUSED(Tcl_Obj *const *))	/* Argument objects. */
 {
     Tk_Window frameWin = (Tk_Window)winPtr;
+
+    /*
+     * Tk ticket 9ab6e37e: forget "." not allowed
+     */
+
+    if (frameWin == mainWin) {
+	Tcl_SetObjResult(interp, Tcl_NewStringObj(
+		"window \".\" can not be forgotten", TCL_INDEX_NONE));
+	Tcl_SetErrorCode(interp, "TK", "WM", "FORGET", ".", NULL);
+	return TCL_ERROR;
+    }
 
     /*
      * Tk ticket c77b426d: avoid panic on usage after wm forget
@@ -3060,17 +3094,19 @@ WmIconbitmapCmd(
 	return TCL_ERROR;
     }
     if (!len) {
-	if (wmPtr->hints.icon_pixmap != None) {
-	    Tk_FreeBitmap(winPtr->display, wmPtr->hints.icon_pixmap);
-	    wmPtr->hints.icon_pixmap = None;
-	}
-	wmPtr->hints.flags &= ~IconPixmapHint;
+	pixmap = None;
     } else {
 	pixmap = Tk_GetBitmap(interp, (Tk_Window)winPtr, str);
 	if (pixmap == None) {
 	    return TCL_ERROR;
 	}
-	wmPtr->hints.icon_pixmap = pixmap;
+    }
+    if (wmPtr->hints.icon_pixmap != None) {
+	Tk_FreeBitmap(winPtr->display, wmPtr->hints.icon_pixmap);
+    }
+    wmPtr->hints.icon_pixmap = pixmap;
+    wmPtr->hints.flags &= ~IconPixmapHint;
+    if (pixmap != None) {
 	wmPtr->hints.flags |= IconPixmapHint;
     }
     return TCL_OK;
@@ -3112,7 +3148,7 @@ WmIconifyCmd(
 		"can't iconify \"%s\": override-redirect flag is set",
 		winPtr->pathName));
 	Tcl_SetErrorCode(interp, "TK", "WM", "ICONIFY", "OVERRIDE_REDIRECT",
-		NULL);
+		(char *)NULL);
 	return TCL_ERROR;
     } else if (wmPtr->container != NULL) {
 	Tcl_SetObjResult(interp, Tcl_ObjPrintf(
@@ -3202,16 +3238,19 @@ WmIconmaskCmd(
 
     argv3 = Tcl_GetString(objv[3]);
     if (*argv3 == '\0') {
-	if (wmPtr->hints.icon_mask != None) {
-	    Tk_FreeBitmap(winPtr->display, wmPtr->hints.icon_mask);
-	}
-	wmPtr->hints.flags &= ~IconMaskHint;
+	pixmap = None;
     } else {
 	pixmap = Tk_GetBitmap(interp, tkwin, argv3);
 	if (pixmap == None) {
 	    return TCL_ERROR;
 	}
-	wmPtr->hints.icon_mask = pixmap;
+    }
+    if (wmPtr->hints.icon_mask != None) {
+	Tk_FreeBitmap(winPtr->display, wmPtr->hints.icon_mask);
+    }
+    wmPtr->hints.icon_mask = pixmap;
+    wmPtr->hints.flags &= ~IconMaskHint;
+    if (pixmap != None) {
 	wmPtr->hints.flags |= IconMaskHint;
     }
     return TCL_OK;
@@ -3474,7 +3513,7 @@ WmIconwindowCmd(
 		    "can't use %s as icon window: not at top level",
 		    Tk_PathName(tkwin2)));
 	    Tcl_SetErrorCode(interp, "TK", "WM", "ICONWINDOW", "TOPLEVEL",
-		    NULL);
+		    (char *)NULL);
 	    return TCL_ERROR;
 	}
 	wmPtr2 = ((TkWindow *)tkwin2)->wmInfoPtr;
@@ -4277,7 +4316,7 @@ WmStateCmd(
 			"can't iconify \"%s\": override-redirect flag is set",
 			winPtr->pathName));
 		Tcl_SetErrorCode(interp, "TK", "WM", "STATE",
-			"OVERRIDE_REDIRECT", NULL);
+			"OVERRIDE_REDIRECT", (char *)NULL);
 		return TCL_ERROR;
 	    }
 	    if (wmPtr->container != NULL) {
@@ -4285,7 +4324,7 @@ WmStateCmd(
 			"can't iconify \"%s\": it is a transient",
 			winPtr->pathName));
 		Tcl_SetErrorCode(interp, "TK", "WM", "STATE", "TRANSIENT",
-			NULL);
+			(char *)NULL);
 		return TCL_ERROR;
 	    }
 	    TkpWmSetState(winPtr, IconicState);
@@ -4901,7 +4940,7 @@ UpdateGeometryInfo(
 {
     TkWindow *winPtr = (TkWindow *)clientData;
     WmInfo *wmPtr = winPtr->wmInfoPtr;
-    int x, y, width, height, min, max;
+    int x, y, width, height, min, max, maxWidth, maxHeight;
 
     wmPtr->flags &= ~WM_UPDATE_PENDING;
 
@@ -4931,21 +4970,24 @@ UpdateGeometryInfo(
     }
 
     /*
-     * Account for window max/min width
+     * Account for window max/min width. The natural size is also limited
+     * by the default maximum, so that the window fits on the screen.
      */
+
+    GetMaxSize(winPtr, &maxWidth, &maxHeight);
 
     if (wmPtr->gridWin != NULL) {
 	min = winPtr->reqWidth
 		+ (wmPtr->minWidth - wmPtr->reqGridWidth)*wmPtr->widthInc;
-	if (wmPtr->maxWidth > 0) {
+	if (wmPtr->maxWidth > 0 || wmPtr->width == -1) {
 	    max = winPtr->reqWidth
-		    + (wmPtr->maxWidth - wmPtr->reqGridWidth)*wmPtr->widthInc;
+		    + (maxWidth - wmPtr->reqGridWidth)*wmPtr->widthInc;
 	} else {
 	    max = 0;
 	}
     } else {
 	min = wmPtr->minWidth;
-	max = wmPtr->maxWidth;
+	max = (wmPtr->maxWidth > 0 || wmPtr->width == -1) ? maxWidth : 0;
     }
     if (width < min) {
 	width = min;
@@ -4972,15 +5014,15 @@ UpdateGeometryInfo(
     if (wmPtr->gridWin != NULL) {
 	min = winPtr->reqHeight
 		+ (wmPtr->minHeight - wmPtr->reqGridHeight)*wmPtr->heightInc;
-	if (wmPtr->maxHeight > 0) {
+	if (wmPtr->maxHeight > 0 || wmPtr->height == -1) {
 	    max = winPtr->reqHeight
-		    + (wmPtr->maxHeight-wmPtr->reqGridHeight)*wmPtr->heightInc;
+		    + (maxHeight - wmPtr->reqGridHeight)*wmPtr->heightInc;
 	} else {
 	    max = 0;
 	}
     } else {
 	min = wmPtr->minHeight;
-	max = wmPtr->maxHeight;
+	max = (wmPtr->maxHeight > 0 || wmPtr->height == -1) ? maxHeight : 0;
     }
     if (height < min) {
 	height = min;
@@ -7307,7 +7349,7 @@ XSetInputFocus(
 /*
  *----------------------------------------------------------------------
  *
- * TkpChangeFocus --
+ * TkpChangeFocus_ --
  *
  *	This function is called when Tk moves focus from one window to another.
  *      It should be passed a non-embedded TopLevel. That toplevel gets raised
@@ -7326,10 +7368,10 @@ XSetInputFocus(
  *----------------------------------------------------------------------
  */
 
-int
-TkpChangeFocus(
+unsigned long
+TkpChangeFocus_(
     TkWindow *winPtr,		/* Window that is to receive the X focus. */
-    int force)			/* Non-zero means claim the focus even if it
+    bool force)			/* True means claim the focus even if it
 				 * didn't originally belong to topLevelPtr's
 				 * application. */
 {

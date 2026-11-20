@@ -28,10 +28,6 @@ static size_t selectedTabTextIndex;
 static size_t pressedButtonTextIndex;
 static Bool useFakeAccentColor = NO;
 static SystemColorDatum **systemColorIndex;
-#if MAC_OS_X_VERSION_MAX_ALLOWED >= 101400
-static NSAppearance *lightAqua = nil;
-static NSAppearance *darkAqua = nil;
-#endif
 
 static NSColorSpace* sRGB = NULL;
 static const CGFloat WINDOWBACKGROUND[4] =
@@ -48,13 +44,6 @@ static void initColorTable()
     size_t index = 0;
     NSColorList *systemColorList = [NSColorList colorListNamed:@"System"];
     NSString *key;
-
-#if MAC_OS_X_VERSION_MAX_ALLOWED >= 101400
-    if (@available(macOS 10.14, *)) {
-	darkAqua = [NSAppearance appearanceNamed:NSAppearanceNameDarkAqua];
-	lightAqua = [NSAppearance appearanceNamed:NSAppearanceNameAqua];
-    }
-#endif
 
     /*
      * Build a hash table for looking up a color by its name.
@@ -76,15 +65,17 @@ static void initColorTable()
 			   && ![colorName isEqualToString:@"pressedButtonTextColor"]) {
 		    /* Uncomment to print all unsupported colors:              */
 		    /* printf("Unsupported color %s\n", colorName.UTF8String); */
+		    [colorName release];
 		    continue;
 		}
 	    }
-	    entry->selector = [colorName retain];
+	    entry->selector = colorName;
 	}
 	if (newPtr == 0) {
 	    oldEntry = (SystemColorDatum *) Tcl_GetHashValue(hPtr);
 	    entry->index = oldEntry->index;
 	    [oldEntry->selector release];
+	    oldEntry->selector = nil;
 	} else {
 	    entry->index = index++;
 	}
@@ -98,8 +89,6 @@ static void initColorTable()
     for (key in [systemColorList allKeys]) {
 	NSUInteger length = [key lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
 	char *name;
-	entry = (SystemColorDatum *)ckalloc(sizeof(SystemColorDatum));
-	bzero(entry, sizeof(SystemColorDatum));
 	name = (char *)ckalloc(length + 1);
 	strcpy(name, key.UTF8String);
 	name[0] = (char)toupper(UCHAR(name[0]));
@@ -109,8 +98,11 @@ static void initColorTable()
 	     * Avoid black windows on old systems.
 	     */
 
+	    ckfree(name);
 	    continue;
 	}
+	entry = (SystemColorDatum *)ckalloc(sizeof(SystemColorDatum));
+	bzero(entry, sizeof(SystemColorDatum));
 	entry->type=semantic;
 	entry->name = name;
 	entry->selector = [key retain];
@@ -119,6 +111,7 @@ static void initColorTable()
 	    oldEntry = (SystemColorDatum *) Tcl_GetHashValue(hPtr);
 	    entry->index = oldEntry->index;
 	    [oldEntry->selector release];
+	    oldEntry->selector = nil;
 	} else {
 	    entry->index = index++;
 	}
@@ -607,7 +600,9 @@ TkpGetColor(
     TkColor *tkColPtr;
     XColor color;
     Colormap colormap = TK_DYNAMIC_COLORMAP;
+#if MAC_OS_X_VERSION_MAX_ALLOWED >= 101400
     NSView *view = nil;
+#endif
     bool haveValidXColor = false;
     static bool initialized = false;
 
@@ -617,8 +612,10 @@ TkpGetColor(
     }
     if (tkwin) {
 	display = Tk_Display(tkwin);
+#if MAC_OS_X_VERSION_MAX_ALLOWED >= 101400
 	Drawable d = Tk_WindowId(tkwin);
 	view = TkMacOSXGetNSViewForDrawable(d);
+#endif
     }
 
     /*

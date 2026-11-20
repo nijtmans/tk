@@ -560,7 +560,7 @@ static Bool runMenuCommand = true;
 
 	    if (!mePtr || !(mePtr->entryFlags & ENTRY_APPLE_MENU)) {
 		applicationMenuItem = [NSMenuItem itemWithSubmenu:
-			[_defaultApplicationMenu copy]];
+			[[_defaultApplicationMenu copy] autorelease]];
 		[menu insertItem:applicationMenuItem atIndex:0];
 	    }
 	    [menu setSpecial:tkMainMenu];
@@ -568,7 +568,7 @@ static Bool runMenuCommand = true;
 	applicationMenu = (TKMenu *)[applicationMenuItem submenu];
 	if (![applicationMenu isSpecial:tkApplicationMenu]) {
 	    for (NSMenuItem *item in _defaultApplicationMenuItems) {
-		[applicationMenu addItem:[item copy]];
+		[applicationMenu addItem:[[item copy] autorelease]];
 	    }
 	    [applicationMenu setSpecial:tkApplicationMenu];
 	}
@@ -584,7 +584,7 @@ static Bool runMenuCommand = true;
 		    NSInteger index = 0;
 
 		    for (NSMenuItem *i in _defaultWindowsMenuItems) {
-			[submenu insertItem:[i copy] atIndex:index++];
+			[submenu insertItem:[[i copy] autorelease] atIndex:index++];
 		    }
 		    [self setWindowsMenu:submenu];
 		    [submenu setSpecial:tkWindowsMenu];
@@ -593,7 +593,7 @@ static Bool runMenuCommand = true;
 		    NSInteger index = 0;
 
 		    for (NSMenuItem *i in _defaultHelpMenuItems) {
-			[submenu insertItem:[i copy] atIndex:index++];
+			[submenu insertItem:[[i copy] autorelease] atIndex:index++];
 		    }
 		    [submenu setSpecial:tkHelpMenu];
 		}
@@ -1003,26 +1003,33 @@ TkpPostMenu(
 	inPostMenu = false;
 	return result;
     }
-    if (itemIndex >= numItems) {
+
+    /*
+     * The post commands could have deleted the menu, which means we are dead
+     * and should go away.
+     */
+    if (menuPtr->tkwin == NULL) {
+	return TCL_OK;
+    }
+
+	if (itemIndex >= numItems) {
 	itemIndex = numItems - 1;
     }
     if (itemIndex >= 0) {
 	item = [menu itemAtIndex:itemIndex];
     }
 
-    /*
-     * The post commands could have deleted the menu, which means we are dead
-     * and should go away.
-     */
-
-    if (menuPtr->tkwin == NULL) {
-	return TCL_OK;
-    }
-
+#if MAC_OS_X_VERSION_MAX_ALLOWED >= 101400
+    if (@available(macOS 10.14, *)) {
+	[menu popUpMenuPositioningItem:item
+			    atLocation:location
+				inView:nil
+			    appearance:realWinView.effectiveAppearance];
+    } else
+#endif
     [menu popUpMenuPositioningItem:item
 			atLocation:location
-			    inView:nil
-			appearance:realWinView.effectiveAppearance];
+			    inView:nil];
     inPostMenu = false;
     return TCL_OK;
 }
@@ -1164,17 +1171,145 @@ TkpSetWindowMenuBar(
     }
 }
 
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * getMenubarOwner --
+ *
+ *	Finds the toplevel whose menu belongs in the menubar: the key window,
+ *	or else the frontmost visible toplevel that can become key, which is
+ *	normally the one made key next.  If no window can become key, it is
+ *	the main window, as in an application that only shows its menubar.  A
+ *	toplevel being destroyed never qualifies.
+ *
+ * Results:
+ *	The owner, or NULL if no Tk toplevel qualifies.
+ *
+ * Side effects:
+ *	None.
+ *
+ *----------------------------------------------------------------------
+ */
+
+static TkWindow*
+getMenubarOwner(
+    TkWindow *winPtr)	/* Used to identify the application. */
+{
+    NSWindow *keyWindow = [NSApp keyWindow];
+    /* If there is a viable keyWindow, it is the owner. */
+    if (keyWindow) {
+	TkWindow *keyWinPtr = TkMacOSXGetTkWindow(keyWindow);
+	if (keyWinPtr &&
+	    keyWinPtr->wmInfoPtr &&
+	    (keyWinPtr->flags & TK_ALREADY_DEAD) == 0) {
+	return keyWinPtr;
+	}
+    }
+    /* Otherwise, if there is a successor keyWindow, it is the owner. */
+    NSWindow *successor = TkMacOSXGetKeyWindowSuccessor(
+	    Tk_Interp((Tk_Window) winPtr), NULL);
+    if (successor) {
+	return TkMacOSXGetTkWindow(successor);
+    }
+    /* Otherise, the owner is the main window of the application. */
+    TkWindow *mainWinPtr = winPtr->mainPtr->winPtr;
+    if (mainWinPtr && mainWinPtr->wmInfoPtr
+	    && !(mainWinPtr->flags & TK_ALREADY_DEAD)) {
+	return mainWinPtr;
+    }
+    return NULL;
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * TkMacOSXInstallWindowMenubar --
+ *
+ *	Puts the menu of a toplevel into the menubar, or the default menu if
+ *	the toplevel has none, unless that menu is already installed.
+ *
+ * Results:
+ *	None.
+ *
+ * Side effects:
+ *	The menubar may be changed.
+ *
+ *----------------------------------------------------------------------
+ */
+
+void
+TkMacOSXInstallWindowMenubar(
+    TkWindow *winPtr)		/* A toplevel. */
+{
+    WmInfo *wmPtr = winPtr->wmInfoPtr;
+    TKMenu *menu = nil;
+
+    if (wmPtr && wmPtr->menuPtr && wmPtr->menuPtr->mainMenuPtr) {
+	menu = (TKMenu *) wmPtr->menuPtr->platformData;
+    }
+    if (!menu || menu != (TKMenu *) [NSApp mainMenu]) {
+	[NSApp tkSetMainMenu:menu];
+    }
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * TkMacOSXInstallMainMenubar --
+ *
+ *	Puts the menu of the main window of an application into the menubar,
+ *	or the default menu if it has none.  Called when no window can become
+ *	key, so that an application that only shows its menubar keeps it.
+ *
+ * Results:
+ *	None.
+ *
+ * Side effects:
+ *	The menubar may be changed.
+ *
+ *----------------------------------------------------------------------
+ */
+
+void
+TkMacOSXInstallMainMenubar(
+    Tcl_Interp *interp)		/* The application, or NULL for the first
+				 * one. */
+{
+    TkMainInfo *mainPtr;
+
+    for (mainPtr = TkGetMainInfoList(); mainPtr != NULL;
+	    mainPtr = mainPtr->nextPtr) {
+	if (!interp || mainPtr->interp == interp) {
+	    break;
+	}
+    }
+    if (mainPtr && mainPtr->winPtr
+	    && !(mainPtr->winPtr->flags & TK_ALREADY_DEAD)) {
+	TkMacOSXInstallWindowMenubar(mainPtr->winPtr);
+    }
+}
+
 /*
  *----------------------------------------------------------------------
  *
  * Tk_SetMainMenubar --
  *
- *	Puts the menu associated with a window into the menubar. Should only be
- *	called when the window is in front.
+ *      This stub function calls getMenubarOwner to find the correct owner of
+ *      the menubar in the application to which the specified window belongs,
+ *      and intalls the menu associated to the owner as the menubar.  This
+ *      ensures that the menubar is the menu associated to the key window when
+ *      there is a key window, and that When a key window is destroyed the menu
+ *      associated to the next key window is assigned as the menubar.  When the
+ *      application has no key window, the menubar is set to the menu
+ *      associated with the root window of the application, which may be off
+ *      screen.
  *
- *      This is a no-op on all other platforms.  On OS X it installs the
- *      menubar with the specified menuName, if possible.  If the name is NULL
- *      it installs the default menu.
+ *      The name is used to determine which menu is associated with a
+ *      window.  If the name is NULL or cannot be found then the default
+ *      Wish menu is used.
+ *
+ *      This stub is a no-op on other platforms.
  *
  * Results:
  *	None.
@@ -1193,6 +1328,7 @@ Tk_SetMainMenubar(
 {
     TKMenu *menu = nil;
     TkWindow *winPtr = (TkWindow *) tkwin;
+    TkWindow *ownerPtr;
 
     /*
      * We will be called when an embedded window receives an ActivationNotify
@@ -1200,6 +1336,12 @@ Tk_SetMainMenubar(
      */
 
     if (Tk_IsEmbedded(winPtr)) {
+	return;
+    }
+
+    ownerPtr = getMenubarOwner(winPtr);
+    if (ownerPtr && ownerPtr != winPtr) {
+	TkMacOSXInstallWindowMenubar(ownerPtr);
 	return;
     }
 

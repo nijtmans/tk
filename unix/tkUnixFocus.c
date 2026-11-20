@@ -16,7 +16,7 @@
 /*
  *----------------------------------------------------------------------
  *
- * TkpChangeFocus --
+ * TkpChangeFocus_ --
  *
  *	This function is invoked to move the official X focus from one window
  *	to another.
@@ -34,32 +34,36 @@
  *----------------------------------------------------------------------
  */
 
-int
-TkpChangeFocus(
+unsigned long
+TkpChangeFocus_(
     TkWindow *winPtr,		/* Window that is to receive the X focus. */
-    int force)			/* Non-zero means claim the focus even if it
+    bool force)			/* True means claim the focus even if it
 				 * didn't originally belong to topLevelPtr's
 				 * application. */
 {
     TkDisplay *dispPtr = winPtr->dispPtr;
     Tk_ErrorHandler errHandler;
     Window window, root, parent, *children;
-    unsigned int numChildren, serial;
+    unsigned long serial;
+    unsigned int numChildren;
     TkWindow *winPtr2;
     int dummy;
 
     /*
-     * Don't set the X focus to a window that's marked override-redirect.
-     * This is a hack to avoid problems with menus under olvwm: if we move
-     * the focus then the focus can get lost during keyboard traversal.
-     * Fortunately, we don't really need to move the focus for menus: events
-     * will still find their way to the focus window, and menus aren't
-     * decorated anyway so the window manager doesn't need to hear about the
-     * focus change in order to redecorate the menu.
+     * Don't set the X focus to a window that's marked override-redirect,
+     * unless explicitly forced.  This is a hack to avoid problems with menus
+     * under olvwm: if we move the focus then the focus can get lost during
+     * keyboard traversal.  Fortunately, we don't really need to move the
+     * focus for menus: events will still find their way to the focus window,
+     * and menus aren't decorated anyway so the window manager doesn't need
+     * to hear about the focus change in order to redecorate the menu.  But
+     * the window manager never gives the focus to such a window, so
+     * "focus -force" is the only way for an application consisting of
+     * override-redirect windows to receive key events. [Bug a53a902ac6]
      */
 
     serial = 0;
-    if (winPtr->atts.override_redirect) {
+    if (winPtr->atts.override_redirect && !force) {
 	return serial;
     }
 
@@ -80,7 +84,7 @@ TkpChangeFocus(
 	 */
 
 	XGetInputFocus(dispPtr->display, &window, &dummy);
-	while (1) {
+	while (true) {
 	    winPtr2 = (TkWindow *) Tk_IdToWindow(dispPtr->display, window);
 	    if ((winPtr2 != NULL) && (winPtr2->mainPtr == winPtr->mainPtr)) {
 		break;

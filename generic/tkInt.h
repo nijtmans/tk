@@ -126,12 +126,6 @@
 #	define TCL_Z_MODIFIER	""
 #   endif
 #endif /* !TCL_Z_MODIFIER */
-#undef TCL_LL_MODIFIER
-#if defined(_WIN32) && (!defined(__USE_MINGW_ANSI_STDIO) || !__USE_MINGW_ANSI_STDIO)
-#   define TCL_LL_MODIFIER	"I64"
-#else
-#   define TCL_LL_MODIFIER	"ll"
-#endif
 
 #if !defined(TCL_SIZE_MODIFIER)
 #   define TCL_SIZE_MODIFIER ""
@@ -1204,6 +1198,8 @@ MODULE_SCOPE Tcl_ObjCmdProc Tk_LabelframeObjCmd;
 MODULE_SCOPE Tcl_ObjCmdProc Tk_ListboxObjCmd;
 MODULE_SCOPE Tcl_ObjCmdProc Tk_LowerObjCmd;
 MODULE_SCOPE Tcl_ObjCmdProc Tk_MenuObjCmd;
+MODULE_SCOPE bool	TkMenubarCloneMissing(Tcl_Interp *interp, Tk_Window tkwin,
+			    const char *menuName);
 MODULE_SCOPE Tcl_ObjCmdProc Tk_MenubuttonObjCmd;
 MODULE_SCOPE Tcl_ObjCmdProc Tk_MessageBoxObjCmd;
 MODULE_SCOPE Tcl_ObjCmdProc Tk_MessageObjCmd;
@@ -1232,7 +1228,9 @@ MODULE_SCOPE void	TkFreeGeometryContainer(Tk_Window tkwin,
 
 MODULE_SCOPE void	TkRegisterObjTypes(void);
 MODULE_SCOPE void	TkRecordDeletedWindow(TkDisplay *dispPtr, Window window);
+MODULE_SCOPE void	TkPointerClearButtons(void);
 MODULE_SCOPE Tcl_ObjCmdProc TkDeadAppObjCmd;
+MODULE_SCOPE Tcl_ObjCmdProc TkStartEndOfClusterCmd;
 MODULE_SCOPE int	TkCanvasGetCoordObj(Tcl_Interp *interp,
 			    Tk_Canvas canvas, Tcl_Obj *obj,
 			    double *doublePtr);
@@ -1279,6 +1277,7 @@ MODULE_SCOPE void	TkpMakeTransparentWindowExist(Tk_Window tkwin,
 MODULE_SCOPE void	TkpCreateBusy(Tk_FakeWin *winPtr, Tk_Window tkRef,
 			    Window *parentPtr, Tk_Window tkParent,
 			    TkBusy busy);
+MODULE_SCOPE unsigned long	TkpChangeFocus_(TkWindow *winPtr, bool force);
 MODULE_SCOPE int	TkBackgroundEvalObjv(Tcl_Interp *interp,
 			    Tcl_Size objc, Tcl_Obj *const *objv, int flags);
 MODULE_SCOPE void	TkDrawDottedRect(Display *disp, Drawable d, GC gc,

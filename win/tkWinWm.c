@@ -1547,7 +1547,7 @@ ReadIconOrCursorFromFile(
 
 	dwBytesRead = Tcl_Read(channel, (char *)lpIR->IconImages[i].lpBits,
 		lpIDE[i].dwBytesInRes);
-	if (dwBytesRead != lpIDE[i].dwBytesInRes) {
+	if (dwBytesRead != (Tcl_Size)lpIDE[i].dwBytesInRes) {
 	    Tcl_SetObjResult(interp, Tcl_ObjPrintf(
 		    "error reading file: %s", Tcl_PosixError(interp)));
 	    goto readError;
@@ -2190,6 +2190,9 @@ UpdateWrapper(
 	wmPtr->flags |= WM_SYNC_PENDING;
 	SetMenu(wmPtr->wrapper, wmPtr->hMenu);
 	wmPtr->flags &= ~WM_SYNC_PENDING;
+	if (oldWrapper != NULL) {
+	    Tk_WinMenuWrapperChanged(wmPtr->hMenu);
+	}
     }
 
     if (childStateInfo) {
@@ -2305,12 +2308,14 @@ TkWmMapWindow(
 
     if (wmPtr->flags & WM_NEVER_MAPPED) {
 	/*
-	 * Don't map a transient if the container is not mapped.
+	 * Don't map a transient if the container is not mapped, but create
+	 * its wrapper withdrawn, so that a later "wm deiconify" can map it.
+	 * [Bug 562c3a3da5]
 	 */
 
 	if (wmPtr->containerPtr != NULL && !Tk_IsMapped(wmPtr->containerPtr)) {
 	    wmPtr->hints.initial_state = WithdrawnState;
-	    return;
+	    Tk_MakeWindowExist((Tk_Window) wmPtr->containerPtr);
 	}
     } else {
 	if (wmPtr->hints.initial_state == WithdrawnState) {
@@ -2529,7 +2534,7 @@ static void CheckForPointer(TkWindow *winPtr)
 
     POINT mouse;
     int x, y;
-    unsigned int state = TkWinGetModifierState();
+    unsigned int state = TkWinGetPointerState();
     TkWindow **windows = TkWmStackorderToplevel(winPtr->mainPtr->winPtr);
     TkWindow **w;
     TkGetPointerCoords(NULL, &x, &y);
@@ -2538,11 +2543,13 @@ static void CheckForPointer(TkWindow *winPtr)
     if (windows != NULL) {
 	for (w = windows; *w ; w++) {
 	    RECT windowRect;
-	    HWND hwnd = Tk_GetHWND(Tk_WindowId((Tk_Window) *w));
-	    if (GetWindowRect(hwnd, &windowRect) == 0) {
+	    Window window = Tk_WindowId((Tk_Window) *w);
+
+	    if ((winPtr == *w) || (window == None)
+		    || (GetWindowRect(Tk_GetHWND(window), &windowRect) == 0)) {
 		continue;
 	    }
-	    if (winPtr != *w && PtInRect(&windowRect, mouse)) {
+	    if (PtInRect(&windowRect, mouse)) {
 		Tk_Window target = Tk_CoordsToWindow(x, y, (Tk_Window) *w);
 		Tk_UpdatePointer((Tk_Window) target, x, y, state);
 		break;
@@ -3640,13 +3647,24 @@ WmFocusmodelCmd(
 
 static int
 WmForgetCmd(
-    TCL_UNUSED(Tk_Window),	/* Main window of the application. */
+    Tk_Window mainWin,	/* Main window of the application. */
     TkWindow *winPtr,		/* Toplevel or Frame to work with */
-    TCL_UNUSED(Tcl_Interp *),		/* Current interpreter. */
+    Tcl_Interp *interp,		/* Current interpreter. */
     TCL_UNUSED(Tcl_Size),		/* Number of arguments. */
     TCL_UNUSED(Tcl_Obj *const *))	/* Argument objects. */
 {
     Tk_Window frameWin = (Tk_Window) winPtr;
+
+    /*
+     * Tk ticket 9ab6e37e: forget "." not allowed
+     */
+
+    if (frameWin == mainWin) {
+	Tcl_SetObjResult(interp, Tcl_NewStringObj(
+		"window \".\" can not be forgotten", TCL_INDEX_NONE));
+	Tcl_SetErrorCode(interp, "TK", "WM", "FORGET", ".", NULL);
+	return TCL_ERROR;
+    }
 
     /*
      * Tk ticket c77b426d: avoid panic on usage after wm forget
@@ -3747,7 +3765,7 @@ WmGeometryCmd(
 {
     WmInfo *wmPtr = winPtr->wmInfoPtr;
     char xSign, ySign;
-    int width, height;
+    int x, y, width, height;
     const char *argv3;
 
     if ((objc != 3) && (objc != 4)) {
@@ -3758,6 +3776,8 @@ WmGeometryCmd(
     if (objc == 3) {
 	xSign = (wmPtr->flags & WM_NEGATIVE_X) ? '-' : '+';
 	ySign = (wmPtr->flags & WM_NEGATIVE_Y) ? '-' : '+';
+	x = wmPtr->x;
+	y = wmPtr->y;
 	if (wmPtr->gridWin != NULL) {
 	    width = wmPtr->reqGridWidth + (winPtr->changes.width
 		    - winPtr->reqWidth)/wmPtr->widthInc;
@@ -3770,11 +3790,36 @@ WmGeometryCmd(
 	if (winPtr->flags & TK_EMBEDDED) {
 	    int result = SendMessageW(wmPtr->wrapper, TK_MOVEWINDOW, -1, -1);
 
-	    wmPtr->x = result >> 16;
-	    wmPtr->y = result & 0x0000ffff;
+	    x = wmPtr->x = result >> 16;
+	    y = wmPtr->y = result & 0x0000ffff;
+	} else {
+	    int zoomed = (wmPtr->hints.initial_state == ZoomState);
+
+	    if (wmPtr->hints.initial_state == IconicState
+		    && wmPtr->wrapper != NULL) {
+		/*
+		 * An iconified window which will be restored zoomed.
+		 */
+
+		WINDOWPLACEMENT placement;
+
+		placement.length = sizeof(WINDOWPLACEMENT);
+		zoomed = GetWindowPlacement(wmPtr->wrapper, &placement)
+			&& (placement.flags & WPF_RESTORETOMAXIMIZED);
+	    }
+	    if (zoomed) {
+		/*
+		 * wmPtr->x and wmPtr->y keep the position of the restored
+		 * window, report the actual position of the zoomed one.
+		 */
+
+		xSign = ySign = '+';
+		x = winPtr->changes.x;
+		y = winPtr->changes.y;
+	    }
 	}
 	Tcl_SetObjResult(interp, Tcl_ObjPrintf("%dx%d%c%d%c%d",
-		width, height, xSign, wmPtr->x, ySign, wmPtr->y));
+		width, height, xSign, x, ySign, y));
 	return TCL_OK;
     }
 
@@ -4130,6 +4175,8 @@ WmIconbitmapCmd(
 	    return TCL_ERROR;
 	}
     } else {
+	Pixmap pixmap = None;
+
 	/*
 	 * In the future this block of code will use Tk's 'image'
 	 * functionality to allow all supported image formats. However, this
@@ -4172,15 +4219,11 @@ WmIconbitmapCmd(
 	     * placed in the interpreter.
 	     */
 
-	    Pixmap pixmap;
-
 	    Tcl_ResetResult(interp);
 	    pixmap = Tk_GetBitmap(interp, (Tk_Window) winPtr, string);
 	    if (pixmap == None) {
 		return TCL_ERROR;
 	    }
-	    wmPtr->hints.icon_pixmap = pixmap;
-	    wmPtr->hints.flags |= IconPixmapHint;
 	    titlebaricon = GetIconFromPixmap(Tk_Display(winPtr), pixmap);
 	    if (titlebaricon != NULL && WinSetIcon(interp, titlebaricon,
 		    (Tk_Window) useWinPtr) != TCL_OK) {
@@ -4191,6 +4234,14 @@ WmIconbitmapCmd(
 		DecrIconRefCount(titlebaricon);
 		titlebaricon = NULL;
 	    }
+	}
+	if (wmPtr->hints.icon_pixmap != None) {
+	    Tk_FreeBitmap(winPtr->display, wmPtr->hints.icon_pixmap);
+	}
+	wmPtr->hints.icon_pixmap = pixmap;
+	wmPtr->hints.flags &= ~IconPixmapHint;
+	if (pixmap != None) {
+	    wmPtr->hints.flags |= IconPixmapHint;
 	}
     }
     return TCL_OK;
@@ -4305,16 +4356,19 @@ WmIconmaskCmd(
     }
     argv3 = Tcl_GetString(objv[3]);
     if (*argv3 == '\0') {
-	if (wmPtr->hints.icon_mask != None) {
-	    Tk_FreeBitmap(winPtr->display, wmPtr->hints.icon_mask);
-	}
-	wmPtr->hints.flags &= ~IconMaskHint;
+	pixmap = None;
     } else {
 	pixmap = Tk_GetBitmap(interp, tkwin, argv3);
 	if (pixmap == None) {
 	    return TCL_ERROR;
 	}
-	wmPtr->hints.icon_mask = pixmap;
+    }
+    if (wmPtr->hints.icon_mask != None) {
+	Tk_FreeBitmap(winPtr->display, wmPtr->hints.icon_mask);
+    }
+    wmPtr->hints.icon_mask = pixmap;
+    wmPtr->hints.flags &= ~IconMaskHint;
+    if (pixmap != None) {
 	wmPtr->hints.flags |= IconMaskHint;
     }
     return TCL_OK;
@@ -6838,6 +6892,18 @@ TkWmStackorderToplevel(
 	    (LPARAM) &pair) == 0) {
 	ckfree(windows);
 	windows = NULL;
+    } else {
+	/*
+	 * Not all toplevels may have been found (e.g. one being destroyed).
+	 * Move the found ones to the beginning of the array. [Bug 7f05a19378]
+	 */
+
+	Tcl_Size found = (windows + table.numEntries) - (pair.windowPtr + 1);
+
+	if (found < table.numEntries) {
+	    memmove(windows, pair.windowPtr + 1,
+		    (found + 1) * sizeof(TkWindow *));
+	}
     }
 
   done:
@@ -7228,6 +7294,26 @@ ConfigureTopLevel(
 	return;
     }
 
+
+    /*
+     * The position and size in pos are not valid if SWP_NOMOVE or SWP_NOSIZE
+     * is set (e.g. in the last message of Aero Shake), use the actual ones.
+     * [Bug 90f5cd3f21]
+     */
+
+    if (pos->flags & (SWP_NOMOVE | SWP_NOSIZE)) {
+	RECT winRect;
+
+	GetWindowRect(wmPtr->wrapper, &winRect);
+	if (pos->flags & SWP_NOMOVE) {
+	    pos->x = winRect.left;
+	    pos->y = winRect.top;
+	}
+	if (pos->flags & SWP_NOSIZE) {
+	    pos->cx = winRect.right - winRect.left;
+	    pos->cy = winRect.bottom - winRect.top;
+	}
+    }
 
     /*
      * Compute the current geometry of the client area, reshape the Tk window
@@ -7748,7 +7834,7 @@ GetMinSize(
  *	The values at *maxWidthPtr and *maxHeightPtr are filled in with the
  *	maximum allowable dimensions of wmPtr's window, in grid units. If no
  *	maximum has been specified for the window, then this function computes
- *	the largest sizes that will fit on the screen.
+ *	the largest sizes that will fit in the work area.
  *
  * Side effects:
  *	None.
@@ -7765,17 +7851,29 @@ GetMaxSize(
     int *maxHeightPtr)		/* Where to store the current maximum height
 				 * of the window. */
 {
-    int tmp;
+    int tmp, width = wmPtr->defMaxWidth, height = wmPtr->defMaxHeight;
 
+    /*
+     * The default fills up the work area of the monitor (the display without
+     * the taskbar), leaving space for the window's decorations.
+     */
+
+    if (wmPtr->maxWidth <= 0 || wmPtr->maxHeight <= 0) {
+	POINT origin = {0, 0};
+	MONITORINFO mi;
+
+	mi.cbSize = sizeof(mi);
+	if (GetMonitorInfoW(wmPtr->wrapper != NULL
+		? MonitorFromWindow(wmPtr->wrapper, MONITOR_DEFAULTTONEAREST)
+		: MonitorFromPoint(origin, MONITOR_DEFAULTTOPRIMARY), &mi)) {
+	    width = mi.rcWork.right - mi.rcWork.left;
+	    height = mi.rcWork.bottom - mi.rcWork.top;
+	}
+    }
     if (wmPtr->maxWidth > 0) {
 	*maxWidthPtr = wmPtr->maxWidth;
     } else {
-	/*
-	 * Must compute a default width. Fill up the display, leaving a bit of
-	 * extra space for the window manager's borders.
-	 */
-
-	tmp = wmPtr->defMaxWidth - wmPtr->borderWidth;
+	tmp = width - wmPtr->borderWidth;
 	if (wmPtr->gridWin != NULL) {
 	    /*
 	     * Gridding is turned on; convert from pixels to grid units.
@@ -7789,7 +7887,7 @@ GetMaxSize(
     if (wmPtr->maxHeight > 0) {
 	*maxHeightPtr = wmPtr->maxHeight;
     } else {
-	tmp = wmPtr->defMaxHeight - wmPtr->borderHeight;
+	tmp = height - wmPtr->borderHeight;
 	if (wmPtr->gridWin != NULL) {
 	    tmp = wmPtr->reqGridHeight
 		    + (tmp - wmPtr->winPtr->reqHeight)/wmPtr->heightInc;
@@ -8004,6 +8102,25 @@ WmProc(
 	result = 0;
 	goto done;
 
+    case WM_NCLBUTTONDOWN:
+    case WM_NCLBUTTONDBLCLK:
+    case WM_NCMBUTTONDOWN:
+    case WM_NCMBUTTONDBLCLK:
+    case WM_NCRBUTTONDOWN:
+    case WM_NCRBUTTONDBLCLK:
+    case WM_NCXBUTTONDOWN:
+    case WM_NCXBUTTONDBLCLK:
+	/*
+	 * A button pressed in the non-client area can still be down after
+	 * the default processing if a double-click on the title bar has
+	 * maximized or closed the window. Do not report it to the Tk window
+	 * which is now under the pointer. [Bug 1391053]
+	 */
+
+	result = DefWindowProcW(hwnd, message, wParam, lParam);
+	TkWinNonClientButtons(TkWinGetModifierState());
+	goto done;
+
     case WM_NCHITTEST: {
 	winPtr = GetTopLevel(hwnd);
 	if (winPtr && (TkGrabState(winPtr) == TK_GRAB_EXCLUDED)) {
@@ -8215,6 +8332,13 @@ TkWinGetWrapperWindow(
 {
     TkWindow *winPtr = (TkWindow *) tkwin;
 
+    /*
+     * Could be a Frame (i.e. not a Toplevel), e.g. after [wm forget].
+     */
+
+    if (winPtr->wmInfoPtr == NULL) {
+	return NULL;
+    }
     return winPtr->wmInfoPtr->wrapper;
 }
 

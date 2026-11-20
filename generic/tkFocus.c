@@ -555,7 +555,6 @@ TkSetFocusWin(
     ToplevelFocusInfo *tlFocusPtr;
     DisplayFocusInfo *displayFocusPtr;
     TkWindow *topLevelPtr, *wrapperPtr;
-    int allMapped, serial;
 
     /*
      * Don't set focus if window is already dead. [Bug 3574708]
@@ -588,7 +587,7 @@ TkSetFocusWin(
      * mapped.
      */
 
-    allMapped = 1;
+    bool allMapped = true;
     for (topLevelPtr = winPtr; ; topLevelPtr = topLevelPtr->parentPtr) {
 	if (topLevelPtr == NULL) {
 
@@ -600,7 +599,7 @@ TkSetFocusWin(
 	    return;
 	}
 	if (!(topLevelPtr->flags & TK_MAPPED)) {
-	    allMapped = 0;
+	    allMapped = false;
 	}
 	if (topLevelPtr->flags & TK_TOP_HIERARCHY) {
 	    break;
@@ -654,7 +653,7 @@ TkSetFocusWin(
 	 */
 
 	TkpClaimFocus(topLevelPtr, force);
-    } else if ((displayFocusPtr->focusWinPtr != NULL) || force) {
+    } else if ((displayFocusPtr->focusWinPtr != NULL) || (force & 1)) {
 
 	/*
 	 * If we are forcing removal of focus from a container hosting a
@@ -681,7 +680,7 @@ TkSetFocusWin(
 	if (wrapperPtr == NULL) {
 	    wrapperPtr = topLevelPtr;
 	}
-	serial = TkpChangeFocus(wrapperPtr, force);
+	unsigned long serial = TkpChangeFocus_(wrapperPtr, force & 1);
 	if (serial != 0) {
 	    displayFocusPtr->focusSerial = serial;
 	}
@@ -690,7 +689,13 @@ TkSetFocusWin(
 	winPtr->dispPtr->focusPtr = winPtr;
     }
 }
-
+
+/* deprecated, not used any more */
+int TkpChangeFocus(TkWindow *winPtr, int force)
+{
+    return (int)TkpChangeFocus_(winPtr, force & 1);
+}
+
 /*
  *----------------------------------------------------------------------
  *

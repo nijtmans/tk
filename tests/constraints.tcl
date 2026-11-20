@@ -184,18 +184,27 @@ testConstraint nonUnixUserInteraction [expr {
 
 testConstraint deprecated [expr {![::tk::build-info no-deprecate]}]
 
+# a test that must be run by the installed wish, not by the tktest executable
+
+testConstraint useInstalledWish [expr {
+    "useInstalledWish" in [tcltest::configure -constraints]
+}]
+
 # constraints for testing facilities defined in the tktest executable
 testConstraint testbitmap      [llength [info commands testbitmap]]
 testConstraint testborder      [llength [info commands testborder]]
 testConstraint testcbind       [llength [info commands testcbind]]
+testConstraint testalignimagedata [llength [info commands testalignimagedata]]
 testConstraint testclipboard   [llength [info commands testclipboard]]
 testConstraint testcolor       [llength [info commands testcolor]]
 testConstraint testcursor      [llength [info commands testcursor]]
 testConstraint testembed       [llength [info commands testembed]]
 testConstraint testfont        [llength [info commands testfont]]
+testConstraint testgetwindowinfo [llength [info commands testgetwindowinfo]]
 testConstraint testImageType   [expr {"test" in [image types]}]
 testConstraint testmakeexist   [llength [info commands testmakeexist]]
 testConstraint testmenubar     [llength [info commands testmenubar]]
+testConstraint testmenubaritems [llength [info commands testmenubaritems]]
 testConstraint testmetrics     [llength [info commands testmetrics]]
 testConstraint testmovemouse   [llength [info commands testmovemouse]]
 testConstraint testobjconfig   [llength [info commands testobjconfig]]
@@ -205,7 +214,9 @@ testConstraint testsend        [llength [info commands testsend]]
 testConstraint testsendinput   [llength [info commands testsendinput]]
 testConstraint testsetlocale   [llength [info commands testsetlocale]]
 testConstraint testtext        [llength [info commands testtext]]
+testConstraint testforeignwindow [llength [info commands testforeignwindow]]
 testConstraint testwinevent    [llength [info commands testwinevent]]
+testConstraint testwindowposchanged [llength [info commands testwindowposchanged]]
 testConstraint testwrapper     [llength [info commands testwrapper]]
 testConstraint testxfocus      [llength [info commands testxfocus]]
 

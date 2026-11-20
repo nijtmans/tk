@@ -368,6 +368,7 @@ be managed by \fBwm\fR.  Windows created with the \fBtoplevel\fR
 command will be treated like \fBframe\fR windows once they are no
 longer managed by \fBwm\fR, however, the \fB\-menu\fR configuration will be
 remembered and the menus will return once the widget is managed again.
+If \fIwindow\fR is ".", an error is raised.
 .\" METHOD: frame
 .TP
 \fBwm frame \fIwindow\fR
@@ -655,7 +656,9 @@ If \fIwidth\fR and \fIheight\fR are
 specified, then the command returns an empty string.  Otherwise
 it returns a Tcl list with two elements, which are the
 maximum width and height currently in effect.
-The maximum size defaults to the size of the screen.
+The maximum size defaults to the size of the work area of the screen (the
+screen without the taskbar, panels or the Dock), less the window's
+decorations.
 See the sections on geometry management below for more information.
 .\" METHOD: minsize
 .TP
@@ -688,6 +691,10 @@ that the window will not be reparented from the root window into a
 decorative frame and the user will not be able to manipulate the
 window using the normal window manager mechanisms.
 .RS
+.PP
+The window manager will not give the keyboard focus to such a window
+either; on X11 an application that needs key events in it has to claim the
+focus with \fBfocus \-force\fR.
 .PP
 Note that the override-redirect flag is only guaranteed to be taken notice of
 when the window is first mapped or when mapped after the state is changed from

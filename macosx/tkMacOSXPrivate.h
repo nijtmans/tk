@@ -223,8 +223,7 @@ typedef struct TkMacOSXDrawingContext {
  */
 
 MODULE_SCOPE HIShapeRef	TkMacOSXGetNativeRegion(Region r);
-MODULE_SCOPE void	TkMacOSXSetWithNativeRegion(Region r,
-			    HIShapeRef rgn);
+MODULE_SCOPE void	TkMacOSXSetWithNativeRegion(Region r, HIShapeRef rgn);
 MODULE_SCOPE OSStatus	TkMacOSHIShapeDifferenceWithRect(
 			    HIMutableShapeRef inShape, const CGRect *inRect);
 MODULE_SCOPE int	TkMacOSXCountRectsInRegion(HIShapeRef shape);
@@ -289,8 +288,13 @@ MODULE_SCOPE int MacSystrayInit(Tcl_Interp *);
 MODULE_SCOPE int MacPrint_Init(Tcl_Interp *);
 MODULE_SCOPE NSString*  TkMacOSXOSTypeToUTI(OSType ostype);
 MODULE_SCOPE NSImage*   TkMacOSXIconForFileType(NSString *filetype);
+MODULE_SCOPE NSWindow*  TkMacOSXGetKeyWindowSuccessor(
+			     Tcl_Interp *interp, NSWindow *w);
 MODULE_SCOPE void TkMacOSXAssignNewKeyWindow(Tcl_Interp *interp,
 					     NSWindow *ignore);
+MODULE_SCOPE void TkMacOSXInstallWindowMenubar(TkWindow *winPtr);
+MODULE_SCOPE void TkMacOSXInstallMainMenubar(Tcl_Interp *interp);
+MODULE_SCOPE int TkMacOSXAccessibility_Init(Tcl_Interp *interp);
 
 #pragma mark Private Objective-C Classes
 
@@ -339,6 +343,7 @@ VISIBILITY_HIDDEN
 @end
 @interface TKApplication(TKInit)
 - (NSString *)tkFrameworkImagePath:(NSString*)image;
+- (void)_clearEventInterp;
 - (void)_resetAutoreleasePool;
 - (void)_lockAutoreleasePool;
 - (void)_unlockAutoreleasePool;
@@ -407,7 +412,6 @@ VISIBILITY_HIDDEN
 {
 @private
     NSString *privateWorkingText;
-    NSTrackingArea *trackingArea;
 }
 @property CGContextRef tkLayerBitmapContext;
 @property Bool onScreen;
@@ -466,6 +470,7 @@ VISIBILITY_HIDDEN
 - (NSMenuItem *)itemInSupermenu;
 @end
 
+#if MAC_OS_X_VERSION_MAX_ALLOWED >= 101400
 // Need undocumented appearance: argument
 @interface NSMenu(TKMenu)
 - (BOOL)popUpMenuPositioningItem:(NSMenuItem *)item
@@ -473,6 +478,7 @@ VISIBILITY_HIDDEN
 			  inView:(NSView *)view
 		      appearance:(NSAppearance *)appearance;
 @end
+#endif
 
 @interface NSMenuItem(TKUtils)
 + (id)itemWithSubmenu:(NSMenu *)submenu;

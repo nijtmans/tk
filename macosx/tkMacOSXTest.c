@@ -24,6 +24,7 @@ static Tcl_ObjCmdProc TestpressbuttonObjCmd;
 static Tcl_ObjCmdProc TestmovemouseObjCmd;
 static Tcl_ObjCmdProc TestinjectkeyeventObjCmd;
 static Tcl_ObjCmdProc TestmenubarheightObjCmd;
+static Tcl_ObjCmdProc2 TestmenubaritemsObjCmd;
 
 
 /*
@@ -61,6 +62,7 @@ TkplatformtestInit(
     Tcl_CreateObjCommand(interp, "testmovemouse", TestmovemouseObjCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "testinjectkeyevent", TestinjectkeyeventObjCmd, NULL, NULL);
     Tcl_CreateObjCommand(interp, "testmenubarheight", TestmenubarheightObjCmd, NULL, NULL);
+    Tcl_CreateObjCommand2(interp, "testmenubaritems", TestmenubaritemsObjCmd, NULL, NULL);
     return TCL_OK;
 }
 
@@ -96,6 +98,43 @@ TestmenubarheightObjCmd(
     Tcl_SetObjResult(interp, Tcl_NewWideIntObj(height));
     return TCL_OK;
 }
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * TestmenubaritemsObjCmd --
+ *
+ *	Returns the titles of the items of the menubar, without the
+ *	application menu, so that tests can tell which menu is installed.
+ *
+ * Results:
+ *	A standard Tcl result.
+ *
+ * Side effects:
+ *	None.
+ *
+ *----------------------------------------------------------------------
+ */
+
+static int
+TestmenubaritemsObjCmd(
+    TCL_UNUSED(void *),		/* Not used. */
+    Tcl_Interp *interp,		/* Current interpreter. */
+    TCL_UNUSED(Tcl_Size),		/* Not used. */
+    TCL_UNUSED(Tcl_Obj *const *))	/* Not used. */
+{
+    NSArray *items = [[NSApp mainMenu] itemArray];
+    Tcl_Obj *result = Tcl_NewListObj(0, NULL);
+
+    for (NSUInteger i = 1; i < [items count]; i++) {
+	NSString *title = [(NSMenuItem *)[items objectAtIndex:i] title];
+
+	Tcl_ListObjAppendElement(NULL, result,
+		Tcl_NewStringObj([title UTF8String], TCL_INDEX_NONE));
+    }
+    Tcl_SetObjResult(interp, result);
+    return TCL_OK;
+}
 
 /*
  *----------------------------------------------------------------------
@@ -124,6 +163,88 @@ TkTestLogDisplay(
 {
     (void) drawable;
     return True;
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * TkpReadPixelSRGB --
+ *
+ *	Read one pixel from a window and convert it from the display's color
+ *	profile to sRGB.  macOS composites windows through the display profile,
+ *	so a raw read-back differs from the sRGB color values that were drawn;
+ *	this returns the drawn values, matching what X11 and Windows read back.
+ *	Used only by the "testpixel" test command.
+ *
+ * Results:
+ *	TCL_OK with the sRGB channels in *r, *g, *b, or TCL_ERROR if the pixel
+ *	could not be read.
+ *
+ *----------------------------------------------------------------------
+ */
+
+int
+TkpReadPixelSRGB(
+    Tk_Window tkwin,
+    int x,
+    int y,
+    unsigned char *r,
+    unsigned char *g,
+    unsigned char *b)
+{
+    Drawable d = Tk_WindowId(tkwin);
+    XImage *image = XGetImage(Tk_Display(tkwin), d, x, y, 1, 1,
+	    AllPlanes, ZPixmap);
+    NSWindow *win = TkMacOSXGetNSWindowForDrawable(d);
+    NSNumber *screenNumber = [[[win screen] deviceDescription]
+	    objectForKey:@"NSScreenNumber"];
+    CGColorSpaceRef displaySpace = screenNumber ?
+	    CGDisplayCopyColorSpace([screenNumber unsignedIntValue]) : NULL;
+    CGColorSpaceRef srgb = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+    unsigned long pixel;
+    CGFloat comps[4], cr, cg, cb;
+    CGColorRef src, dst;
+    const CGFloat *out;
+
+    if (!image || !displaySpace || !srgb) {
+	if (image) XDestroyImage(image);
+	if (displaySpace) CGColorSpaceRelease(displaySpace);
+	if (srgb) CGColorSpaceRelease(srgb);
+	return TCL_ERROR;
+    }
+
+    /*
+     * The captured pixel is in the window's display profile.  Wrap it in a
+     * CGColor tagged with that profile and match it to sRGB, the space the
+     * drawn color values were specified in.  (macOS XGetImage returns a 32bpp
+     * image with R, G, B in bits 16, 8, 0.)
+     */
+
+    pixel = XGetPixel(image, 0, 0);
+    comps[0] = ((pixel & image->red_mask)   >> 16) / 255.0;
+    comps[1] = ((pixel & image->green_mask) >>  8) / 255.0;
+    comps[2] =  (pixel & image->blue_mask)         / 255.0;
+    comps[3] = 1.0;
+    XDestroyImage(image);
+
+    src = CGColorCreate(displaySpace, comps);
+    dst = CGColorCreateCopyByMatchingToColorSpace(srgb,
+	    kCGRenderingIntentDefault, src, NULL);
+    out = dst ? CGColorGetComponents(dst) : NULL;
+    if (out) {
+	cr = out[0] < 0.0 ? 0.0 : (out[0] > 1.0 ? 1.0 : out[0]);
+	cg = out[1] < 0.0 ? 0.0 : (out[1] > 1.0 ? 1.0 : out[1]);
+	cb = out[2] < 0.0 ? 0.0 : (out[2] > 1.0 ? 1.0 : out[2]);
+	*r = (unsigned char) (cr * 255.0 + 0.5);
+	*g = (unsigned char) (cg * 255.0 + 0.5);
+	*b = (unsigned char) (cb * 255.0 + 0.5);
+    }
+
+    if (src) CGColorRelease(src);
+    if (dst) CGColorRelease(dst);
+    CGColorSpaceRelease(displaySpace);
+    CGColorSpaceRelease(srgb);
+    return out ? TCL_OK : TCL_ERROR;
 }
 
 /*
@@ -384,7 +505,7 @@ TestinjectkeyeventObjCmd(
     }
     if (type != NSFlagsChanged) {
 	UniChar keychar = macKC.v.keychar;
-	chars = [[NSString alloc] initWithCharacters: &keychar length:1];
+	chars = [NSString stringWithCharacters: &keychar length:1];
 	upper = [chars uppercaseString];
 	lower = [chars lowercaseString];
 	if (![upper isEqual: lower] && [chars isEqual: upper]) {

@@ -247,11 +247,6 @@ GetNewID(
 	    curID = 1;
 	}
 
-	/* Return error when we've checked all IDs without success. */
-	if (curID == tsdPtr->lastCommandID) {
-	    return TCL_ERROR;
-	}
-
 	commandEntryPtr = Tcl_CreateHashEntry(&tsdPtr->commandTable,
 		INT2PTR(curID), &isNew);
 	if (isNew) {
@@ -259,6 +254,15 @@ GetNewID(
 	    *menuIDPtr = curID;
 	    tsdPtr->lastCommandID = curID;
 	    return TCL_OK;
+	}
+
+	/*
+	 * Return error when we've checked all IDs, including the last
+	 * allocated one, without success.
+	 */
+
+	if (curID == tsdPtr->lastCommandID) {
+	    return TCL_ERROR;
 	}
     }
 }
@@ -675,9 +679,7 @@ ReconfigureWindowsMenu(
 		    itemID = PTR2INT(childMenuHdl);
 		}
 	    }
-	    if ((menuPtr->menuType == MENUBAR)
-		    && !(mePtr->childMenuRefPtr->menuPtr->menuFlags
-			    & MENU_SYSTEM_MENU)) {
+	    if (menuPtr->menuType == MENUBAR) {
 		Tcl_DString ds;
 		TkMenuReferences *menuRefPtr;
 		TkMenu *systemMenuPtr = mePtr->childMenuRefPtr->menuPtr;
@@ -700,13 +702,24 @@ ReconfigureWindowsMenu(
 		    HMENU systemMenuHdl = (HMENU) systemMenuPtr->platformData;
 		    HWND wrapper = TkWinGetWrapperWindow(menuPtr
 			    ->parentTopLevelPtr);
+		    HMENU wrapperSystemMenuHdl = (wrapper != NULL)
+			    ? GetSystemMenu(wrapper, FALSE) : NULL;
 
-		    if (wrapper != NULL) {
-			DestroyMenu(systemMenuHdl);
-			systemMenuHdl = GetSystemMenu(wrapper, FALSE);
+		    /*
+		     * Bind the menu to the system menu of the wrapper window
+		     * of the toplevel. The wrapper may have been recreated
+		     * since the last time, e.g. by "wm overrideredirect", so
+		     * this may be a different system menu. [Bug 220781]
+		     */
+
+		    if ((wrapperSystemMenuHdl != NULL)
+			    && (systemMenuHdl != wrapperSystemMenuHdl)) {
+			if (!(systemMenuPtr->menuFlags & MENU_SYSTEM_MENU)) {
+			    DestroyMenu(systemMenuHdl);
+			}
 			systemMenuPtr->menuFlags |= MENU_SYSTEM_MENU;
 			systemMenuPtr->platformData =
-				(TkMenuPlatformData) systemMenuHdl;
+				(TkMenuPlatformData) wrapperSystemMenuHdl;
 			ScheduleMenuReconfigure(systemMenuPtr);
 		    }
 		}
@@ -835,10 +848,21 @@ TkpPostMenu(
 	}
     }
 
+    /*
+     * The menu has the mouse while it is tracked, so Tk windows must not
+     * receive pointer events meanwhile, and the release of the button which
+     * posted the menu is consumed by the menu, as on X11. [Bug 869305]
+     */
+
+    TkWinSuspendPointer(1);
     TrackPopupMenu(winMenuHdl, flags, x, y, 0,
 	    tsdPtr->menuHWND, &noGoawayRect);
+    TkWinSuspendPointer(0);
     Tcl_SetServiceMode(oldServiceMode);
 
+    if (!(TkWinGetModifierState() & ALL_BUTTONS)) {
+	TkPointerClearButtons();
+    }
     GetCursorPos(&point);
     TkWinPointerEvent(NULL, point.x, point.y);
 
@@ -973,6 +997,9 @@ TkpMenuNewEntry(
     TkMenu *menuPtr = mePtr->menuPtr;
 
     if (GetNewID(mePtr, &commandID) != TCL_OK) {
+	Tcl_SetObjResult(menuPtr->interp, Tcl_NewStringObj(
+		"No more menu entries can be allocated.", TCL_INDEX_NONE));
+	Tcl_SetErrorCode(menuPtr->interp, "TK", "MENU", "SYSTEM_RESOURCES", (char *)NULL);
 	return TCL_ERROR;
     }
     ScheduleMenuReconfigure(menuPtr);
@@ -1491,6 +1518,38 @@ RecursivelyClearActiveMenu(
     }
 }
 
+/*
+ *----------------------------------------------------------------------
+ *
+ * Tk_WinMenuWrapperChanged --
+ *
+ *	This function is called when the wrapper window of a toplevel has
+ *	been recreated. The menubar is reconfigured, so that its system menu
+ *	is bound to the system menu of the new wrapper. [Bug 220781]
+ *
+ * Results:
+ *	None.
+ *
+ * Side effects:
+ *	None.
+ *
+ *----------------------------------------------------------------------
+ */
+
+void
+Tk_WinMenuWrapperChanged(
+    HMENU hMenu)		/* The menubar of the toplevel. */
+{
+    ThreadSpecificData *tsdPtr = (ThreadSpecificData *)
+	    Tcl_GetThreadData(&dataKey, sizeof(ThreadSpecificData));
+    Tcl_HashEntry *hashEntryPtr =
+	    Tcl_FindHashEntry(&tsdPtr->winMenuTable, hMenu);
+
+    if (hashEntryPtr != NULL) {
+	ScheduleMenuReconfigure((TkMenu *) Tcl_GetHashValue(hashEntryPtr));
+    }
+}
+
 /*
  *----------------------------------------------------------------------
  *
