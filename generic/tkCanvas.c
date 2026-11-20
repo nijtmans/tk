@@ -23,6 +23,13 @@
 #ifdef _WIN32
 #include "tkWinInt.h"
 #endif
+#ifdef TK_USE_WAYLAND
+#include "tkWaylandInt.h"
+#endif
+
+#ifndef AA_PAD
+#define AA_PAD 0
+#endif
 
 /*
  * See tkCanvas.h for key data structures used to implement canvases.
@@ -2266,6 +2273,29 @@ ConfigureCanvas(
     Tk_State old_canvas_state=canvasPtr->canvas_state;
     int width, height, borderWidth, highlightWidth;
     int xScrollIncrement, yScrollIncrement;
+    Tcl_Size i;
+    int redrawItems = (objc == 0);
+
+    /*
+     * Options which do not affect the appearance of the items. If only such
+     * options are given, the items are not redrawn, which can be expensive
+     * for a canvas with many items. [Bug 1954833]
+     */
+
+    static const char *const noRedrawOptions[] = {
+	"-closeenough", "-cursor", "-takefocus", "-xscrollcommand",
+	"-xscrollincrement", "-yscrollcommand", "-yscrollincrement", NULL
+    };
+
+    for (i = 0; i < objc; i += 2) {
+	int index;
+
+	if (Tcl_GetIndexFromObj(NULL, objv[i], noRedrawOptions, "option", 0,
+		&index) != TCL_OK) {
+	    redrawItems = 1;
+	    break;
+	}
+    }
 
     if (Tk_ConfigureWidget(interp, canvasPtr->tkwin, configSpecs,
 	    objc, objv, canvasPtr,
@@ -2400,10 +2430,15 @@ ConfigureCanvas(
 
     CanvasSetOrigin(canvasPtr, canvasPtr->xOrigin, canvasPtr->yOrigin);
     canvasPtr->flags |= UPDATE_SCROLLBARS|REDRAW_BORDERS;
-    Tk_CanvasEventuallyRedraw((Tk_Canvas) canvasPtr,
-	    canvasPtr->xOrigin, canvasPtr->yOrigin,
-	    canvasPtr->xOrigin + Tk_Width(canvasPtr->tkwin),
-	    canvasPtr->yOrigin + Tk_Height(canvasPtr->tkwin));
+    if (redrawItems) {
+	Tk_CanvasEventuallyRedraw((Tk_Canvas) canvasPtr,
+		canvasPtr->xOrigin, canvasPtr->yOrigin,
+		canvasPtr->xOrigin + Tk_Width(canvasPtr->tkwin),
+		canvasPtr->yOrigin + Tk_Height(canvasPtr->tkwin));
+    } else if (!(canvasPtr->flags & REDRAW_PENDING)) {
+	Tcl_DoWhenIdle(DisplayCanvas, canvasPtr);
+	canvasPtr->flags |= REDRAW_PENDING;
+    }
     return TCL_OK;
 }
 
@@ -3123,12 +3158,28 @@ DisplayCanvas(
 	    (screenY2 + 30 - canvasPtr->drawableYOrigin),
 	    Tk_Depth(tkwin));
 #else
+	/* Set up a clipping rectangle for the redraw area. */
 	canvasPtr->drawableXOrigin = canvasPtr->xOrigin;
 	canvasPtr->drawableYOrigin = canvasPtr->yOrigin;
-	pixmap = Tk_WindowId(tkwin);
+	pixmap = Tk_WindowId(tkwin); /* Really it's a window, not a pixmap. */
+	/* Expand the clipping rectangle if we are anti-aliasing. */
+	int clipX = screenX1 - canvasPtr->xOrigin - AA_PAD;
+	int clipY = screenY1 - canvasPtr->yOrigin - AA_PAD; 
+	int clipW = width + 2*AA_PAD;
+	int clipH = height + 2*AA_PAD;
+	if (AA_PAD) {
+	    /* But make sure the clip stays inside the inset rectangle. */
+	    if (clipX < canvasPtr->inset) clipX = canvasPtr->inset;
+	    if (clipY < canvasPtr->inset) clipY = canvasPtr->inset;
+	    if (clipX + clipW > Tk_Width(tkwin) - 2 * canvasPtr->inset) {
+		clipW = Tk_Width(tkwin) - 2 * canvasPtr->inset - clipX;
+	    }
+	    if (clipY + clipH > Tk_Height(tkwin) - 2 * canvasPtr->inset) {
+		clipH = Tk_Height(tkwin) - 2 * canvasPtr->inset - clipY;
+	    }
+	}
 	Tk_ClipDrawableToRect(Tk_Display(tkwin), pixmap,
-		screenX1 - canvasPtr->xOrigin, screenY1 - canvasPtr->yOrigin,
-		width, height);
+	    clipX, clipY, clipW, clipH);
 	/*
 	 * Call ItemDisplay for all window items.  This does not redraw the
 	 * windows, but sets their position within the canvas, which ensures
@@ -3154,13 +3205,17 @@ DisplayCanvas(
 #endif /* TK_NO_DOUBLE_BUFFERING */
 
 	/*
-	 * Clear the area to be redrawn.
+	 * Clear the area to be redrawn.  If items are anti-aliased
+	 * we need to also clear the nearby pixels which were modified
+	 * by the anti-aliasing.  Otherwise, dragging an object in the
+	 * canvas will leave a vapor trail of boundary-colored pixels.
 	 */
-
+	
 	XFillRectangle(Tk_Display(tkwin), pixmap, canvasPtr->pixmapGC,
-		screenX1 - canvasPtr->drawableXOrigin,
-		screenY1 - canvasPtr->drawableYOrigin, (unsigned int) width,
-		(unsigned int) height);
+		screenX1 - canvasPtr->drawableXOrigin - AA_PAD,
+		screenY1 - canvasPtr->drawableYOrigin - AA_PAD,
+	        (unsigned int) width + 2*AA_PAD,
+		(unsigned int) height + 2*AA_PAD);
 
 	/*
 	 * Scan through the item list, redrawing those items that need it. An
@@ -3168,19 +3223,24 @@ DisplayCanvas(
 	 * on-screen area or (b) it intersects the full canvas area and its
 	 * type requests that it be redrawn always (e.g. so subwindows can be
 	 * unmapped when they move off-screen).
+	 *
+	 * If the items are anti-aliased we use a larger bounding box,
+	 * expanded by AA_PAD, which is an upper bound for the thickness of
+	 * the feathering halo.
+	 * 
 	 */
-
+	
 	for (itemPtr = canvasPtr->firstItemPtr; itemPtr != NULL;
 		itemPtr = itemPtr->nextPtr) {
-	    if ((itemPtr->x1 >= screenX2)
-		    || (itemPtr->y1 >= screenY2)
-		    || (itemPtr->x2 < screenX1)
-		    || (itemPtr->y2 < screenY1)) {
+	    if ((itemPtr->x1 - AA_PAD >= screenX2)
+		    || (itemPtr->y1 - AA_PAD >= screenY2)
+		    || (itemPtr->x2 + AA_PAD < screenX1)
+		    || (itemPtr->y2 + AA_PAD < screenY1)) {
 		if (!AlwaysRedraw(itemPtr)
-			|| (itemPtr->x1 >= canvasPtr->redrawX2)
-			|| (itemPtr->y1 >= canvasPtr->redrawY2)
-			|| (itemPtr->x2 < canvasPtr->redrawX1)
-			|| (itemPtr->y2 < canvasPtr->redrawY1)) {
+			|| (itemPtr->x1 - AA_PAD >= canvasPtr->redrawX2)
+			|| (itemPtr->y1 - AA_PAD >= canvasPtr->redrawY2)
+			|| (itemPtr->x2 + AA_PAD < canvasPtr->redrawX1)
+			|| (itemPtr->y2 + AA_PAD < canvasPtr->redrawY1)) {
 		    continue;
 		}
 	    }
